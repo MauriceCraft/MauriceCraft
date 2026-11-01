@@ -321,6 +321,151 @@
     <div class="row">
       <button class="btn" id="play" type="button" disabled>Loading…</button>
       <button class="btn ghost" id="newworld" type="button" disabled>New world</button>
+
+  let dimension = 'overworld'; // overworld, nether, or end
+const portals = []; // { x, y, z, axis, width, height, targetDimension, paired }
+const portalVisuals = [];
+let portalCooldown = 0;
+
+function makePortalMesh(p) {
+  const geometry = new THREE.PlaneGeometry(p.width, p.height);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x5ee7ff,
+    transparent: true,
+    opacity: 0.8,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+
+  mesh.position.set(
+    p.axis === 'x' ? p.x + 0.5 : p.x + p.width / 2,
+    p.y + p.height / 2,
+    p.axis === 'x' ? p.z + 0.5 : p.z + p.width / 2
+  );
+
+  if (p.axis === 'x') {
+    mesh.rotation.y = Math.PI / 2;
+  } else {
+    mesh.rotation.y = 0;
+  }
+
+  scene.add(mesh);
+  portalVisuals.push(mesh);
+  return mesh;
+}
+
+function clearPortalVisuals() {
+  for (const v of portalVisuals) scene.remove(v);
+  for (const v of portalVisuals) {
+    if (v.geometry) v.geometry.dispose();
+    if (v.material) v.material.dispose();
+  }
+  portalVisuals.length = 0;
+}
+
+function buildPortalAt(x, y, z, axis = 'z') {
+  const wx = Math.floor(x), wy = Math.floor(y), wz = Math.floor(z);
+  const portal = {
+    x: wx,
+    y: wy,
+    z: wz,
+    axis,
+    width: 2,
+    height: 4,
+    targetDimension: dimension === 'overworld' ? 'nether' : 'overworld'
+  };
+
+  // frame of obsidian
+  const ox = portal.x, oy = portal.y, oz = portal.z;
+  for (let i = 0; i < 2; i++) {
+    const px = ox + (axis === 'x' ? i * 2 : 0);
+    const pz = oz + (axis === 'z' ? i * 2 : 0);
+    for (let h = 0; h < portal.height; h++) {
+      if (axis === 'x') {
+        setBlock(px, oy + h, oz, OBSIDIAN);
+        setBlock(px, oy + h, oz + 1, OBSIDIAN);
+      } else {
+        setBlock(ox, oy + h, pz, OBSIDIAN);
+        setBlock(ox + 1, oy + h, pz, OBSIDIAN);
+      }
+    }
+    for (let w = 0; w < 2; w++) {
+      if (axis === 'x') {
+        setBlock(ox + w, oy, oz, OBSIDIAN);
+        setBlock(ox + w, oy + portal.height - 1, oz, OBSIDIAN);
+      } else {
+        setBlock(ox, oy, oz + w, OBSIDIAN);
+        setBlock(ox + 1, oy + portal.height - 1, oz + w, OBSIDIAN);
+      }
+    }
+  }
+
+  // keep the interior empty and track it
+  portals.push(portal);
+  makePortalMesh(portal);
+  showHint('Portal built! Step through to the Nether!', 1800);
+  return portal;
+}
+
+function findPortalAtPlayer() {
+  for (const p of portals) {
+    const px = p.x + 0.5;
+    const pz = p.z + 0.5;
+    const dx = player.x - px;
+    const dz = player.z - pz;
+    const dy = player.y - (p.y + 1.5);
+
+    if (p.axis === 'x') {
+      if (Math.abs(dz) < 1.1 && Math.abs(dx) < 0.8 && dy > 0 && dy < p.height - 0.5) return p;
+    } else {
+      if (Math.abs(dx) < 1.1 && Math.abs(dz) < 0.8 && dy > 0 && dy < p.height - 0.5) return p;
+    }
+  }
+  return null;
+}
+
+function travelToDimension(targetDimension) {
+  const oldDimension = dimension;
+  dimension = targetDimension;
+
+  // Clear world chunks so they regenerate in the correct dimension
+  chunks.clear();
+  resetChunkCache();
+  clearPortalVisuals();
+
+  if (targetDimension === 'nether') {
+    player.x = 18 + Math.random() * 12;
+    player.y = 18;
+    player.z = 18 + Math.random() * 12;
+    showHint('You entered the Nether!', 1800);
+  } else {
+    player.x = 0 + Math.random() * 10;
+    player.y = 18;
+    player.z = 0 + Math.random() * 10;
+    showHint('You returned to the Overworld.', 1800);
+  }
+
+  // re-create any surviving portal visuals
+  for (const p of portals) {
+    if (p.targetDimension === targetDimension || oldDimension === targetDimension) {
+      makePortalMesh(p);
+    }
+  }
+}
+
+function checkPortals(dt) {
+  if (portalCooldown > 0) portalCooldown -= dt;
+
+  const p = findPortalAtPlayer();
+  if (!p || portalCooldown > 0) return;
+
+  portalCooldown = 1.1;
+  const target = p.targetDimension === 'nether' ? 'nether' : 'overworld';
+  travelToDimension(target);
+}
+        checkPortals(dt);
+        
     </div>
   </div>
 </div>
@@ -329,6 +474,35 @@
 <script>
 (function () {
   'use strict';
+
+  if (cmd.startsWith('/portal')) {
+  const parts = cmd.trim().split(/\s+/);
+  if (parts[1] === 'build') {
+    const px = Math.floor(player.x);
+    const py = Math.floor(player.y);
+    const pz = Math.floor(player.z);
+    buildPortalAt(px, py, pz, 'z');
+    return true;
+  }
+}
+
+if (cmd.startsWith('/dimension')) {
+  const parts = cmd.trim().split(/\s+/);
+  const target = parts[1];
+  if (target === 'nether') {
+    travelToDimension('nether');
+    return true;
+  }
+  if (target === 'overworld') {
+    travelToDimension('overworld');
+    return true;
+  }
+  if (target === 'end') {
+    dimension = 'end';
+    showHint('The End is unstable and dangerous...', 1800);
+    return true;
+  }
+}
 
   /* ---------- World constants ---------- */
   const H = 48, CS = 16, SEA = 14, R = 5;   // R = view distance in chunks
