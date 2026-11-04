@@ -31,4 +31,6 @@ Saves live **only in your current browser** in IndexedDB. They are not stored in
 - `npm run preview`: serve the production build
 - `npm test`: run the automated tests (added in the testing pass)
 
+New here? Start with [**Build your game: first steps**](docs/START_HERE.md), [**copy-and-edit agent prompts**](docs/AGENT_PROMPTS.md), and [**coding-agent rules**](AGENTS.md).
+
 See [architecture](docs/ARCHITECTURE.md), [development guide](docs/DEVELOPMENT.md), [deployment](docs/DEPLOYMENT.md), and [contributing](CONTRIBUTING.md).

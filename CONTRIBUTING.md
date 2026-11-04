@@ -18,3 +18,5 @@ Thanks for improving MauriceCraft! Make changes in small, focused commits so it'
 - Prefer existing packages over maintaining duplicate implementations, but avoid unnecessary UI frameworks and large runtime dependencies.
 - Make commits with a clear purpose; do not combine unrelated formatting with gameplay changes.
 - Do not introduce a new error suppression, broad `any`, or test deletion merely to make checks pass.
+
+For a beginner-friendly walkthrough, see [Start here](docs/START_HERE.md) and [Agent prompts](docs/AGENT_PROMPTS.md). Coding agents should read [AGENTS.md](AGENTS.md) first.

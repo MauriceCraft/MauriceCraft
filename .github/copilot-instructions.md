@@ -1,3 +1,5 @@
+Read [AGENTS.md](../AGENTS.md) first. This game belongs to a young creator. Explain changes in short, accessible language and use the reusable skills under `.github/skills/` whenever they apply.
+
 # MauriceCraft coding-agent rules
 
 Read `README.md`, `CONTRIBUTING.md`, `docs/ARCHITECTURE.md`, and `docs/DEVELOPMENT.md` before changing game behavior.
