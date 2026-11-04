@@ -17,7 +17,8 @@
     "check:full": "npm run check && npm run test:e2e"
   },
   "dependencies": {
-    "three": "0.128.0"
+    "three": "0.128.0",
+    "dexie": "4.4.7"
   },
   "devDependencies": {
     "@types/three": "0.128.0",
@@ -27,6 +28,7 @@
     "@vitest/coverage-v8": "5.1.0",
     "eslint": "9.39.1",
     "typescript-eslint": "8.46.3",
-    "@playwright/test": "1.56.1"
+    "@playwright/test": "1.56.1",
+    "fake-indexeddb": "6.2.4"
   }
 }
