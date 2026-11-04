@@ -95,7 +95,7 @@ export function createAudioEngine(
     g.gain.setValueAtTime(o.vol || 0.2, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
     src.start(t0, Math.random() * 0.4); src.stop(t0 + d + 0.05);
   }
-  function matOf(b?: number): string {
+  function matOf(b: number): string {
     if (b === 3 || b === 8 || b === 9 || b === 10 || b === 11 || b === 14 || b === 15 || b === 16 || (b >= 27 && b <= 33)) return 'stone';
     if (b === 5 || b === 7 || b === 17 || b === 18) return 'wood';
     if (b === 6) return 'leaf';
@@ -107,7 +107,7 @@ export function createAudioEngine(
     v = (v === undefined) ? 1 : v;
     if (v < 0.03) return;
     pan = pan || 0;
-    const m = matOf(arg);
+    const m = matOf(arg ?? -1);
     switch (name) {
       case 'break':
         if (m === 'stone') { hiss({ d: 0.2, vol: 0.35 * v, type: 'bandpass', f: 1400, f2: 400, q: 1, pan: pan }); tone({ f: 95, f2: 55, d: 0.12, type: 'square', vol: 0.1 * v, pan: pan }); }
