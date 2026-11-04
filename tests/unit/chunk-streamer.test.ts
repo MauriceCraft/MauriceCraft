@@ -56,7 +56,7 @@ describe('chunk streaming regression', () => {
     expect(safe.disposed).toBe(true);
     expect(stream.counts().resets).toBe(1);
   });
-  it('streams from the player's new position after movement', () => {
+  it("streams from the player's new position after movement", () => {
     const stream = harness();
     stream.tick();
     stream.player.x = 16 * 11 + 0.5;
