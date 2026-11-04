@@ -10,6 +10,7 @@ import { blockKind } from './world/block-kind';
 import { createBlockCatalog } from './world/block-catalog';
 import { cropGrid, samePattern } from './crafting/grid';
 import { coord } from './commands/coordinates';
+import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { restorePortals, snapshotPortals } from './portals/persistence';
 import { makeAtlas } from './rendering/texture-atlas';
@@ -2805,23 +2806,7 @@ import { createAudioEngine } from './audio/sound-engine';
     const c = { name: names[0], usage: usage, desc: desc, fn: fn, choices: choices };
     names.forEach(function (n) { CMDS[n] = c; });
   }
-  const slug = function (t) { return String(t).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); };
-  let itemKeys = null;
-  function itemMap() { if (!itemKeys) { itemKeys = {}; Object.keys(NAMES).forEach(function (k) { itemKeys[slug(NAMES[k])] = +k; }); } return itemKeys; }
-  // Find an item or block by name: "iron_ingot", "ironingot" and "iron" all work when unambiguous
-  function findItem(name, blocksOnly) {
-    const map = itemMap(), q = slug(name).replace(/_/g, '');
-    const keys = Object.keys(map).filter(function (k) { return !blocksOnly || (map[k] < 100 && map[k] !== BED); });
-    const flat = function (k) { return k.replace(/_/g, ''); };
-    const exact = keys.filter(function (k) { return flat(k) === q; });
-    if (exact.length) return map[exact[0]];
-    const pre = keys.filter(function (k) { return flat(k).indexOf(q) === 0; });
-    if (pre.length === 1) return map[pre[0]];
-    const has = keys.filter(function (k) { return flat(k).indexOf(q) >= 0; });
-    if (has.length === 1) return map[has[0]];
-    const cand = pre.length ? pre : has;
-    throw new Error('Unknown ' + (blocksOnly ? 'block' : 'item') + ' "' + name + '"' + (cand.length ? '. Did you mean: ' + cand.slice(0, 6).join(', ') + '?' : ''));
-  }
+  const { slug, itemMap, findItem } = createItemResolver(NAMES, BED);
   function spawnSpot() {
     const x = player.x - Math.sin(player.yaw) * 3, z = player.z - Math.cos(player.yaw) * 3;
     getOrGen(Math.floor(x) >> 4, Math.floor(z) >> 4);
