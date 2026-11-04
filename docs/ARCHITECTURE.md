@@ -64,3 +64,7 @@ flowchart TD
 ### Mob models
 
 `src/game/entities/mob-models.ts` owns the shared Three.js geometry/material factories and each mob's 3D shape. It does **not** own mob AI, spawning, combat, world state, or the render loop. That separation lets tests instantiate models without launching the game; future mob-behavior extraction can happen independently.
+
+### Item and block identities
+
+`src/game/world/block-catalog.ts` is the single source for historically assigned item IDs, mining timings, texture tile numbers and tool tiers. These IDs are embedded in saved-world data. When adding a block, choose a new ID and add a regression test; never reorder or reuse an existing ID.
