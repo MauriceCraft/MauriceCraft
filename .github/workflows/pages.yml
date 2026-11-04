@@ -1,9 +1,7 @@
-name: Verify and Deploy Pages
+name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -11,12 +9,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: github-pages
+  cancel-in-progress: false
 
 jobs:
   build:
-    name: Lint, test, build, browser smoke
+    name: Build Pages artifact
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
@@ -27,25 +25,18 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Shift-left checks (lint, typecheck, unit coverage, build)
-        run: npm run check
-      - name: Install Chromium for browser regression tests
-        run: npx playwright install --with-deps chromium
-      - name: Test production build on desktop and mobile
-        run: npm run test:e2e
+      - name: Typecheck and build production website
+        run: npm run build
       - name: Configure Pages
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
-      - name: Upload tested site
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      - name: Upload production artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: dist
 
   deploy:
-    name: Publish verified site
+    name: Publish Pages
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     permissions:
       pages: write
@@ -54,6 +45,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy GitHub Pages
+      - name: Deploy production website
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

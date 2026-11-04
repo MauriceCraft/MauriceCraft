@@ -18,7 +18,7 @@ Run the relevant unit tests, then the entire test suite and production build. Te
 
 ## Shift-left quality gates
 
-Use `npm run check` on every meaningful code change to enforce lint, typecheck, unit coverage and a production build. After `npx playwright install chromium`, run `npm run check:full` for the full production-browser suite. GitHub Actions runs all checks before uploading any release artifact, and runs the same checks for pull requests without deploying them.
+Use `npm run check` on every meaningful code change to enforce lint, typecheck, unit coverage and a production build. After `npx playwright install chromium`, run `npm run check:full` for the full production-browser suite. The separate **CI** workflow runs lint, TypeScript, coverage, build and browser checks on pushes and pull requests. **Deploy GitHub Pages** is independent: it installs dependencies, typechecks, builds and publishes the site from main without waiting for unit or browser tests. A TypeScript/build failure still prevents deployment.
 
 ```mermaid
 flowchart LR

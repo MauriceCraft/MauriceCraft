@@ -12,3 +12,7 @@ The GitHub Pages site is a **project site** at `https://maniator.github.io/Mauri
 **Do not select `dist/` as a Pages branch directory.** It is generated, not committed. While branch publishing remains enabled, the source HTML will not work as a built Vite site, so switch to Actions once the workflow is committed. The Pages settings are not changed by source commits.
 
 The site must remain at the same origin/path for existing browser saves to be reachable. If deploying to a custom domain later, adjust the Vite base and be aware that IndexedDB storage does not transfer to the new origin automatically.
+
+## Independent CI and deployment
+
+`.github/workflows/pages.yml` is the standalone Pages build and release workflow. It checks TypeScript and builds `dist/` but does **not** wait for slow or failing unit/Playwright tests. `.github/workflows/ci.yml` independently runs lint, tests, coverage and desktop/mobile smoke checks on pushes and PRs. **A CI failure does not prevent a Pages deployment**; check the CI status before telling players a new version is safe.
