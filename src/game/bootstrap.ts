@@ -8,7 +8,7 @@ import { createChunkStreamer } from './world/chunk-streamer';
 import { mulberry32, hash2, fbm, smooth } from './world/noise';
 import { blockKind } from './world/block-kind';
 import { createBlockCatalog } from './world/block-catalog';
-import { cropGrid, samePattern } from './crafting/grid';
+import { createRecipeMatcher } from './crafting/recipes';
 import { coord } from './commands/coordinates';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
@@ -1759,29 +1759,7 @@ import { createAudioEngine } from './audio/sound-engine';
   const craftMsg = document.getElementById('craftMsg'), cgrid = document.getElementById('cgrid'), cres = document.getElementById('cres');
   const craftBtn = document.getElementById('craftBtn'), craftItems = document.getElementById('craftItems'), craftBook = document.getElementById('craftBook');
   const craftState = { size: 2, grid: [0, 0, 0, 0, 0, 0, 0, 0, 0], sel: 0 };
-  const recipePattern = r => r.shape.map(function (row) { return row.split('').map(function (ch) { return ch === '.' ? 0 : r.key[ch]; }); });
-  function recipeCounts(r) {
-    const c = {};
-    if (r.shapeless) r.shapeless.forEach(function (id) { c[id] = (c[id] || 0) + 1; });
-    else recipePattern(r).forEach(function (row) { row.forEach(function (id) { if (id) c[id] = (c[id] || 0) + 1; }); });
-    return c;
-  }
-  function matchRecipe(grid, size) {
-    const crop = cropGrid(grid, size);
-    if (!crop) return null;
-    const flat = [];
-    crop.forEach(function (row) { row.forEach(function (v) { if (v) flat.push(v); }); });
-    const key = flat.slice().sort(function (a, b) { return a - b; }).join(',');
-    for (let i = 0; i < RECIPES.length; i++) {
-      const r = RECIPES[i];
-      if (r.shapeless) { if (r.shapeless.slice().sort(function (a, b) { return a - b; }).join(',') === key) return r; }
-      else {
-        const pat = recipePattern(r);
-        if (samePattern(crop, pat) || samePattern(crop, pat.map(function (row) { return row.slice().reverse(); }))) return r;
-      }
-    }
-    return null;
-  }
+  const { recipePattern, recipeCounts, matchRecipe } = createRecipeMatcher(RECIPES);
   function gridCounts(size) {
     const c = {};
     for (let i = 0; i < size * size; i++) { const v = craftState.grid[i]; if (v) c[v] = (c[v] || 0) + 1; }
