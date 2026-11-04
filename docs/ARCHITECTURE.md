@@ -26,3 +26,30 @@ src/
 Existing users have saved worlds in the `blockcraft-worlds` IndexedDB database with `worlds` and `chunks` stores. Do not rename, reset, or silently migrate these. Any future schema change must include a tested upgrade path. Seeded noise and block IDs are also part of persisted world behavior.
 
 `bootstrap.ts` currently has `// @ts-nocheck` because the legacy script is large and uses shared mutable state; new and extracted modules must be strictly typed. Removing that exception is a follow-up effort, not a pretext for rewriting working gameplay in one pass.
+
+## Module boundaries
+
+```mermaid
+flowchart TD
+    Entry["src/main.ts (entry point)"] --> Bootstrap["game/bootstrap.ts (temporary legacy adapter)"]
+    Entry --> CSS["styles/global.css"]
+    Bootstrap --> World["world: deterministic terrain + block rules"]
+    Bootstrap --> Portals["portals: frame detection + travel geometry"]
+    Bootstrap --> Crafting["crafting: pattern matching"]
+    Bootstrap --> Commands["commands: coordinate parser"]
+    Bootstrap --> Browser["Browser adapters: WebGL, input, audio, IndexedDB"]
+    Portals --> PortalPersistence["portals/persistence.ts: backwards-compatible metadata"]
+```
+
+## Portal lighting and travel
+
+```mermaid
+flowchart TD
+    Trigger{"Flint & steel or final obsidian placement"} --> Scan["Find complete upright obsidian frame"]
+    Scan --> Valid{"Minimum 4x5, clear interior?"}
+    Valid -- No --> Unlit["Leave frame unlit"]
+    Valid -- Yes --> Register["Register portal with axis + dimensions"]
+    Register --> Show["Display purple portal and save metadata"]
+    Show --> EntryCheck["Player enters portal plane"]
+    EntryCheck --> Travel["Change dimension / find or create partner portal"]
+```

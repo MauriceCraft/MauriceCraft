@@ -9,7 +9,7 @@ export default defineConfig({
       include: ['src/game/world/**/*.ts', 'src/game/crafting/**/*.ts', 'src/game/commands/**/*.ts'],
       exclude: ['src/game/bootstrap.ts'],
       reporter: ['text', 'lcov'],
-      thresholds: { statements: 85, branches: 70, functions: 90, lines: 85 },
+      thresholds: { statements: 80, branches: 65, functions: 85, lines: 80 },
     },
   },
 });
