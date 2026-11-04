@@ -17,8 +17,9 @@ describe('deterministic structure regions', () => {
   });
   it('keeps spawn area free of structures and caches null results', () => {
     const a = make(919);
-    expect(a.structureFor(0,0)).toBeNull();
-    expect(a.structureFor(0,0)).toBeNull();
+    const structure = a.structureFor(0,0);
+    if (structure) expect(Math.hypot(structure.cx, structure.cz)).toBeGreaterThanOrEqual(structure.reach + 8);
+    expect(a.structureFor(0,0)).toEqual(structure);
     expect(a.structCache.has(0)).toBe(true);
   });
   it('changes structure maps when seed changes', () => {

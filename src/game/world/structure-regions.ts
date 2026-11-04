@@ -27,7 +27,7 @@ export function createStructureRegions(deps: StructureRegionDependencies) {
   const STRUCT_NAMES: Record<StructureType, string> = { village: 'Village', temple: 'Desert temple', tower: 'Ruined tower', dungeon: 'Old dungeon', cabin: 'Cabin', circle: 'Stone circle' };
   function structureFor(rx: number, rz: number): GeneratedStructure | null {
     const k = ckey(rx, rz);
-    if (structCache.has(k)) return structCache.get(k);
+    if (structCache.has(k)) return structCache.get(k) ?? null;
     const st = makeStructure(rx, rz);
     structCache.set(k, st);
     return st;
