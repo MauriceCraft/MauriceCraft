@@ -11,6 +11,7 @@ src/
     bootstrap.ts                  current gameplay loop and browser integration
     world/{noise,chunk-key,block-kind}.ts  deterministic world rules
     crafting/grid.ts              pure crafting pattern helpers
+    entities/mob-models.ts         typed Three.js mob geometry factories
     commands/coordinates.ts       command coordinate parsing
 ```
 
@@ -36,6 +37,7 @@ flowchart TD
     Bootstrap --> World["world: deterministic terrain + block rules"]
     Bootstrap --> Portals["portals: frame detection + travel geometry"]
     Bootstrap --> Crafting["crafting: pattern matching"]
+    Bootstrap --> MobModels["entities/mob-models.ts: reusable 3D models"]
     Bootstrap --> Commands["commands: coordinate parser"]
     Bootstrap --> Browser["Browser adapters: WebGL, input, audio"]
     Bootstrap --> Storage["storage/world-storage.ts: typed Dexie + bounded metadata cache"]
@@ -54,3 +56,7 @@ flowchart TD
     Show --> EntryCheck["Player enters portal plane"]
     EntryCheck --> Travel["Change dimension / find or create partner portal"]
 ```
+
+### Mob models
+
+`src/game/entities/mob-models.ts` owns the shared Three.js geometry/material factories and each mob's 3D shape. It does **not** own mob AI, spawning, combat, world state, or the render loop. That separation lets tests instantiate models without launching the game; future mob-behavior extraction can happen independently.
