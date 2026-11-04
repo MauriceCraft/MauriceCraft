@@ -58,5 +58,36 @@ test('the in-game portal command builds a frame without exceptions', async ({ pa
   await input.fill('/portal build');
   await input.press('Enter');
   await expect(page.locator('#chatlog')).toContainText('Built an obsidian Nether portal frame');
+
+  // Validate the actual IndexedDB metadata, not just a success message.
+  await expect.poll(async () => page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('blockcraft-worlds');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const worlds = await new Promise<unknown[]>((resolve, reject) => {
+        const request = db.transaction('worlds', 'readonly').objectStore('worlds').getAll();
+        request.onsuccess = () => resolve(request.result as unknown[]);
+        request.onerror = () => reject(request.error);
+      });
+      return worlds.some(world => {
+        if (!world || typeof world !== 'object') return false;
+        const portals = (world as { portals?: unknown }).portals;
+        return Array.isArray(portals) && portals.some((entry: unknown) => {
+          if (!entry || typeof entry !== 'object') return false;
+          const portal = entry as { dimension?: unknown; axis?: unknown };
+          return portal.dimension === 'overworld' && portal.axis === 'x';
+        });
+      });
+    } finally {
+      db.close();
+    }
+  }), { timeout: 15_000 }).toBe(true);
+
+  // A reload must still be able to open the old database and the saved world.
+  await page.reload();
+  await expect(page.locator('#play')).toBeEnabled({ timeout: 15_000 });
   expect(errors).toEqual([]);
 });
