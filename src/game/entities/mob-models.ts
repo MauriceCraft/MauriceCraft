@@ -150,7 +150,7 @@ const JOBLOOK = {
 };
 function makeVillager(o: { job?: keyof typeof JOBLOOK } = {}): THREE.Group {
   const g = new THREE.Group(); g.userData.legs = [];
-  const L = JOBLOOK[o.job] || JOBLOOK.farmer;
+  const L = JOBLOOK[o.job ?? 'farmer'];
   leg(g, 0.28, 0.75, 0x4a3a2a, -0.15, 0.75, 0); leg(g, 0.28, 0.75, 0x4a3a2a, 0.15, 0.75, 0);
   part(g, 0.62, 0.8, 0.4, L.robe, 0, 1.15, 0); part(g, 0.66, 0.5, 0.05, L.apron, 0, 1.0, 0.22);
   part(g, 0.5, 0.5, 0.5, 0xc9a07a, 0, 1.75, 0); part(g, 0.14, 0.24, 0.16, 0xb98a68, 0, 1.68, 0.3);
