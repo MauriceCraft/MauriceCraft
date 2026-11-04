@@ -857,7 +857,7 @@ import { createAudioEngine } from './audio/sound-engine';
   }
 
   /* ---------- Sound ---------- */
-  const { Snd, saveSound, applySound, audioInit, sfx, sfxAt, updateMusic } =
+  const { Snd, saveSound, applySound, audioInit, sfx, sfxAt, updateMusic, tone, hiss } =
     createAudioEngine(() => player, () => isNight);
 
   /* ---------- Mobs: hostile monsters, villagers and farm animals ---------- */

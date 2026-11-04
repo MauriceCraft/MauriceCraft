@@ -13,6 +13,8 @@ describe('game audio', () => {
     const audio = createAudioEngine(() => ({ x: 0, y: 0, z: 0, yaw: 0 }), () => true);
     expect(() => audio.sfx('break', 1, 0, 36)).not.toThrow();
     expect(() => audio.sfxAt('place', 0, 0, 0, 3)).not.toThrow();
+    expect(() => audio.tone({ f: 180 })).not.toThrow();
+    expect(() => audio.hiss({ d: 0.1 })).not.toThrow();
     expect(() => audio.updateMusic(0.5)).not.toThrow();
     expect(() => audio.applySound()).not.toThrow();
     expect(() => audio.saveSound()).not.toThrow();

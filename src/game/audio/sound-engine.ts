@@ -178,5 +178,5 @@ export function createAudioEngine(
       tone({ f: sc[i], d: night ? 2.4 : 1.7, type: 'triangle', vol: 0.12, attack: 0.04, delay: k * (night ? 0.95 : 0.55), lp: 2200, music: true });
     }
   }
-  return { Snd, saveSound, applySound, audioInit, sfx, sfxAt, updateMusic };
+  return { Snd, saveSound, applySound, audioInit, sfx, sfxAt, updateMusic, tone, hiss };
 }
