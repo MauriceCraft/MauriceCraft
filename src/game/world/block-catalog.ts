@@ -46,7 +46,7 @@ export function createBlockCatalog() {
       NAMES[id] = tn + ' ' + k[0].toUpperCase() + k.slice(1); ITEM_TILE[id] = toolTile(ti, ki);
     });
   });
-  ALL_BLOCKS.push.apply(ALL_BLOCKS, TOOL_IDS);
+  ALL_BLOCKS.push(...TOOL_IDS);
   EGG_KINDS[129] = 'pillager'; EGG_KINDS[142] = 'vindicator'; EGG_KINDS[153] = 'irongolem'; EGG_KINDS[154] = 'coppergolem'; EGG_KINDS[155] = 'diamondgolem';
   NAMES[129] = 'Pillager Spawn Egg'; NAMES[142] = 'Vindicator Spawn Egg'; NAMES[153] = 'Iron Golem Spawn Egg'; NAMES[154] = 'Copper Golem Spawn Egg'; NAMES[155] = 'Diamond Golem Spawn Egg';
   ITEM_TILE[129] = 64; ITEM_TILE[142] = 65; ITEM_TILE[153] = 89; ITEM_TILE[154] = 90; ITEM_TILE[155] = 91;
