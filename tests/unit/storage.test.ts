@@ -1,70 +1,79 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
-import Dexie from 'dexie';
-import { WorldStore, type ChunkRecord, type WorldRecord } from '../../src/game/storage/world-store';
+import { openWorldStorage, type ChunkRecord, type WorldRecord, type WorldStorage } from '../../src/game/storage/world-storage';
 
-const dbNames: string[] = [];
-function makeStore(): { db: WorldStore; name: string } {
-  const name = `mauricecraft-test-${dbNames.length}`;
-  dbNames.push(name);
-  return { db: new WorldStore(name), name };
-}
-const world: WorldRecord = { id: 'w-one', name: 'My World', seed: 125, mode: 'creative' };
-const chunk: ChunkRecord = { k: 'w-one:0,0', w: 'w-one', cx: 0, cz: 0, data: new Uint8Array([1, 2, 36]) };
-
-afterEach(async () => {
-  await Promise.all(dbNames.splice(0).map(name => Dexie.delete(name)));
+let current: WorldStorage | undefined;
+const name = (): string => 'mauricecraft-test-' + crypto.randomUUID();
+const world = (id = 'w1'): WorldRecord => ({
+  id, name: 'Practice world', seed: 1234, created: 1, lastPlayed: 2,
+  portals: [{ dimension: 'nether', axis: 'z', x: 6, y: 10, z: 4 }],
+});
+const chunk = (w = 'w1', cx = 2, cz = 3): ChunkRecord => ({
+  k: `${w}:${cx},${cz}`, w, cx, cz, data: Uint8Array.from([0, 36, 0, 7]),
 });
 
-describe('world persistence with Dexie', () => {
-  it('opens the existing native IndexedDB v1 schema without resetting records', async () => {
-    const { db, name } = makeStore();
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open(name, 1);
-      request.onupgradeneeded = () => {
-        request.result.createObjectStore('worlds', { keyPath: 'id' });
-        request.result.createObjectStore('chunks', { keyPath: 'k' });
+afterEach(async () => {
+  if (!current) return;
+  const db = current;
+  current = undefined;
+  await db.delete();
+});
+
+describe('Dexie storage and cache', () => {
+  it('round-trips metadata and typed chunk buffers in one transaction', async () => {
+    current = await openWorldStorage(name());
+    await current.saveWorld(world(), [chunk()]);
+    expect(await current.listWorlds()).toMatchObject([{ id: 'w1', seed: 1234 }]);
+    expect((await current.getChunks('w1'))[0].data).toEqual(chunk().data);
+    expect(await current.getWorld('w1')).toEqual(world());
+  });
+
+  it('does not allow callers to mutate cached metadata', async () => {
+    current = await openWorldStorage(name());
+    await current.saveWorld(world(), []);
+    const first = await current.getWorld('w1');
+    if (!first) throw new Error('World missing');
+    first.name = 'Not saved';
+    expect((await current.getWorld('w1'))?.name).toBe('Practice world');
+    await current.saveWorld({ ...world(), name: 'Updated' }, []);
+    expect((await current.getWorld('w1'))?.name).toBe('Updated');
+  });
+
+  it('removes only the chosen world and its chunks', async () => {
+    current = await openWorldStorage(name());
+    await current.saveWorld(world('w1'), [chunk('w1')]);
+    await current.saveWorld(world('w2'), [chunk('w2')]);
+    await current.deleteWorld('w1');
+    expect(await current.getWorld('w1')).toBeUndefined();
+    expect(await current.getChunks('w1')).toEqual([]);
+    expect((await current.getChunks('w2')).length).toBe(1);
+  });
+});
+
+describe('existing browser saves', () => {
+  it('opens the old raw IndexedDB v1 schema and keeps its world and chunks', async () => {
+    const dbName = name();
+    const raw = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open(dbName, 1);
+      req.onupgradeneeded = () => {
+        req.result.createObjectStore('worlds', { keyPath: 'id' });
+        req.result.createObjectStore('chunks', { keyPath: 'k' });
       };
-      request.onsuccess = () => {
-        const raw = request.result;
-        const tx = raw.transaction(['worlds', 'chunks'], 'readwrite');
-        tx.objectStore('worlds').put(world);
-        tx.objectStore('chunks').put(chunk);
-        tx.oncomplete = () => { raw.close(); resolve(); };
-        tx.onerror = () => reject(tx.error);
-      };
-      request.onerror = () => reject(request.error);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
     });
-    await db.open();
-    expect((await db.getWorld('w-one'))?.seed).toBe(125);
-    expect(await db.getChunks('w-one')).toEqual([chunk]);
-    db.close();
-  });
+    await new Promise<void>((resolve, reject) => {
+      const tx = raw.transaction(['worlds', 'chunks'], 'readwrite');
+      tx.objectStore('worlds').put(world());
+      tx.objectStore('chunks').put(chunk());
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    raw.close();
 
-  it('writes chunks atomically and loads each world separately', async () => {
-    const { db } = makeStore();
-    await db.open();
-    await db.saveWorld(world, [chunk]);
-    await db.saveWorld({ id: 'w-two', name: 'Other', seed: 444 }, [
-      { k: 'w-two:0,0', w: 'w-two', cx: 0, cz: 0, data: [9] },
-    ]);
-    expect((await db.getChunks('w-one'))[0].data).toEqual(chunk.data);
-    expect(await db.getChunks('w-two')).toHaveLength(1);
-    expect(await db.listWorlds()).toHaveLength(2);
-    db.close();
-  });
-
-  it('invalidates the metadata cache on save and delete', async () => {
-    const { db } = makeStore();
-    await db.open();
-    expect(await db.listWorlds()).toEqual([]);
-    await db.saveWorld(world, [chunk]);
-    expect((await db.listWorlds()).map(item => item.name)).toEqual(['My World']);
-    await db.saveWorld({ ...world, name: 'Renamed' }, []);
-    expect((await db.listWorlds()).map(item => item.name)).toEqual(['Renamed']);
-    await db.deleteWorld('w-one');
-    expect(await db.listWorlds()).toEqual([]);
-    expect(await db.getChunks('w-one')).toEqual([]);
-    db.close();
+    current = await openWorldStorage(dbName);
+    expect((await current.getWorld('w1'))?.seed).toBe(1234);
+    expect((await current.getChunks('w1'))[0].data).toEqual(chunk().data);
+    expect(current.verno).toBe(1);
   });
 });
