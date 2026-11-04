@@ -33,4 +33,6 @@ Saves live **only in your current browser** in IndexedDB. They are not stored in
 
 New here? Start with [**Build your game: first steps**](docs/START_HERE.md), [**copy-and-edit agent prompts**](docs/AGENT_PROMPTS.md), and [**coding-agent rules**](AGENTS.md).
 
+For help making a Nether portal, see [the Nether portal guide](docs/PORTALS.md).
+
 See [architecture](docs/ARCHITECTURE.md), [development guide](docs/DEVELOPMENT.md), [deployment](docs/DEPLOYMENT.md), and [contributing](CONTRIBUTING.md).
