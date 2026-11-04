@@ -2,6 +2,11 @@
 // This legacy gameplay loop is being migrated to typed, focused modules.
 // Keep IndexedDB store names/keys and world serialization compatible.
 import * as THREE from 'three';
+import { ckey } from './world/chunk-key';
+import { mulberry32, hash2, fbm } from './world/noise';
+import { blockKind } from './world/block-kind';
+import { cropGrid, samePattern } from './crafting/grid';
+import { coord } from './commands/coordinates';
 
 (function () {
   'use strict';
@@ -10,7 +15,6 @@ import * as THREE from 'three';
   const H = 48, CS = 16, SEA = 14, R = 5;   // R = view distance in chunks
   const chunks = new Map();
   let _ck = null, _cc = null;
-  function ckey(cx, cz) { return ((cx & 0xffff) << 16) | (cz & 0xffff); }
   function chunkAt(cx, cz) { const k = ckey(cx, cz); if (k === _ck) return _cc; _ck = k; _cc = chunks.get(k) || null; return _cc; }
   function resetChunkCache() { _ck = null; _cc = null; }
   // Unloaded space counts as solid, so nothing can walk into it
@@ -88,41 +92,6 @@ import * as THREE from 'three';
   const TOOL_DMG = { sword: [6, 8, 12, 9, 14], axe: [5, 7, 10, 8, 12], pickaxe: [4, 6, 8, 6, 9], shovel: [4, 5, 7, 5, 8] };
   // blocks that only drop with a pickaxe of at least this level
   const NEEDS_PICK = { 3: 0, 8: 0, 9: 0, 10: 0, 11: 0, 15: 0, 14: 1, 27: 0, 28: 1, 29: 1, 30: 2, 31: 1, 32: 1, 33: 2 };
-  function blockKind(b) {
-    if (b === 3 || b === 8 || b === 9 || b === 10 || b === 11 || b === 14 || b === 15 || (b >= 27 && b <= 33)) return 'pickaxe';
-    if (b === 5 || b === 6 || b === 7 || b === 13 || b === 18) return 'axe';
-    if (b === 1 || b === 2 || b === 4 || b === 12) return 'shovel';
-    return null;
-  }
-
-  /* ---------- Noise ---------- */
-  function mulberry32(a) {
-    return function () {
-      a |= 0; a = a + 0x6D2B79F5 | 0;
-      let t = Math.imul(a ^ a >>> 15, 1 | a);
-      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-  }
-  function hash2(x, y, s) {
-    let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(s, 982451653)) | 0;
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  }
-  const smooth = t => t * t * (3 - 2 * t);
-  function vnoise(x, y, s) {
-    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
-    const a = hash2(xi, yi, s), b = hash2(xi + 1, yi, s), c = hash2(xi, yi + 1, s), d = hash2(xi + 1, yi + 1, s);
-    const u = smooth(xf), v = smooth(yf);
-    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
-  }
-  function fbm(x, y, s) {
-    let sum = 0, amp = 1, f = 1, norm = 0;
-    for (let i = 0; i < 4; i++) { sum += vnoise(x * f, y * f, s + i) * amp; norm += amp; amp *= 0.5; f *= 2; }
-    return sum / norm;
-  }
-
   /* ---------- Texture atlas ---------- */
   function makeAtlas() {
     const c = document.createElement('canvas');
@@ -2379,19 +2348,6 @@ import * as THREE from 'three';
     else recipePattern(r).forEach(function (row) { row.forEach(function (id) { if (id) c[id] = (c[id] || 0) + 1; }); });
     return c;
   }
-  function cropGrid(grid, size) {
-    let r0 = 99, r1 = -1, c0 = 99, c1 = -1;
-    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (grid[r * size + c]) { r0 = Math.min(r0, r); r1 = Math.max(r1, r); c0 = Math.min(c0, c); c1 = Math.max(c1, c); }
-    if (r1 < 0) return null;
-    const out = [];
-    for (let r = r0; r <= r1; r++) { const row = []; for (let c = c0; c <= c1; c++) row.push(grid[r * size + c]); out.push(row); }
-    return out;
-  }
-  function samePattern(a, b) {
-    if (a.length !== b.length || a[0].length !== b[0].length) return false;
-    for (let r = 0; r < a.length; r++) for (let c = 0; c < a[0].length; c++) if (a[r][c] !== b[r][c]) return false;
-    return true;
-  }
   function matchRecipe(grid, size) {
     const crop = cropGrid(grid, size);
     if (!crop) return null;
@@ -3504,13 +3460,6 @@ import * as THREE from 'three';
     if (has.length === 1) return map[has[0]];
     const cand = pre.length ? pre : has;
     throw new Error('Unknown ' + (blocksOnly ? 'block' : 'item') + ' "' + name + '"' + (cand.length ? '. Did you mean: ' + cand.slice(0, 6).join(', ') + '?' : ''));
-  }
-  function coord(tok, base) {
-    if (tok === undefined) throw new Error('Missing a coordinate');
-    if (tok.charAt(0) === '~') { const off = tok.length > 1 ? parseFloat(tok.slice(1)) : 0; if (!isFinite(off)) throw new Error('"' + tok + '" is not a number'); return base + off; }
-    const v = parseFloat(tok);
-    if (!isFinite(v)) throw new Error('"' + tok + '" is not a number');
-    return v;
   }
   function spawnSpot() {
     const x = player.x - Math.sin(player.yaw) * 3, z = player.z - Math.cos(player.yaw) * 3;

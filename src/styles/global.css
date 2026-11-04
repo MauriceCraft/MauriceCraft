@@ -194,3 +194,20 @@
     #food.raised { bottom: calc(env(safe-area-inset-bottom, 0px) + 62px); }
     #hearts.raised { bottom: calc(env(safe-area-inset-bottom, 0px) + 98px); }
   }
+
+/* Phone layout: keep the game menu and inventory usable in portrait. */
+@media (max-width: 600px) {
+  #overlay, #inv, #trade, #craftui { padding: 10px; }
+  .card, .invcard { box-sizing: border-box; width: 100%; max-height: calc(100dvh - 20px); padding: 14px; }
+  .card h1 { font-size: clamp(26px, 9vw, 40px); }
+  .controls { grid-template-columns: minmax(72px, auto) minmax(0, 1fr); gap: 4px 9px; }
+  #info { max-width: 49vw; overflow: hidden; font-size: 12px; white-space: pre-wrap; }
+  #objective { max-width: 40vw; font-size: 12px; white-space: pre-wrap; }
+  #hint { max-width: 88vw; }
+  .ccell { width: 48px; height: 48px; }
+}
+@media (max-width: 370px) {
+  .slot { width: 31px; height: 39px; }
+  #btnJump, #btnPlace { width: 56px; height: 56px; }
+  #btnPlace { right: 84px; }
+}

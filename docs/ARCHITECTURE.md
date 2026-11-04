@@ -1,0 +1,28 @@
+# Architecture
+
+The former single-file `index.html` has been separated into an HTML shell, styles, an ES-module app entry, and game code. The refactor is intentionally incremental: existing behavior, deterministic terrain generation, block IDs, and IndexedDB saves must remain stable.
+
+```text
+index.html                       HTML shell and game UI
+src/
+  main.ts                        app entry (imports CSS and game bootstrap)
+  styles/global.css              shared HUD, overlays, touch and responsive styles
+  game/
+    bootstrap.ts                  current gameplay loop and browser integration
+    world/{noise,chunk-key,block-kind}.ts  deterministic world rules
+    crafting/grid.ts              pure crafting pattern helpers
+    commands/coordinates.ts       command coordinate parsing
+```
+
+## Responsibilities
+
+- **World rules** belong in `game/world`; keep pure functions independent of the DOM and renderer.
+- **Crafting/commands** own rules and parsing, not UI events.
+- **Bootstrap** temporarily owns rendering, audio, UI events, entity behavior, world generation, and IndexedDB. Extract each domain in focused, tested changes rather than large all-at-once migrations.
+- **Styles** remain global while the HUD uses static element IDs. CSS Modules are appropriate once a UI element is extracted into its own component with isolated styling. Do not introduce React solely to use CSS Modules.
+
+## Important compatibility rules
+
+Existing users have saved worlds in the `blockcraft-worlds` IndexedDB database with `worlds` and `chunks` stores. Do not rename, reset, or silently migrate these. Any future schema change must include a tested upgrade path. Seeded noise and block IDs are also part of persisted world behavior.
+
+`bootstrap.ts` currently has `// @ts-nocheck` because the legacy script is large and uses shared mutable state; new and extracted modules must be strictly typed. Removing that exception is a follow-up effort, not a pretext for rewriting working gameplay in one pass.
