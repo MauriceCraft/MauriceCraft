@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { bg, bm, part, JOBS, JOB_NAMES, makeZombie, makeCow, makePig, makeSheep, makeChicken, makeCreeper, makeSkeleton, makeSpider, makePillager, makeVindicator, makeIronGolem, makeCopperGolem, makeDiamondGolem, makeVillager, makeEnderDragon } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
 import { createChunkStreamer } from './world/chunk-streamer';
+import { createStructureRegions } from './world/structure-regions';
 import { raycastBlocks } from './world/raycast';
 import { createCollisionEngine } from './world/collision';
 import { mulberry32, hash2, fbm, smooth } from './world/noise';
@@ -136,85 +137,11 @@ import { createAudioEngine } from './audio/sound-engine';
     return Math.max(3, Math.min(H - 12, h));
   }
   /* ---------- Structures: villages, temples, towers, dungeons ---------- */
-  // The world is split into 80x80 regions; each region can hold one structure that fits entirely inside it,
-  // so every chunk only has to ask its own region what to build.
-  const REG = 80;
-  const structCache = new Map();
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  const STRUCT_NAMES = { village: 'Village', temple: 'Desert temple', tower: 'Ruined tower', dungeon: 'Old dungeon', cabin: 'Cabin', circle: 'Stone circle' };
-  function structureFor(rx, rz) {
-    const k = ckey(rx, rz);
-    if (structCache.has(k)) return structCache.get(k);
-    const st = makeStructure(rx, rz);
-    structCache.set(k, st);
-    return st;
-  }
-  function sampleGround(cx, cz, rad) {
-    let mn = 999, mx = -999, sum = 0, n = 0;
-    for (let a = 0; a <= 8; a++) {
-      const x = a === 8 ? cx : Math.round(cx + Math.cos(a * Math.PI / 4) * rad);
-      const z = a === 8 ? cz : Math.round(cz + Math.sin(a * Math.PI / 4) * rad);
-      const h = heightAt(x, z);
-      mn = Math.min(mn, h); mx = Math.max(mx, h); sum += h; n++;
-    }
-    return { spread: mx - mn, avg: Math.round(sum / n), min: mn };
-  }
-  function makeStructure(rx, rz) {
-    const r = hash2(rx, rz, seed + 500), jx = hash2(rx, rz, seed + 501), jz = hash2(rx, rz, seed + 502);
-    const ox = rx * REG, oz = rz * REG;
-    let st = null;
-    if (r < 0.22) {
-      const cx = ox + 28 + Math.floor(jx * 25), cz = oz + 28 + Math.floor(jz * 25), f = sampleGround(cx, cz, 16);
-      if (f.min > SEA + 2 && f.spread <= 9) st = { type: 'village', cx: cx, cz: cz, gy: f.avg, pad: 20, blend: 8, reach: 22 };
-    } else if (r < 0.30) {
-      const cx = ox + 22 + Math.floor(jx * 37), cz = oz + 22 + Math.floor(jz * 37), f = sampleGround(cx, cz, 10);
-      if (f.avg <= 30 && f.spread <= 9) st = { type: 'temple', cx: cx, cz: cz, gy: Math.max(f.avg, 5), pad: 15, blend: 6, reach: 16 };
-    } else if (r < 0.40) {
-      const cx = ox + 14 + Math.floor(jx * 53), cz = oz + 14 + Math.floor(jz * 53), f = sampleGround(cx, cz, 6);
-      if (f.min > SEA + 1 && f.spread <= 8) st = { type: 'tower', cx: cx, cz: cz, gy: f.avg, pad: 7, blend: 5, reach: 8 };
-    } else if (r < 0.50) {
-      const cx = ox + 8 + Math.floor(jx * 52), cz = oz + 8 + Math.floor(jz * 64), gy = heightAt(cx, cz);
-      if (gy >= 14 && gy <= H - 14) st = { type: 'dungeon', cx: cx, cz: cz, gy: gy, pad: 0, blend: 0, reach: 20, zone: 4 };
-    } else if (r < 0.60) {
-      const cx = ox + 14 + Math.floor(jx * 53), cz = oz + 14 + Math.floor(jz * 53), f = sampleGround(cx, cz, 6);
-      if (f.min > SEA + 1 && f.spread <= 6) st = { type: 'cabin', cx: cx, cz: cz, gy: f.avg, pad: 8, blend: 5, reach: 10 };
-    } else if (r < 0.68) {
-      const cx = ox + 14 + Math.floor(jx * 53), cz = oz + 14 + Math.floor(jz * 53), f = sampleGround(cx, cz, 6);
-      if (f.min > SEA + 1 && f.spread <= 7) st = { type: 'circle', cx: cx, cz: cz, gy: f.avg, pad: 8, blend: 5, reach: 9 };
-    }
-    if (st) {
-      st.rx = rx; st.rz = rz;
-      if (st.zone === undefined) st.zone = st.pad + st.blend + 2;
-      if (Math.hypot(st.cx, st.cz) < st.reach + 8) st = null;   // keep the spawn point clear
-    }
-    return st;
-  }
-  function structAt(x, z) { return structureFor(Math.floor(x / REG), Math.floor(z / REG)); }
-  function inStructZone(x, z) { const st = structAt(x, z); return !!st && Math.hypot(x - st.cx, z - st.cz) <= st.zone; }
-  // Terrain height, levelled and blended around structures so they sit on flat ground
-  function groundH(x, z) {
-    const h0 = heightAt(x, z), st = structAt(x, z);
-    if (!st || !st.pad) return h0;
-    const d = Math.hypot(x - st.cx, z - st.cz);
-    if (d <= st.pad) return st.gy;
-    if (d < st.pad + st.blend) { const t = smooth((d - st.pad) / st.blend); return Math.round(st.gy + (h0 - st.gy) * t); }
-    return h0;
-  }
-  function forceSand(x, z) {
-    const st = structAt(x, z);
-    return !!st && st.type === 'temple' && Math.hypot(x - st.cx, z - st.cz) <= st.pad + st.blend * 0.5;
-  }
-  function nearestStructure() {
-    const prx = Math.floor(player.x / REG), prz = Math.floor(player.z / REG);
-    let best = null, bd = 1e9;
-    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
-      const st = structureFor(prx + dx, prz + dz);
-      if (!st) continue;
-      const d = Math.hypot(st.cx - player.x, st.cz - player.z);
-      if (d < bd) { bd = d; best = st; }
-    }
-    return best ? STRUCT_NAMES[best.type] + ' ' + Math.round(bd) + ' m' : 'nothing close';
-  }
+  const { REG, STRUCT_NAMES, structCache, structureFor, structAt, inStructZone,
+    groundH, forceSand, nearestStructure } = createStructureRegions({
+    heightAt, getSeed: () => seed, getPlayer: () => player, seaLevel: SEA, maxHeight: H,
+  });
 
   function eachXZ(x0, z0, a1, b1, a2, b2, fn) {
     for (let x = Math.max(a1, x0); x <= Math.min(a2, x0 + 15); x++) for (let z = Math.max(b1, z0); z <= Math.min(b2, z0 + 15); z++) fn(x, z);
