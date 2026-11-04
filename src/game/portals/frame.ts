@@ -3,7 +3,8 @@
  *
  * A minimum Nether portal is four blocks wide by five tall, with a 2x3
  * opening. Also recognize larger complete rectangles (including old 5x5
- * frames), in either horizontal direction. A portal must be unlit (air).
+ * frames), in either horizontal direction. The four corner blocks are optional.
+ * A portal must be unlit (air).
  */
 export type PortalAxis = 'x' | 'z';
 export type PortalDimension = 'overworld' | 'nether';
@@ -39,9 +40,12 @@ export function findPortalFrame(
               for (let v = 0; v < outerHeight; v++) {
                 const x = axis === 'x' ? start + u : hit.x;
                 const z = axis === 'z' ? start + u : hit.z;
-                const border = u === 0 || u === outerWidth - 1 || v === 0 || v === outerHeight - 1;
+                const side = u === 0 || u === outerWidth - 1;
+                const topOrBottom = v === 0 || v === outerHeight - 1;
+                // A valid ten-obsidian frame does not need four corner blocks.
+                if (side && topOrBottom) continue;
                 const actual = get(x, bottom + v, z);
-                if (border ? actual !== obsidian : actual !== 0) {
+                if ((side || topOrBottom) ? actual !== obsidian : actual !== 0) {
                   valid = false;
                   break;
                 }

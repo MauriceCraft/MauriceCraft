@@ -32,6 +32,19 @@ describe('Nether portal lighting regression', () => {
     })).toBe(true);
     expect(portalContains(portal!, 'nether', { x: 12, y: 6, z: 10.5 })).toBe(false);
   });
+  it.each(['x', 'z'] as const)('lights a ten-obsidian frame without corners along %s', axis => {
+    const world = makeWorld(axis);
+    for (const u of [0, 3]) for (const y of [world.base, world.base + 4]) {
+      world.put(axis === 'x' ? 10 + u : 10, y, axis === 'z' ? 10 + u : 10, 0);
+    }
+    const frame = findPortalFrame(world.get, { x: 10, y: world.base + 2, z: 10 }, 'overworld', OBSIDIAN, 48);
+    expect(frame).toMatchObject({ axis, width: 2, height: 3 });
+  });
+  it('rejects a missing side block, not just a missing corner', () => {
+    const world = makeWorld('x');
+    world.put(10, world.base + 1, 10, 0);
+    expect(findPortalFrame(world.get, { x: 11, y: world.base, z: 10 }, 'overworld', OBSIDIAN, 48)).toBeNull();
+  });
   it('accepts the original 5x5 frame for compatibility', () => {
     const world = makeWorld('x', 5, 5);
     expect(findPortalFrame(world.get, { x: 12, y: 8, z: 10 }, 'nether', OBSIDIAN, 48))
