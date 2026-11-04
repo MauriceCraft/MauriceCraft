@@ -68,3 +68,7 @@ flowchart TD
 ### Item and block identities
 
 `src/game/world/block-catalog.ts` is the single source for historically assigned item IDs, mining timings, texture tile numbers and tool tiers. These IDs are embedded in saved-world data. When adding a block, choose a new ID and add a regression test; never reorder or reuse an existing ID.
+
+### Chunk streaming
+
+`src/game/world/chunk-streamer.ts` owns the per-frame chunk generation and meshing budgets, unloading untouched distant terrain while retaining edited chunk data. It receives renderer/world callbacks through a small typed interface so the behavior can be regression-tested without WebGL.

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { bg, bm, part, JOBS, JOB_NAMES, makeZombie, makeCow, makePig, makeSheep, makeChicken, makeCreeper, makeSkeleton, makeSpider, makePillager, makeVindicator, makeIronGolem, makeCopperGolem, makeDiamondGolem, makeVillager, makeEnderDragon } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
+import { createChunkStreamer } from './world/chunk-streamer';
 import { mulberry32, hash2, fbm, smooth } from './world/noise';
 import { blockKind } from './world/block-kind';
 import { createBlockCatalog } from './world/block-catalog';
@@ -778,46 +779,11 @@ import { createAudioEngine } from './audio/sound-engine';
     for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) buildChunk(ox + dx, oz + dz);
   }
 
-  // Load and mesh chunks around the player as they move; drop the ones left far behind
-  const OFFS = [];
-  for (let dz = -R - 1; dz <= R + 1; dz++) for (let dx = -R - 1; dx <= R + 1; dx++) OFFS.push({ dx: dx, dz: dz, d: Math.max(Math.abs(dx), Math.abs(dz)), e: dx * dx + dz * dz });
-  OFFS.sort(function (a, b) { return a.e - b.e; });
-  let streamTick = 0;
-  function neighborsLoaded(cx, cz) {
-    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (!chunks.has(ckey(cx + dx, cz + dz))) return false;
-    return true;
-  }
-  function streamChunks() {
-    const pcx = Math.floor(player.x / 16), pcz = Math.floor(player.z / 16);
-    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) getOrGen(pcx + dx, pcz + dz);
-    const t0 = performance.now();
-    let n = 0;
-    for (let i = 0; i < OFFS.length; i++) {
-      const o = OFFS[i];
-      if (chunks.has(ckey(pcx + o.dx, pcz + o.dz))) continue;
-      genChunk(pcx + o.dx, pcz + o.dz);
-      if (++n >= 3 || performance.now() - t0 > 7) break;
-    }
-    n = 0;
-    for (let i = 0; i < OFFS.length; i++) {
-      const o = OFFS[i];
-      if (o.d > R) continue;
-      const c = chunks.get(ckey(pcx + o.dx, pcz + o.dz));
-      if (!c || c.meshed || !neighborsLoaded(c.cx, c.cz)) continue;
-      buildChunk(c.cx, c.cz);
-      if (++n >= 2 || performance.now() - t0 > 12) break;
-    }
-    if (++streamTick % 60 === 0) {
-      const gone = [];
-      chunks.forEach(function (c, k) {
-        const d = Math.max(Math.abs(c.cx - pcx), Math.abs(c.cz - pcz));
-        if (c.meshed && d > R + 1) disposeMesh(c);
-        if (!c.edited && d > R + 3) { disposeMesh(c); gone.push(k); }
-      });
-      gone.forEach(function (k) { chunks.delete(k); });
-      resetChunkCache();
-    }
-  }
+  const streamChunks = createChunkStreamer({
+    chunks, viewDistance: R,
+    getPlayer: () => player,
+    getOrGen, genChunk, buildChunk, disposeMesh, resetChunkCache,
+  });
 
   /* ---------- Game state ---------- */
   let mode = 'creative';
