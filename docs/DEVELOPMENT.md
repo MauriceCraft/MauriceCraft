@@ -1,7 +1,7 @@
 # Development
 
 1. Install Node.js 22 or newer (`.nvmrc` specifies 22) and npm.
-2. Run `npm install`, then `npm run dev`.
+2. Run `npm ci` to install exactly the locked dependencies, then `npm run dev`.
 3. Run `npm run typecheck` and `npm run build` before merging any changes.
 4. Run the test suite once the testing stage is installed. New gameplay features should be accompanied by tests.
 
