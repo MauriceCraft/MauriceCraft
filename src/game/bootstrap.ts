@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { bg, bm, part, JOBS, JOB_NAMES, makeZombie, makeCow, makePig, makeSheep, makeChicken, makeCreeper, makeSkeleton, makeSpider, makePillager, makeVindicator, makeIronGolem, makeCopperGolem, makeDiamondGolem, makeVillager, makeEnderDragon } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
-import { mulberry32, hash2, fbm } from './world/noise';
+import { mulberry32, hash2, fbm, smooth } from './world/noise';
 import { blockKind } from './world/block-kind';
 import { cropGrid, samePattern } from './crafting/grid';
 import { coord } from './commands/coordinates';

@@ -13,7 +13,7 @@ export function hash2(x: number, y: number, s: number): number {
   h ^= h >>> 16;
   return (h >>> 0) / 4294967296;
 }
-const smooth = (t: number): number => t * t * (3 - 2 * t);
+export const smooth = (t: number): number => t * t * (3 - 2 * t);
 export function vnoise(x: number, y: number, s: number): number {
   const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
   const a = hash2(xi, yi, s), b = hash2(xi + 1, yi, s), c = hash2(xi, yi + 1, s), d = hash2(xi + 1, yi + 1, s);

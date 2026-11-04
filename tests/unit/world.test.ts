@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ckey } from '../../src/game/world/chunk-key';
 import { blockKind } from '../../src/game/world/block-kind';
-import { mulberry32, hash2, vnoise, fbm } from '../../src/game/world/noise';
+import { mulberry32, hash2, vnoise, fbm, smooth } from '../../src/game/world/noise';
 
 describe('persisted chunk keys', () => {
   it('preserves the original bit-packed format', () => {
@@ -29,6 +29,11 @@ describe('world generation determinism', () => {
   it('preserves integer-coordinate hash output', () => {
     expect(hash2(2, -5, 123)).toBe(0.4495100495405495);
     expect(hash2(2, -5, 123)).not.toBe(hash2(2, -5, 124));
+  });
+  it('keeps smoothing available to terrain and structure generation', () => {
+    expect(smooth(0)).toBe(0);
+    expect(smooth(0.5)).toBe(0.5);
+    expect(smooth(1)).toBe(1);
   });
   it('interpolates smoothly and returns finite values', () => {
     const sample = vnoise(1.3, -2.4, 77);
