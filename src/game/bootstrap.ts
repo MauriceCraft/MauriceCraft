@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { bg, bm, part, JOBS, JOB_NAMES, makeZombie, makeCow, makePig, makeSheep, makeChicken, makeCreeper, makeSkeleton, makeSpider, makePillager, makeVindicator, makeIronGolem, makeCopperGolem, makeDiamondGolem, makeVillager, makeEnderDragon } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
 import { createChunkStreamer } from './world/chunk-streamer';
+import { raycastBlocks } from './world/raycast';
 import { mulberry32, hash2, fbm, smooth } from './world/noise';
 import { blockKind } from './world/block-kind';
 import { createBlockCatalog } from './world/block-catalog';
@@ -2092,28 +2093,8 @@ import { createAudioEngine } from './audio/sound-engine';
   const dirV = new THREE.Vector3();
   let blockHit = null, target = null;
   function raycast(maxD) {
-    const o = camera.position;
     camera.getWorldDirection(dirV);
-    let x = Math.floor(o.x), y = Math.floor(o.y), z = Math.floor(o.z);
-    if (solid(get(x, y, z))) return null;
-    const sx = dirV.x > 0 ? 1 : -1, sy = dirV.y > 0 ? 1 : -1, sz = dirV.z > 0 ? 1 : -1;
-    const tdx = dirV.x !== 0 ? Math.abs(1 / dirV.x) : Infinity;
-    const tdy = dirV.y !== 0 ? Math.abs(1 / dirV.y) : Infinity;
-    const tdz = dirV.z !== 0 ? Math.abs(1 / dirV.z) : Infinity;
-    let tmx = dirV.x !== 0 ? (dirV.x > 0 ? x + 1 - o.x : o.x - x) * tdx : Infinity;
-    let tmy = dirV.y !== 0 ? (dirV.y > 0 ? y + 1 - o.y : o.y - y) * tdy : Infinity;
-    let tmz = dirV.z !== 0 ? (dirV.z > 0 ? z + 1 - o.z : o.z - z) * tdz : Infinity;
-    let fx = 0, fy = 0, fz = 0, t = 0;
-    while (t <= maxD) {
-      if (tmx < tmy && tmx < tmz) { x += sx; t = tmx; tmx += tdx; fx = -sx; fy = 0; fz = 0; }
-      else if (tmy < tmz) { y += sy; t = tmy; tmy += tdy; fx = 0; fy = -sy; fz = 0; }
-      else { z += sz; t = tmz; tmz += tdz; fx = 0; fy = 0; fz = -sz; }
-      if (t > maxD) break;
-      if (y < 0) return null;
-      if (y >= H) { if (sy > 0) return null; continue; }
-      if (get(x, y, z)) return { x: x, y: y, z: z, nx: fx, ny: fy, nz: fz, t: t };
-    }
-    return null;
+    return raycastBlocks(camera.position, dirV, maxD, get, solid, H);
   }
   function resetMine() { mine.t = 0; mine.x = mine.y = mine.z = -1; mineBar.style.display = 'none'; }
   function doBreak(t) {
