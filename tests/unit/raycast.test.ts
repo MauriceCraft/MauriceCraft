@@ -18,7 +18,7 @@ describe('voxel targeting regression', () => {
     expect(raycastBlocks(origin, { x: 1, y: 0, z: 0 }, 2, blocks, solid, 48)).toBeNull();
     expect(raycastBlocks(origin, { x: 1, y: 0, z: 0 }, 3, blocks, solid, 48)?.x).toBe(3);
   });
-  it('does not select a block if the player's eye begins inside a solid', () => {
+  it("does not select a block if the player's eye begins inside a solid", () => {
     expect(raycastBlocks(origin, { x: 1, y: 0, z: 0 }, 5, world({ '0,5,0': 3 }), solid, 48))
       .toBeNull();
   });
