@@ -6,6 +6,7 @@ import { bg, bm, part, JOBS, JOB_NAMES, makeZombie, makeCow, makePig, makeSheep,
 import { ckey } from './world/chunk-key';
 import { createChunkStreamer } from './world/chunk-streamer';
 import { raycastBlocks } from './world/raycast';
+import { createCollisionEngine } from './world/collision';
 import { mulberry32, hash2, fbm, smooth } from './world/noise';
 import { blockKind } from './world/block-kind';
 import { createBlockCatalog } from './world/block-catalog';
@@ -824,38 +825,9 @@ import { createAudioEngine } from './audio/sound-engine';
     player.vx = player.vy = player.vz = 0; player.yaw = 0; player.pitch = -0.1; player.fallStart = null;
   }
   const PR = 0.3, PH = 1.8, EYE = 1.62;
-  function collides(px, py, pz, r, h) {
-    if (r === undefined) { r = PR; h = PH; }
-    const x0 = Math.floor(px - r), x1 = Math.floor(px + r);
-    const y0 = Math.floor(py), y1 = Math.floor(py + h - 0.0001);
-    const z0 = Math.floor(pz - r), z1 = Math.floor(pz + r);
-    for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
-      const bb = get(x, y, z);
-      if (solid(bb)) { if (bb >= 19 && bb <= 26) { if (py < y + BED_H && py + h > y) return true; } else return true; }
-    }
-    return false;
-  }
-  // Move an entity (player or mob) along one axis with collision
-  function moveEnt(e, axis, d) {
-    if (!d) return;
-    const steps = Math.max(1, Math.ceil(Math.abs(d) / 0.25));
-    const sd = d / steps;
-    for (let i = 0; i < steps; i++) {
-      const nx = e.x + (axis === 0 ? sd : 0), ny = e.y + (axis === 1 ? sd : 0), nz = e.z + (axis === 2 ? sd : 0);
-      if (collides(nx, ny, nz, e.r || PR, e.h || PH)) {
-        let lo = 0, hi = 1;   // slide right up to the obstacle instead of stopping a step short
-        for (let k = 0; k < 6; k++) {
-          const mid = (lo + hi) / 2;
-          if (collides(e.x + (axis === 0 ? sd * mid : 0), e.y + (axis === 1 ? sd * mid : 0), e.z + (axis === 2 ? sd * mid : 0), e.r || PR, e.h || PH)) hi = mid; else lo = mid;
-        }
-        if (lo > 0) { if (axis === 0) e.x += sd * lo; else if (axis === 1) e.y += sd * lo; else e.z += sd * lo; }
-        if (axis === 1) { if (sd < 0) e.onGround = true; e.vy = 0; }
-        else { e.hit = true; if (axis === 0) e.vx = 0; else e.vz = 0; }
-        return;
-      }
-      e.x = nx; e.y = ny; e.z = nz;
-    }
-  }
+  const { collides, moveEnt } = createCollisionEngine({
+    getBlock: get, solid, defaultRadius: PR, defaultHeight: PH, bedHeight: BED_H,
+  });
 
   /* ---------- Sound ---------- */
   const { Snd, saveSound, applySound, audioInit, sfx, sfxAt, updateMusic, tone, hiss } =
