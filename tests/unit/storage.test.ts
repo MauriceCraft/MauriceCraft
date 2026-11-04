@@ -39,10 +39,22 @@ describe('Dexie storage and cache', () => {
     expect((await current.getWorld('w1'))?.name).toBe('Updated');
   });
 
+  it('rolls back metadata when a chunk write fails', async () => {
+    current = await openWorldStorage(name());
+    const invalid = { ...chunk(), k: undefined } as unknown as ChunkRecord;
+    await expect(current.saveWorld(world(), [invalid])).rejects.toThrow();
+    // The world and its chunks must commit together, never half-save.
+    expect(await current.listWorlds()).toEqual([]);
+    expect(await current.getChunks('w1')).toEqual([]);
+    await current.saveWorld(world(), [chunk()]);
+    expect(await current.getWorld('w1')).toMatchObject({ id: 'w1' });
+  });
+
   it('removes only the chosen world and its chunks', async () => {
     current = await openWorldStorage(name());
     await current.saveWorld(world('w1'), [chunk('w1')]);
     await current.saveWorld(world('w2'), [chunk('w2')]);
+    await current.getWorld('w1'); // warm the metadata cache first
     await current.deleteWorld('w1');
     expect(await current.getWorld('w1')).toBeUndefined();
     expect(await current.getChunks('w1')).toEqual([]);
