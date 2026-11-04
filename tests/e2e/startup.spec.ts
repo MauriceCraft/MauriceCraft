@@ -28,7 +28,8 @@ test('desktop and mobile can start playing', async ({ page, isMobile }) => {
   if (isMobile) {
     await expect(page.locator('#btnJump')).toBeVisible();
     await expect(page.locator('#btnPlace')).toBeVisible();
-    await page.locator('#btnInv').click();
+    // The game handles touchstart and prevents its synthetic click; use a real touch gesture.
+    await page.locator('#btnInv').tap();
     await expect(page.locator('#inv')).toBeVisible();
     await page.locator('#invClose').click();
     await expect(page.locator('#inv')).toBeHidden();
@@ -48,7 +49,7 @@ test('the in-game portal command builds a frame without exceptions', async ({ pa
   // Both desktop and mobile can invoke the command bar through the DOM;
   // on mobile we use the visible Cmd button.
   if (await page.locator('#btnCmd').isVisible()) {
-    await page.locator('#btnCmd').click();
+    await page.locator('#btnCmd').tap();
   } else {
     await page.keyboard.press('t');
   }
