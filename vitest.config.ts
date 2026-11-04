@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       provider: 'v8',
-      include: ['src/game/world/**/*.ts', 'src/game/crafting/**/*.ts', 'src/game/commands/**/*.ts'],
+      include: ['src/game/world/**/*.ts', 'src/game/crafting/**/*.ts', 'src/game/commands/**/*.ts', 'src/game/portals/**/*.ts', 'src/game/storage/**/*.ts'],
       exclude: ['src/game/bootstrap.ts'],
       reporter: ['text', 'lcov'],
       thresholds: { statements: 80, branches: 65, functions: 85, lines: 80 },

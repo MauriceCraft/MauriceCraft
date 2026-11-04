@@ -33,3 +33,5 @@ flowchart LR
 ```
 
 The line-count limit applies to non-test TypeScript, with the original bootstrap temporarily excluded from lint. Browser smoke and pure unit tests are complementary: regression tests cover frame lighting and save metadata, while browser smoke detects startup, mobile input and portal-command failures.
+
+The automated coverage gate includes world rules, commands, crafting, **portal frame/save compatibility**, and **Dexie storage**. Browser-dependent modules (WebGL, Web Audio, and the temporary legacy bootstrap) are exercised through separate integration and browser tests and will be added to coverage gates as they are made testable. Do not lower thresholds just to pass CI.
