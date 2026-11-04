@@ -13,12 +13,14 @@ src/
     crafting/grid.ts              pure crafting pattern helpers
     entities/mob-models.ts         typed Three.js mob geometry factories
     commands/coordinates.ts       command coordinate parsing
+    rendering/texture-atlas.ts    canvas textures for blocks, tools and items
 ```
 
 ## Responsibilities
 
 - **World rules** belong in `game/world`; keep pure functions independent of the DOM and renderer.
 - **Crafting/commands** own rules and parsing, not UI events.
+- **Rendering/texture-atlas** owns the seeded block/item texture drawing independently of world state. The renderer passes in tool tile IDs.
 - **Bootstrap** temporarily owns rendering, audio, UI events, entity behavior, and world generation. IndexedDB access is owned by the typed Dexie storage adapter. Extract each domain in focused, tested changes rather than large all-at-once migrations.
 - **Styles** remain global while the HUD uses static element IDs. CSS Modules are appropriate once a UI element is extracted into its own component with isolated styling. Do not introduce React solely to use CSS Modules.
 
@@ -35,6 +37,8 @@ flowchart TD
     Entry["src/main.ts (entry point)"] --> Bootstrap["game/bootstrap.ts (temporary legacy adapter)"]
     Entry --> CSS["styles/global.css"]
     Bootstrap --> World["world: deterministic terrain + block rules"]
+    Bootstrap --> Atlas["rendering/texture-atlas.ts: typed deterministic canvas textures"]
+    Atlas --> Noise["world/noise.ts: seeded pixel variation"]
     Bootstrap --> Portals["portals: frame detection + travel geometry"]
     Bootstrap --> Crafting["crafting: pattern matching"]
     Bootstrap --> MobModels["entities/mob-models.ts: reusable 3D models"]
