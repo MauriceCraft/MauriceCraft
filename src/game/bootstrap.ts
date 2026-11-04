@@ -9,6 +9,7 @@ import { cropGrid, samePattern } from './crafting/grid';
 import { coord } from './commands/coordinates';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { restorePortals, snapshotPortals } from './portals/persistence';
+import { openWorldStorage } from './storage/world-storage';
 
 (function () {
   'use strict';
@@ -3724,33 +3725,12 @@ import { restorePortals, snapshotPortals } from './portals/persistence';
   let db = null, storageOK = false, currentWorld = null, worldList = [], saveChain = Promise.resolve(), busy = false;
   const sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
 
-  function openDB() {
-    const open = new Promise(function (res, rej) {
-      try {
-        const rq = indexedDB.open('blockcraft-worlds', 1);
-        rq.onupgradeneeded = function () {
-          rq.result.createObjectStore('worlds', { keyPath: 'id' });
-          rq.result.createObjectStore('chunks', { keyPath: 'k' });
-        };
-        rq.onsuccess = function () { res(rq.result); };
-        rq.onerror = function () { rej(rq.error); };
-        rq.onblocked = function () { rej(new Error('blocked')); };
-      } catch (e) { rej(e); }
-    });
-    return Promise.race([open, sleep(4000).then(function () { throw new Error('timeout'); })]);
-  }
-  function reqP(r) { return new Promise(function (res, rej) { r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }); }
-  function txDone(tx) { return new Promise(function (res, rej) { tx.oncomplete = function () { res(); }; tx.onerror = function () { rej(tx.error); }; tx.onabort = function () { rej(tx.error); }; }); }
-  const chunkRange = function (id) { return IDBKeyRange.bound(id + ':', id + ':\uffff'); };
-  function dbListWorlds() { return reqP(db.transaction('worlds', 'readonly').objectStore('worlds').getAll()); }
-  function dbGetWorld(id) { return reqP(db.transaction('worlds', 'readonly').objectStore('worlds').get(id)); }
-  function dbGetChunks(id) { return reqP(db.transaction('chunks', 'readonly').objectStore('chunks').getAll(chunkRange(id))); }
-  function dbDeleteWorld(id) {
-    const tx = db.transaction(['worlds', 'chunks'], 'readwrite');
-    tx.objectStore('worlds').delete(id);
-    tx.objectStore('chunks').delete(chunkRange(id));
-    return txDone(tx);
-  }
+  // Dexie uses the existing v1 database/stores without a destructive upgrade.
+  function openDB() { return openWorldStorage(); }
+  function dbListWorlds() { return db.listWorlds(); }
+  function dbGetWorld(id) { return db.getWorld(id); }
+  function dbGetChunks(id) { return db.getChunks(id); }
+  function dbDeleteWorld(id) { return db.deleteWorld(id); }
 
   function snapshot() {
     const m = currentWorld;
@@ -3780,13 +3760,20 @@ import { restorePortals, snapshotPortals } from './portals/persistence';
       recMap.set(key, { k: k, w: meta.id, cx: cx, cz: cz, data: data.slice() });
     });
     const recs = Array.from(recMap.values());
-    const tx = db.transaction(['worlds', 'chunks'], 'readwrite');
-    tx.objectStore('worlds').put(meta);
-    const cs = tx.objectStore('chunks');
-    recs.forEach(function (r) { cs.put(r); });
-    return txDone(tx).catch(function (err) { dirty.forEach(function (c) { c.dirty = true; }); throw err; });
+    return db.saveWorld(meta, recs).catch(function (err) {
+      // Keep dirty chunks in memory if the transaction fails; retry on autosave.
+      dirty.forEach(function (c) { c.dirty = true; });
+      throw err;
+    });
   }
-  function saveWorld() { saveChain = saveChain.then(doSave).catch(function () {}); return saveChain; }
+  function saveWorld() {
+    saveChain = saveChain.then(doSave).catch(function (err) {
+      console.error('MauriceCraft save failed:', err);
+      showHint('Saving failed. Your changes are still in memory; please keep this tab open and try again.', 6500);
+    });
+    return saveChain;
+  }
+
 
   function ago(t) {
     const sec = Math.max(0, (Date.now() - t) / 1000);

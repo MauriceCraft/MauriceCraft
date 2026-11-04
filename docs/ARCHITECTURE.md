@@ -18,12 +18,12 @@ src/
 
 - **World rules** belong in `game/world`; keep pure functions independent of the DOM and renderer.
 - **Crafting/commands** own rules and parsing, not UI events.
-- **Bootstrap** temporarily owns rendering, audio, UI events, entity behavior, world generation, and IndexedDB. Extract each domain in focused, tested changes rather than large all-at-once migrations.
+- **Bootstrap** temporarily owns rendering, audio, UI events, entity behavior, and world generation. IndexedDB access is owned by the typed Dexie storage adapter. Extract each domain in focused, tested changes rather than large all-at-once migrations.
 - **Styles** remain global while the HUD uses static element IDs. CSS Modules are appropriate once a UI element is extracted into its own component with isolated styling. Do not introduce React solely to use CSS Modules.
 
 ## Important compatibility rules
 
-Existing users have saved worlds in the `blockcraft-worlds` IndexedDB database with `worlds` and `chunks` stores. Do not rename, reset, or silently migrate these. Any future schema change must include a tested upgrade path. Seeded noise and block IDs are also part of persisted world behavior.
+Existing users have saved worlds in the `blockcraft-worlds` IndexedDB database with `worlds` and `chunks` stores. `src/game/storage/world-storage.ts` uses **Dexie** on the unchanged version 1 stores, with atomic world/chunk transactions. It caches up to 16 metadata records; the existing gameplay chunk cache holds loaded chunk arrays instead of duplicating them in Dexie. Do not rename, reset, or silently migrate these. Any future schema change must include a tested upgrade path. Seeded noise and block IDs are also part of persisted world behavior.
 
 `bootstrap.ts` currently has `// @ts-nocheck` because the legacy script is large and uses shared mutable state; new and extracted modules must be strictly typed. Removing that exception is a follow-up effort, not a pretext for rewriting working gameplay in one pass.
 
@@ -37,7 +37,8 @@ flowchart TD
     Bootstrap --> Portals["portals: frame detection + travel geometry"]
     Bootstrap --> Crafting["crafting: pattern matching"]
     Bootstrap --> Commands["commands: coordinate parser"]
-    Bootstrap --> Browser["Browser adapters: WebGL, input, audio, IndexedDB"]
+    Bootstrap --> Browser["Browser adapters: WebGL, input, audio"]
+    Bootstrap --> Storage["storage/world-storage.ts: typed Dexie + bounded metadata cache"]
     Portals --> PortalPersistence["portals/persistence.ts: backwards-compatible metadata"]
 ```
 
