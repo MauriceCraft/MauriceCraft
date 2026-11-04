@@ -7,6 +7,8 @@ import { mulberry32, hash2, fbm } from './world/noise';
 import { blockKind } from './world/block-kind';
 import { cropGrid, samePattern } from './crafting/grid';
 import { coord } from './commands/coordinates';
+import { findPortalFrame, portalContains } from './portals/frame';
+import { restorePortals, snapshotPortals } from './portals/persistence';
 
 (function () {
   'use strict';
@@ -2798,52 +2800,35 @@ import { coord } from './commands/coordinates';
       d.x * 14 + player.vx * 0.3, d.y * 14 + 2.5, d.z * 14 + player.vz * 0.3);
     return 0.5;
   }
-  function activatePortalAtTarget() {
-    if (!target || get(target.x, target.y, target.z) !== OBSIDIAN) return false;
-    // A manually built portal is a 5x5 obsidian frame with a 3x3 opening.
-    // Check both possible vertical frame orientations (along X or along Z).
-    for (const axis of ['x', 'z']) {
-      for (let cx = target.x - 2; cx <= target.x + 2; cx++) {
-        for (let cz = target.z - 2; cz <= target.z + 2; cz++) {
-          for (let by = target.y - 4; by <= target.y; by++) {
-            if (by < 1 || by + 4 >= H) continue;
-            let valid = true;
-            for (let u = -2; u <= 2 && valid; u++) {
-              for (let v = 0; v <= 4; v++) {
-                const x = cx + (axis === 'x' ? u : 0);
-                const z = cz + (axis === 'z' ? u : 0);
-                const edge = Math.abs(u) === 2 || v === 0 || v === 4;
-                const block = get(x, by + v, z);
-                if (edge ? block !== OBSIDIAN : block !== 0) { valid = false; break; }
-              }
-            }
-            if (!valid) continue;
-            const already = portals.some(function (p) {
-              return p.dimension === dimension && p.x === cx && p.y === by && p.z === cz && p.axis === axis;
-            });
-            if (!already) {
-              const portal = { dimension: dimension, x: cx, y: by, z: cz, width: 2, height: 3, axis: axis };
-              portals.push(portal);
-              showPortalVisual(portal);
-              rebuildRegion(cx - 2, cz - 2, cx + 2, cz + 2);
-              saveWorld();
-            }
-            showHint('Portal activated! Walk into the purple opening.', 3000);
-            sfx('click');
-            return true;
-          }
-        }
-      }
+  function lightPortalAt(px, py, pz) {
+    if (dimension === 'end') return false;
+    // Both the final obsidian placement and flint-and-steel use this one
+    // validator, so the two controls cannot disagree about valid frames.
+    ensureAround(px, pz);
+    const portal = findPortalFrame(get, { x: px, y: py, z: pz }, dimension, OBSIDIAN, H);
+    if (!portal) return false;
+    const already = portals.some(p => p.dimension === portal.dimension && p.axis === portal.axis &&
+      p.x === portal.x && p.y === portal.y && p.z === portal.z);
+    if (!already) {
+      portals.push(portal);
+      showPortalVisual(portal);
+      rebuildRegion(Math.floor(portal.x - 4), Math.floor(portal.z - 4), Math.ceil(portal.x + 4), Math.ceil(portal.z + 4));
+      saveWorld();
     }
-    return false;
+    showHint('Nether portal activated! Walk through the purple opening.', 3500);
+    sfx('click');
+    return true;
+  }
+  function activatePortalAtTarget() {
+    return !!target && get(target.x, target.y, target.z) === OBSIDIAN &&
+      lightPortalAt(target.x, target.y, target.z);
   }
   function lightTnt() {
-    // Flint & steel should activate a complete obsidian portal instead of requiring TNT.
+    if (mode === 'survival' && !(inv[FLINT] > 0)) { showHint('You have no flint & steel.', 1500); return 0.3; }
     if (activatePortalAtTarget()) return 0.3;
     if (!target || get(target.x, target.y, target.z) !== TNT) {
-      flashName('Aim flint & steel at an obsidian frame, not TNT'); return 0.3;
+      flashName('Aim flint & steel at a complete obsidian frame or TNT'); return 0.3;
     }
-    if (mode === 'survival' && !(inv[FLINT] > 0)) { showHint('You have no flint & steel.', 1500); return 0.3; }
     setBlock(target.x, target.y, target.z, 0); queueRebuild(target.x, target.z); flushRebuilds();
     spawnTnt(target.x + 0.5, target.y, target.z + 0.5, 3, 0, 0, 0);
     return 0.4;
@@ -2935,46 +2920,7 @@ import { coord } from './commands/coordinates';
     sfx('place', 1, 0, BED); refreshAround(x, z); refreshAround(hx, hz);
   }
   function detectObsidianPortal(px, py, pz) {
-    // Load nearby chunks first. Unloaded chunks are treated as solid by get(),
-    // which can make a correct frame look incomplete near chunk borders.
-    ensureAround(px, pz);
-    // Detect a complete 5x5 obsidian frame in either vertical direction.
-    // The 3x3 inside must be empty, leaving a 2x3 doorway for the player.
-    for (const axis of ['x', 'z']) {
-      for (let base = py - 4; base <= py; base++) {
-        for (let offset = -2; offset <= 2; offset++) {
-          const cx = axis === 'x' ? px + offset : px;
-          const cz = axis === 'z' ? pz + offset : pz;
-          if (base < 1 || base + 4 >= H) continue;
-          let valid = true;
-          for (let u = -2; u <= 2 && valid; u++) {
-            for (let v = 0; v <= 4; v++) {
-              const x = cx + (axis === 'x' ? u : 0);
-              const z = cz + (axis === 'z' ? u : 0);
-              const edge = Math.abs(u) === 2 || v === 0 || v === 4;
-              const block = get(x, base + v, z);
-              if (edge ? block !== OBSIDIAN : block !== 0) {
-                valid = false;
-                break;
-              }
-            }
-          }
-          if (!valid) continue;
-          const already = portals.some(q => q.dimension === dimension && q.x === cx && q.y === base && q.z === cz && (q.axis || 'x') === axis);
-          if (already) return true;
-          const portal = { dimension, x: cx, y: base, z: cz, width: 2, height: 3, axis };
-          portals.push(portal);
-          showPortalVisual(portal);
-          if (axis === 'x') rebuildRegion(cx - 2, cz, cx + 2, cz);
-          else rebuildRegion(cx, cz - 2, cx, cz + 2);
-          saveWorld();
-          showHint('Nether portal activated! Walk through the purple opening.', 3500);
-          sfx('pop');
-          return true;
-        }
-      }
-    }
-    return false;
+    return lightPortalAt(px, py, pz);
   }
 
   function doPlace() {
@@ -3488,9 +3434,11 @@ import { coord } from './commands/coordinates';
   function clearPortalVisuals() { while (portalVisuals.length) { const m = portalVisuals.pop(); scene.remove(m); m.geometry.dispose(); m.material.dispose(); } }
   function showPortalVisual(portal) {
     if (portal.dimension !== dimension) return;
-    const geo = new THREE.PlaneGeometry(2.85, 2.85);
+    const geo = new THREE.PlaneGeometry(portal.width + 0.85, portal.height - 0.15);
     const mat = new THREE.MeshBasicMaterial({ color: 0x9a42ff, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false });
-    const mesh = new THREE.Mesh(geo, mat); mesh.position.set(portal.x + (portal.axis === 'z' ? 0.53 : 0.5), portal.y + 2.45, portal.z + (portal.axis === 'z' ? 0.5 : 0.53)); if (portal.axis === 'z') mesh.rotation.y = Math.PI / 2;
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(portal.x + 0.5, portal.y + 1 + portal.height / 2, portal.z + 0.5);
+    if (portal.axis === 'z') mesh.rotation.y = Math.PI / 2;
     scene.add(mesh); portalVisuals.push(mesh);
   }
   function buildPortalFrame(dim, centerX, baseY, centerZ) {
@@ -3498,10 +3446,11 @@ import { coord } from './commands/coordinates';
     const cx = Math.round(centerX), cz = Math.round(centerZ), by = Math.max(1, Math.min(H - 6, Math.floor(baseY)));
     // Load all nearby chunks before placing the frame, including Z-side chunks.
     ensureAround(cx, cz);
-    const portal = { dimension: dim, x: cx, y: by, z: cz, width: 2, height: 3, axis: 'x' };
-    for (let dx = -2; dx <= 2; dx++) {
+    // Standard 4-by-5 frame (two blocks wide and three blocks tall inside).
+    const portal = { dimension: dim, x: cx - 0.5, y: by, z: cz, width: 2, height: 3, axis: 'x' };
+    for (let dx = -2; dx <= 1; dx++) {
       for (let dy = 0; dy <= 4; dy++) {
-        const edge = Math.abs(dx) === 2 || dy === 0 || dy === 4;
+        const edge = dx === -2 || dx === 1 || dy === 0 || dy === 4;
         setBlock(cx + dx, by + dy, cz, edge ? OBSIDIAN : 0);
       }
     }
@@ -3531,7 +3480,7 @@ import { coord } from './commands/coordinates';
   function checkPortal(dt) {
     portalCooldown = Math.max(0, portalCooldown - dt);
     if (portalCooldown > 0 || !playing || dimension === 'end') return;
-    const p = portals.find(function (q) { return q.dimension === dimension && Math.abs(player.x - q.x) < (q.axis === 'z' ? 1.25 : 1.15) && Math.abs(player.z - q.z) < (q.axis === 'z' ? 1.15 : 1.25) && player.y >= q.y && player.y <= q.y + 4.2; });
+    const p = portals.find(q => portalContains(q, dimension, player));
     if (!p) return;
     const target = dimension === 'overworld' ? 'nether' : 'overworld';
     const scale = dimension === 'overworld' ? 1 / 8 : 8;
@@ -3805,7 +3754,7 @@ import { coord } from './commands/coordinates';
 
   function snapshot() {
     const m = currentWorld;
-    m.dimension = dimension; m.enderDragonDefeated = enderDragonDefeated; m.portals = portals.map(function (p) { return { dimension: p.dimension, x: p.x, y: p.y, z: p.z, width: p.width, height: p.height }; }); m.mode = mode; m.difficulty = difficulty; m.spawn = spawnPoint; m.omen = omen; m.hunger = hunger; m.sat = sat; m.weather = { w: weather, t: weatherT, r: rainLevel }; m.lastPlayed = Date.now(); m.tod = tod; m.hp = dead ? MAXHP : hp;
+    m.dimension = dimension; m.enderDragonDefeated = enderDragonDefeated; m.portals = snapshotPortals(portals); m.mode = mode; m.difficulty = difficulty; m.spawn = spawnPoint; m.omen = omen; m.hunger = hunger; m.sat = sat; m.weather = { w: weather, t: weatherT, r: rainLevel }; m.lastPlayed = Date.now(); m.tod = tod; m.hp = dead ? MAXHP : hp;
     m.selected = selected; m.hotbar = hotbar.slice(); m.inv = Object.assign({}, inv);
     m.player = { x: player.x, y: player.y, z: player.z, yaw: player.yaw, pitch: player.pitch, fly: !!player.fly };
     m.relics = relics.map(function (r) { return { x: r.x, y: r.y, z: r.z, got: r.got }; });
@@ -3893,7 +3842,7 @@ import { coord } from './commands/coordinates';
     const p = m.player || { x: 0.5, y: 60, z: 0.5, yaw: 0, pitch: 0, fly: false };
     dimension = ['overworld', 'nether', 'end'].includes(m.dimension) ? m.dimension : 'overworld';
     enderDragonDefeated = !!m.enderDragonDefeated;
-    portals.length = 0; if (Array.isArray(m.portals)) m.portals.forEach(function (p) { if (p && ['overworld', 'nether'].includes(p.dimension)) portals.push({ dimension: p.dimension, x: p.x | 0, y: p.y | 0, z: p.z | 0, width: 2, height: 3, axis: p.axis === 'z' ? 'z' : 'x' }); });
+    portals.length = 0; portals.push(...restorePortals(m.portals));
     clearPortalVisuals(); portals.forEach(showPortalVisual);
     resetWorld(m.seed, Math.floor(p.x / 16), Math.floor(p.z / 16));
     clearMobs();
