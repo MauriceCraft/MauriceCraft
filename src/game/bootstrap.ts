@@ -23,10 +23,8 @@ import type { BlockRayHit } from './world/raycast';
 import type { DragGesture, MovementTouch, CameraTouch } from './input/game-controls';
 import type { SpawnMob } from './entities/mob-spawning';
 import { createGameUiComposition } from './ui/game-ui-composition';
-import { coord } from './commands/coordinates';
 import { createCommandConsole } from './commands/command-console';
 import { registerCoreGameCommands } from './commands/core-game-commands';
-import { findPortalFrame, portalContains } from './portals/frame';
 import { createPortalSystem } from './portals/portal-system';
 import { snapshotPortals } from './portals/persistence';
 import { createGameplayWorldSession } from './session/gameplay-world-session';
@@ -55,22 +53,22 @@ const worldServices = createWorldRuntime({
   getPlayer: () => player,
 });
 const {
-  GRASS, DIRT, STONE, SAND, WOOD, LEAVES, PLANKS, BRICK,
-  COBBLE, STONEBRICK, SANDSTONE, GRAVEL, HAY, GOLD, MOSSY, TNT,
-  TORCH, CTABLE, BED, WATER, LAVA, OBSIDIAN, SNOW, PINE_LEAVES, RED_SAND, DARK_WOOD, COAL_ORE, COPPER_ORE,
-  IRON_ORE, DIAMOND_ORE, IRON_BLOCK, COPPER_BLOCK, DIAMOND_BLOCK, BEEF, PORK, MUTTON,
-  CHICKEN, COOKED, WOOL, FEATHER, LEATHER, GUNPOWDER, DYNAMITE, FLINT,
-  EMERALD, BONE, STRING, STICK, COAL, RAW_COPPER, RAW_IRON, COPPER_INGOT,
-  IRON_INGOT, DIAMOND, ITEM_TILE, EGG_KINDS, FOOD, TILES, tileOf, ATLAS_N,
-  isBed, BED_H, BED_DIR, solid, opq, NAMES, ALL_BLOCKS, BREAK_TIME,
-  DROPS, TOOL_KINDS, TOOL_TIERS, toolId, toolTile, TOOLS, TOOL_IDS, TOOL_MAX,
-  TOOL_LVL, TOOL_SPD, TOOL_DMG, NEEDS_PICK,
-  hotbar, toolWear, canvas, renderer, scene, camera, atlasCanvas, tex, mat, torchMat,
-  dayUniform, glowMat, sun, moon, sel, disposeMesh, buildChunk, refreshAround, blockGeo,
-  chunks, savedChunks, chunkAt, resetChunkCache, get, setBlock, inBounds,
-  STRUCTURE_REGION_SIZE, STRUCT_NAMES, structCache, structureFor, structAt, inStructZone,
-  groundH, forceSand, nearestStructure,
-  genChunk, getOrGen, topY, resetWorld, streamChunks,
+  GRASS, DIRT, STONE, SAND, WOOD, LEAVES,
+  PLANKS, BRICK, COBBLE, STONEBRICK, SANDSTONE, GRAVEL,
+  HAY, GOLD, TNT, TORCH, CTABLE, BED,
+  LAVA, OBSIDIAN, IRON_BLOCK, COPPER_BLOCK, DIAMOND_BLOCK, BEEF,
+  PORK, MUTTON, CHICKEN, COOKED, WOOL, FEATHER,
+  LEATHER, GUNPOWDER, DYNAMITE, FLINT, EMERALD, BONE,
+  STRING, STICK, COAL, RAW_COPPER, RAW_IRON, COPPER_INGOT,
+  IRON_INGOT, DIAMOND, EGG_KINDS, FOOD, tileOf, isBed,
+  BED_H, BED_DIR, solid, NAMES, ALL_BLOCKS, BREAK_TIME,
+  DROPS, TOOL_TIERS, toolId, TOOLS, TOOL_MAX, TOOL_LVL,
+  TOOL_SPD, TOOL_DMG, NEEDS_PICK, hotbar, toolWear, canvas,
+  renderer, scene, camera, atlasCanvas, tex, dayUniform,
+  glowMat, sun, moon, sel, disposeMesh, buildChunk,
+  refreshAround, blockGeo, chunks, savedChunks, chunkAt, resetChunkCache,
+  get, setBlock, inBounds, STRUCTURE_REGION_SIZE, structCache, structureFor,
+  inStructZone, nearestStructure, getOrGen, topY, resetWorld, streamChunks,
 } = worldServices;
 
 /* ---------- Game state ---------- */
@@ -118,12 +116,13 @@ let enderDragonDefeated = false;
 let shake = 0;
 const raidElement = document.getElementById('raid');
 if (!raidElement) throw new Error('Missing raid status element');
-const { mobs, KINDS, addMob, removeMobAt, clearMobs, updateMobs, raycastMobs,
-  attackMob, damageMob, arrows, blasts, fx, queueRebuild, flushRebuilds,
-  rebuildSet, spawnTnt, addDynamite, removeBlastAt, removeFxAt, explode,
-  updateBlasts, updateArrows, updateFx, RELIC_COUNT, relics, addRelic,
-  clearRelics, createRelics, updateRelics, checkRelics, objectiveText,
-  syncRelicVisibility } = createMobRuntime({
+const {
+  mobs, KINDS, addMob, removeMobAt, clearMobs, updateMobs,
+  raycastMobs, attackMob, damageMob, queueRebuild, flushRebuilds, rebuildSet,
+  spawnTnt, addDynamite, explode, updateBlasts, updateArrows, updateFx,
+  RELIC_COUNT, relics, addRelic, clearRelics, createRelics, updateRelics,
+  checkRelics, objectiveText, syncRelicVisibility,
+} = createMobRuntime({
   scene, camera, player,
   mobDropIds: { GUNPOWDER, BONE, STRING, EMERALD, IRON_INGOT, COPPER_INGOT,
     DIAMOND, BEEF, LEATHER, PORK, MUTTON, WOOL, CHICKEN, FEATHER },
@@ -232,11 +231,11 @@ const gameState = {
   get touchJump() { return touchJump; }, set touchJump(value: boolean) { touchJump = value; },
 };
 
-const { hotbarEl, heartsEl, foodEl, flashEl, mineBar,
-  updateHotbar, flashName, updateFood, updateHearts,
-  openCraft, renderCraft, openInventory, closeInventory, renderInventory,
-  openTrade, renderTrade, touchUI, jumpButton: bJump, placeButton: bPlace,
-  flyButton: bFly, inventoryButton: bInv, toggleFly } = createGameUiComposition({
+const {
+  hotbarEl, heartsEl, foodEl, flashEl, mineBar, updateHotbar,
+  flashName, updateFood, updateHearts, openCraft, closeInventory, openTrade,
+  touchUI, jumpButton: bJump, placeButton: bPlace, flyButton: bFly, inventoryButton: bInv, toggleFly,
+} = createGameUiComposition({
   state: gameState, player, canvas, atlasCanvas, tileOf,
   inventory: inv, hotbar, allBlocks: ALL_BLOCKS, names: NAMES,
   tools: TOOLS, toolMax: TOOL_MAX, toolWear,
@@ -413,7 +412,7 @@ const { WEATHER_LABEL, setWeather, updateWeather, updateRain, updateRainSound, d
 
 /* ---------- UI / state ---------- */
 const LABEL = MODE_LABELS;
-const { overlay, playBtn, newBtn, subEl, infoEl, objEl,
+const { overlay, playBtn, subEl, infoEl, objEl,
   updateModeUI, updateDiffUI, updateWeatherUI, showHint } = createGameMenu({
   getMode: () => mode, getDifficulty: () => difficulty, getWeather: () => weather,
   canInteract, hasHealth, isTouch, relicCount: RELIC_COUNT,
