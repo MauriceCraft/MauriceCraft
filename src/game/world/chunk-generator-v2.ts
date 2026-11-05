@@ -14,7 +14,7 @@ export function createModernChunkGenerator(
   const { maxHeight: H, seaLevel: SEA, regionSize: REG, blocks, getSeed,
     groundH, inStructZone, forceSand, structureFor, buildStructure, getBiome } = deps;
   const natural = createNaturalFeatures({
-    getSeed, biomeAt: getBiome, heightAt: deps.heightAt, inStructureZone: inStructZone,
+    getSeed, getGeneratorVersion: deps.getGeneratorVersion, biomeAt: getBiome, heightAt: deps.heightAt, inStructureZone: inStructZone,
     seaLevel: SEA, maxHeight: H, waterBlock: blocks.WATER, lavaBlock: blocks.LAVA,
   });
   const trees = createTreeDecorator({
