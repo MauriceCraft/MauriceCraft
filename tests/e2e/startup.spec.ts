@@ -50,7 +50,7 @@ test('new worlds use versioned biomes and weather settings persist across reload
   const before = await readWorlds();
   expect(before).toHaveLength(2);
   for (const world of before) {
-    expect(world.generatorVersion).toBe(3);
+    expect(world.generatorVersion).toBe(4);
     expect(world.seed).toBeGreaterThanOrEqual(0);
     expect(world.seed).toBeLessThan(0x100000000);
   }

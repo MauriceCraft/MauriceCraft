@@ -29,6 +29,26 @@ describe('lakes and flowing terrain features', () => {
     expect(center!.bottom).toBeLessThan(center!.surface);
     expect(center!.liquid).toBe('water');
   });
+  it('makes highland lava lakes more discoverable on v4 without changing v3', () => {
+    const create = (version: number) => createNaturalFeatures({
+      getSeed: () => 677, getGeneratorVersion: () => version,
+      biomeAt: () => 'highlands', heightAt: () => 23,
+      inStructureZone: () => false, seaLevel: 14, maxHeight: 48,
+      waterBlock: 34, lavaBlock: 35,
+    });
+    const v3 = create(3), v4 = create(4);
+    let oldLava = 0, newLava = 0, oldWater = 0;
+    for (let rx = -12; rx < 12; rx++) for (let rz = -12; rz < 12; rz++) {
+      const older = v3.lakeFor(rx, rz), modern = v4.lakeFor(rx, rz);
+      if (older?.liquid === 'lava') oldLava++;
+      if (older?.liquid === 'water') oldWater++;
+      if (modern?.liquid === 'lava') newLava++;
+    }
+    expect(oldLava).toBe(0);
+    expect(oldWater).toBeGreaterThan(0);
+    expect(newLava).toBeGreaterThan(10);
+  });
+
   it('clips feature decorations to adjacent chunks without random generation order', () => {
     const features = make(121);
     const collect = (cx: number, cz: number) => {

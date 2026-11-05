@@ -45,15 +45,21 @@ export function createNaturalFeatures(deps: NaturalFeatureDependencies) {
 
   function makeLake(rx: number, rz: number, seed: number): Lake | null {
     const roll = hash2(rx, rz, seed + 2110);
-    if (roll > 0.34) return null;
+    const modernLava = (deps.getGeneratorVersion?.() ?? 2) >= 4;
+    if (roll > (modernLava ? 0.54 : 0.34)) return null;
     const x = rx * LAKE_CELL + 20 + Math.floor(hash2(rx, rz, seed + 2111) * 56);
     const z = rz * LAKE_CELL + 20 + Math.floor(hash2(rx, rz, seed + 2112) * 56);
     if (inStructureZone(x, z)) return null;
     const h = heightAt(x, z);
     if (h < deps.seaLevel + 3 || h >= deps.maxHeight - 7) return null;
     const biome = biomeAt(x, z);
-    const liquid: NaturalLiquid = (biome === 'volcanic' || (biome === 'badlands' && roll < 0.10)) &&
-      Math.hypot(x, z) > 80 ? 'lava' : 'water';
+    const lavaBiome = modernLava
+      ? biome === 'volcanic' || (biome === 'badlands' && roll < 0.44) ||
+        (biome === 'highlands' && roll < 0.17) ||
+        (biome === 'desert' && roll < 0.045)
+      : biome === 'volcanic' || (biome === 'badlands' && roll < 0.10);
+    const liquid: NaturalLiquid = lavaBiome && Math.hypot(x, z) > (modernLava ? 60 : 80)
+      ? 'lava' : 'water';
     if (biome === 'desert' && roll > 0.09) return null;
     const lake = {
       x, z, rx: 7 + Math.floor(hash2(rx, rz, seed + 2113) * 10),
@@ -104,7 +110,9 @@ export function createNaturalFeatures(deps: NaturalFeatureDependencies) {
       const biome = biomeAt(x, z);
       best = { x, z, dx, dz, high, low,
         liquid: biome === 'volcanic' || (biome === 'badlands' &&
-          hash2(rx, rz, seed + 2153) < 0.4) ? 'lava' : 'water' };
+          hash2(rx, rz, seed + 2153) < 0.4) ||
+          ((deps.getGeneratorVersion?.() ?? 2) >= 4 && biome === 'highlands' &&
+            hash2(rx, rz, seed + 2154) < 0.24) ? 'lava' : 'water' };
     }
     return best;
   }
