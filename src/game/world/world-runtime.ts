@@ -10,6 +10,7 @@ import { createFluidSimulator } from './fluid-simulator';
 import { createCaveCarver } from './cave-carver';
 import { biomeAt, biomeHeightAt } from './biomes';
 import { volcanoHeightAt } from './volcanoes';
+import { createLandmarkFinder } from './world-landmarks';
 import { createGameRenderer } from '../rendering/game-renderer';
 import { createChunkMesher } from '../rendering/chunk-mesher';
 
@@ -91,6 +92,12 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
   });
   const { REG: STRUCTURE_REGION_SIZE, groundH, forceSand,
     inStructZone, structureFor } = regions;
+  const landmarks = createLandmarkFinder({
+    getSeed: deps.getSeed, getVersion: deps.getGeneratorVersion,
+    getDimension: deps.getDimension, getPlayer: deps.getPlayer,
+    heightAt, inStructureZone: inStructZone,
+    seaLevel: SEA_LEVEL, worldHeight: WORLD_HEIGHT,
+  });
   const { buildStructure } = createStructureBuilders(deps.getSeed, {
     BRICK, COBBLE, CTABLE, DIRT, GOLD, GRAVEL, HAY,
     LEAVES, MOSSY, PLANKS, SANDSTONE, STONEBRICK, TORCH, WOOD,
@@ -132,6 +139,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     ...renderer,
     ...mesher,
     ...regions,
+    ...landmarks,
     ...lifecycle,
     chunks, savedChunks, hotbar, toolWear,
     chunkAt, resetChunkCache, get, setBlock, inBounds,
