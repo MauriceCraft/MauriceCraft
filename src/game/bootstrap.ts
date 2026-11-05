@@ -6,17 +6,10 @@ import { createFrameLoop, startFrameLoop } from './runtime/frame-loop';
 import { createGameTick } from './runtime/game-tick';
 import { createGameSessionControls } from './runtime/game-session-controls';
 import { showStartupFailure } from '../startup/startup-health';
-import { raycastActors } from './entities/actor-targeting';
-import { createMobCatalog } from './entities/mob-catalog';
 import { createPlayerMovement } from './player/player-movement';
-import { createRelicSystem } from './adventure/relics';
 import { createWeatherSystem } from './rendering/weather-system';
-import { SpatialIndex } from './entities/spatial-index';
-import { createMobSimulation } from './entities/mob-simulation';
-import { createArrowSystem } from './entities/arrow-system';
-import { createMobSpawning } from './entities/mob-spawning';
-import { createMobWorldCycle } from './entities/mob-world-cycle';
-import { part, JOBS, JOB_NAMES } from './entities/mob-models';
+import { JOBS, JOB_NAMES } from './entities/mob-models';
+import { createMobRuntime } from './entities/mob-runtime';
 import { ckey } from './world/chunk-key';
 import { createWorldRuntime } from './world/world-runtime';
 import { raycastBlocks } from './world/raycast';
@@ -38,7 +31,6 @@ import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { createPortalSystem } from './portals/portal-system';
 import { snapshotPortals } from './portals/persistence';
-import { createExplosionSystem } from './effects/explosions';
 import { openWorldStorage } from './storage/world-storage';
 import { createWorldSession } from './session/world-session';
 import { snapshotWorldState, collectWorldSaveBatch } from './session/world-persistence';
@@ -129,144 +121,48 @@ const { Snd, saveSound, applySound, audioInit, sfx, sfxAt, updateMusic, tone, hi
 
 /* ---------- Mobs: hostile monsters, villagers and farm animals ---------- */
 let enderDragonDefeated = false;
-const mobs = [];
-const hostileActors = new SpatialIndex(16);
-const defenders = new SpatialIndex(16);
-let activeMobIndexes = null;
-const { KINDS, ANIMALS } = createMobCatalog({ GUNPOWDER, BONE, STRING, EMERALD, IRON_INGOT, COPPER_INGOT, DIAMOND, BEEF, LEATHER, PORK, MUTTON, WOOL, CHICKEN, FEATHER });
-function addMob(kind, x, y, z, opts) {
-  const K = KINDS[kind];
-  const m = { kind: kind, hostile: K.hostile, r: K.r, h: K.h, hp: K.hp, x: x, y: y, z: z, vx: 0, vy: 0, vz: 0, onGround: false, hit: false,
-    atk: 0.8, burn: -1, phase: Math.random() * 6, ai: Math.random() * 3, walk: false, dx: 0, dz: 1, panic: 0, face: Math.random() * 6.28,
-    jumpCd: 0, persist: false, golem: !!K.golem, fuse: -1, shoot: 1.5 + Math.random(), snd: 3 + Math.random() * 8, job: opts && opts.job, village: null, hx: 0, hz: 0,
-    group: K.make(opts || {}) };
-  m.group.position.set(x, y, z);
-  scene.add(m.group); mobs.push(m);
-  return m;
-}
-function removeMobAt(index) {
-  const mob = mobs[index];
-  activeMobIndexes?.hostiles.delete(mob);
-  activeMobIndexes?.defenders.delete(mob);
-  scene.remove(mob.group);
-  mobs.splice(index, 1);
-}
-function clearMobs() {
-  mobs.forEach(function (m) { if (m.village) m.village.vSpawned = false; });   // villages repopulate afterwards
-  while (mobs.length) removeMobAt(mobs.length - 1);
-  while (blasts.length) removeBlastAt(blasts.length - 1);
-  while (fx.length) removeFxAt(fx.length - 1);
-  while (arrows.length) { scene.remove(arrows.pop().mesh); }
-  pendingBlasts.length = 0; pendingHits.length = 0;
-  endRaid(null);
-  shake = 0;
-}
-const { raid, endRaid, trySpawnMob, trySpawnAnimals, manageVillagers,
-  trySpawnPatrol, updateRaid } = createMobSpawning({
-  mobs, player, kinds: KINDS, animals: ANIMALS, jobs: JOBS,
+let shake = 0;
+const raidElement = document.getElementById('raid');
+if (!raidElement) throw new Error('Missing raid status element');
+const { mobs, KINDS, addMob, removeMobAt, clearMobs, updateMobs, raycastMobs,
+  attackMob, damageMob, arrows, blasts, fx, queueRebuild, flushRebuilds,
+  rebuildSet, spawnTnt, addDynamite, removeBlastAt, removeFxAt, explode,
+  updateBlasts, updateArrows, updateFx, RELIC_COUNT, relics, addRelic,
+  clearRelics, createRelics, updateRelics, checkRelics, objectiveText,
+  syncRelicVisibility } = createMobRuntime({
+  scene, camera, player,
+  mobDropIds: { GUNPOWDER, BONE, STRING, EMERALD, IRON_INGOT, COPPER_INGOT,
+    DIAMOND, BEEF, LEATHER, PORK, MUTTON, WOOL, CHICKEN, FEATHER },
+  diamondItem: DIAMOND, names: NAMES,
+  getSeed: () => seed, getDimension: () => dimension,
+  isDragonDefeated: () => enderDragonDefeated,
+  setDragonDefeated: value => { enderDragonDefeated = value; },
+  getDifficulty: () => DIFF[difficulty],
+  getOmen: () => omen, setOmen: value => { omen = value; },
+  isDead: () => dead, hasHealth: () => hasHealth(),
+  isDaylight: () => isDay, isNight: () => isNight,
+  getRainLevel: () => rainLevel, getWeather: () => weather,
+  getMode: () => mode,
   regionSize: STRUCTURE_REGION_SIZE,
   grassBlock: GRASS, leavesBlock: LEAVES, woodBlock: WOOD,
-  torchBlock: TORCH, emeraldItem: EMERALD,
-  getSeed: () => seed,
-  getChunk: chunkAt,
-  getBlock: get, topY, solid, collides,
-  getStructure: structureFor, addMob,
-  getOmen: () => omen, setOmen: next => { omen = next; },
-  isDead: () => dead, hasHealth: () => hasHealth(), getMode: () => mode,
+  torchBlock: TORCH, emeraldItem: EMERALD, sandBlock: SAND,
+  tntId: TNT, worldHeight: WORLD_HEIGHT, texture: tex,
+  breakTimes: BREAK_TIME, blockGeometry: blockGeo,
+  getChunk: chunkAt, getBlock: get, setBlock, topY, solid, collides,
+  getStructure: structureFor, buildChunk, moveEntity: moveEnt,
+  getOrGenerateChunk: getOrGen, inStructureZone: inStructZone,
+  damagePlayer: (damage, scaled) => damagePlayer(damage, scaled),
   giveItem: (id, count) => giveItem(id, count),
+  attackDamage: () => attackDamage(),
   showHint: (message, ms) => showHint(message, ms),
-  playSound: event => sfx(event),
-  raidElement: document.getElementById('raid'),
-});
-const pendingBlasts = [], pendingHits = [];
-const { arrows, hasLOS, shootArrow, updateArrows } = createArrowSystem({
-  scene, player, mobs, getBlock: get, solid, collides,
-  hasHealth: () => hasHealth(),
-  damagePlayer, damageMob,
+  flashName: message => flashName(message),
   playSound: event => sfx(event),
   playSoundAt: (event, x, y, z) => sfxAt(event, x, y, z),
-});
-const stepMobActors = createMobSimulation({
-  mobs, player, kinds: KINDS, raid, hostileActors, defenders,
-  getDifficulty: () => DIFF[difficulty],
-  isDaylight: () => isDay, isNight: () => isNight, getRainLevel: () => rainLevel,
-  canTakeDamage: hasHealth,
-  removeMobAt, damagePlayer, showHint: (message, milliseconds) => showHint(message, milliseconds),
-  playSoundAt: (sound, x, y, z) => sfxAt(sound, x, y, z),
-  hasLineOfSight: hasLOS, shootArrow,
-  moveEntity: moveEnt, pendingHits, pendingBlasts,
-});
-const { updateMobs } = createMobWorldCycle({
-  mobs, player, kinds: KINDS, hostileActors, defenders, pendingHits, pendingBlasts,
-  getDifficulty: () => DIFF[difficulty], getDimension: () => dimension,
-  isDragonDefeated: () => enderDragonDefeated,
-  hasHealth: () => hasHealth(), isNight: () => isNight, getWeather: () => weather,
-  addMob, trySpawnMob, trySpawnAnimals, manageVillagers, trySpawnPatrol, updateRaid,
-  stepMobActors,
-  setActiveIndexes: indexes => { activeMobIndexes = indexes; },
-  damageMob, explode,
-  showHint: (message, ms) => showHint(message, ms),
-});
-
-const rayDir = new THREE.Vector3();
-function raycastMobs(maxDistance) {
-  camera.getWorldDirection(rayDir);
-  return raycastActors(mobs, camera.position, rayDir, maxDistance);
-}
-function giveItem(id, n) { inv[id] = (inv[id] || 0) + n; updateHotbar(false); }
-function killMob(m) {
-  const i = mobs.indexOf(m);
-  if (i >= 0) removeMobAt(i);
-  if (m.kind === 'enderdragon') {
-    enderDragonDefeated = true;
-    showHint('THE ENDER DRAGON IS DEFEATED! You conquered the End!', 8000);
-    sfxAt('explode', m.x, m.y, m.z);
-    if (mode === 'survival') giveItem(DIAMOND, 5);
-    return;
-  }
-  sfxAt('die', m.x, m.y + 0.5, m.z);
-  if (m.leader && hasHealth() && !omen && DIFF[difficulty].cap > 0) { omen = true; showHint('You feel an ominous presence... Enter a village and a raid will follow.', 5500); }
-  if (mode === 'survival') {
-    const got = [];
-    KINDS[m.kind].drops().forEach(function (d) { if (d[1] > 0) { giveItem(d[0], d[1]); got.push('+' + d[1] + ' ' + NAMES[d[0]]); } });
-    if (got.length) flashName(got.join('   '));
-  }
-}
-function damageMob(m, dmg) {
-  m.hp -= dmg;
-  if (!m.hostile) m.panic = 3.5;
-  if (m.hp <= 0) { killMob(m); return true; }
-  return false;
-}
-function attackMob(m) {
-  if (m.golem) { flashName('That golem is on your side'); return; }
-  const dx = m.x - player.x, dz = m.z - player.z, d = Math.hypot(dx, dz) || 1;
-  m.vx += dx / d * 9; m.vz += dz / d * 9; m.vy = 5;
-  sfxAt('hit', m.x, m.y + 0.8, m.z);
-  damageMob(m, attackDamage());
-}
-
-let shake = 0;
-const { blasts, fx, rebuildSet, spawnTnt, addDynamite, removeBlastAt, removeFxAt,
-  queueRebuild, flushRebuilds, explode, updateBlasts, updateFx } = createExplosionSystem({
-  scene, texture: tex, tntId: TNT, torchId: TORCH, worldHeight: WORLD_HEIGHT,
-  breakTimes: BREAK_TIME, blockGeometry: blockGeo,
-  getBlock: get, setBlock, hasChunk: (x, z) => !!chunkAt(x, z), buildChunk,
-  getMobs: () => mobs, getPlayer: () => player,
-  damageMob: (mob, damage) => { damageMob(mob, damage); },
-  damagePlayer: damage => damagePlayer(damage),
-  moveEntity: moveEnt, collides,
-  playSound: (name, x, y, z) => sfxAt(name, x, y, z),
+  raidElement,
   increaseShake: amount => { shake = Math.max(shake, amount); },
+  setShake: amount => { shake = amount; },
 });
-
-const { RELIC_COUNT, relics, addRelic, clearRelics, createRelics,
-  updateRelics, checkRelics, objectiveText, setMode: syncRelicVisibility } = createRelicSystem({
-  scene, getMode: () => mode, getPlayer: () => player,
-  getOrGenerateChunk: getOrGen, topBlockY: topY, getBlock: get,
-  inStructureZone: inStructZone, grassBlock: GRASS, sandBlock: SAND,
-  showHint: (message, milliseconds) => showHint(message, milliseconds),
-});
+function giveItem(id, n) { inv[id] = (inv[id] || 0) + n; updateHotbar(false); }
 
 /* ---------- Input state ---------- */
 const keys = {};
