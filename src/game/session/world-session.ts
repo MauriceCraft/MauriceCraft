@@ -42,6 +42,20 @@ export function nextWorldSeed(worlds: readonly WorldRecord[], random: () => numb
   return seed;
 }
 
+/** Blank means random; negative 32-bit values use the same bits as unsigned seeds. */
+export function parseWorldSeedInput(raw: string): number | null {
+  const value = raw.trim();
+  if (!value) return null;
+  if (!/^-?\d+$/.test(value)) {
+    throw new RangeError('Enter a whole-number seed, or leave this blank for a random world.');
+  }
+  const seed = Number(value);
+  if (!Number.isSafeInteger(seed) || seed < -2147483648 || seed > 4294967295) {
+    throw new RangeError('Seed must be between -2147483648 and 4294967295.');
+  }
+  return seed >>> 0;
+}
+
 export function nextWorldName(worlds: readonly WorldRecord[]): string {
   let highestNumber = 0;
   for (const world of worlds) {
@@ -67,6 +81,8 @@ export function createWorldSession(deps: WorldSessionDependencies) {
   const subtitle = requireElement<HTMLElement>('sub');
   const playButton = requireElement<HTMLButtonElement>('play');
   const newWorldButton = requireElement<HTMLButtonElement>('newworld');
+  const worldSeedInput = requireElement<HTMLInputElement>('worldSeed');
+  worldSeedInput.addEventListener('input', () => worldSeedInput.setCustomValidity(''));
   let database: WorldStorage | null = null;
   let storageAvailable = false;
   let currentWorld: WorldRecord | null = null;
@@ -98,6 +114,7 @@ export function createWorldSession(deps: WorldSessionDependencies) {
     busy = isBusy;
     playButton.disabled = isBusy;
     newWorldButton.disabled = isBusy;
+    worldSeedInput.disabled = isBusy;
     worldsElement.classList.toggle('busy', isBusy);
     if (isBusy) {
       playButton.textContent = 'Loading…';
@@ -120,7 +137,8 @@ export function createWorldSession(deps: WorldSessionDependencies) {
       openButton.appendChild(document.createTextNode(world.name));
       const details = document.createElement('small');
       details.textContent = deps.modeLabel(world.mode) + ' · played ' +
-        timeAgo(world.lastPlayed || world.created || Date.now());
+        timeAgo(world.lastPlayed || world.created || Date.now()) +
+        ' · Seed ' + world.seed + ' · Terrain v' + (world.generatorVersion ?? 1);
       openButton.appendChild(details);
       openButton.addEventListener('click', () => {
         if (busy) return;
@@ -199,7 +217,7 @@ export function createWorldSession(deps: WorldSessionDependencies) {
     }
   }
 
-  async function newWorld(): Promise<void> {
+  async function newWorld(seedOverride: number | null = null): Promise<void> {
     setBusy(true, 'Building your world…');
     await saveWorld();
     deps.setWorldReady(false);
@@ -207,12 +225,13 @@ export function createWorldSession(deps: WorldSessionDependencies) {
     const now = Date.now();
     const world: WorldRecord = {
       id: 'w' + now.toString(36) + Math.floor(Math.random() * 1296).toString(36),
-      name: nextWorldName(worlds), seed: nextWorldSeed(worlds),
+      name: nextWorldName(worlds), seed: seedOverride ?? nextWorldSeed(worlds),
       generatorVersion: CURRENT_WORLD_GENERATOR_VERSION,
       created: now, lastPlayed: now,
     };
     currentWorld = world;
     deps.prepareNewWorld(world);
+    worldSeedInput.value = '';
     await saveWorld();
     await refreshWorlds();
     finishLoad();
@@ -269,7 +288,17 @@ export function createWorldSession(deps: WorldSessionDependencies) {
   }
 
   newWorldButton.addEventListener('click', () => {
-    if (!busy) void newWorld().catch(error => showWorldLifecycleError(error));
+    if (busy) return;
+    let seed: number | null;
+    try {
+      seed = parseWorldSeedInput(worldSeedInput.value);
+    } catch (error) {
+      worldSeedInput.setCustomValidity(error instanceof Error ? error.message : 'Invalid seed');
+      worldSeedInput.reportValidity();
+      worldSeedInput.focus();
+      return;
+    }
+    void newWorld(seed).catch(error => showWorldLifecycleError(error));
   });
   function showWorldLifecycleError(error: unknown): void {
     console.error('MauriceCraft world operation failed:', error);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextWorldName, nextWorldSeed, CURRENT_WORLD_GENERATOR_VERSION, timeAgo } from '../../src/game/session/world-session';
+import { nextWorldName, nextWorldSeed, parseWorldSeedInput, CURRENT_WORLD_GENERATOR_VERSION, timeAgo } from '../../src/game/session/world-session';
 import type { WorldRecord } from '../../src/game/storage/world-storage';
 
 function world(name: string): WorldRecord {
@@ -20,6 +20,17 @@ describe('saved world session naming and history', () => {
     expect(nextWorldSeed([world('a')], () => 0)).toBe(0);
     const existing = [{ ...world('a'), seed: 3221225472 }];
     expect(nextWorldSeed(existing, () => 0.75)).toBe(0);
+  });
+
+  it('accepts signed and unsigned seeds while treating blank as random', () => {
+    expect(parseWorldSeedInput('')).toBeNull();
+    expect(parseWorldSeedInput('  123456789 ')).toBe(123456789);
+    expect(parseWorldSeedInput('0')).toBe(0);
+    expect(parseWorldSeedInput('-1')).toBe(4294967295);
+    expect(parseWorldSeedInput('4294967295')).toBe(4294967295);
+    for (const invalid of ['abc', '1.5', '0xff', '-2147483649', '4294967296', '1e3']) {
+      expect(() => parseWorldSeedInput(invalid)).toThrow(RangeError);
+    }
   });
 
   it('renders stable user-friendly save ages', () => {

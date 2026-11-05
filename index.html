@@ -103,6 +103,11 @@
     </div>
     <div class="invsub">Worlds</div>
     <div class="worlds" id="worlds"></div>
+    <label class="world-seed-label" for="worldSeed">New world seed (optional)</label>
+    <input id="worldSeed" type="text" inputmode="numeric" autocomplete="off"
+      spellcheck="false" placeholder="Blank for random, or enter a seed"
+      aria-describedby="worldSeedHelp">
+    <small id="worldSeedHelp" class="world-seed-help">Same seed and terrain version create the same world. You can use -2147483648 to 4294967295.</small>
     <p id="saveNote"></p>
     <dl class="controls" id="controls">
       <dt>W A S D</dt><dd>Move</dd>
