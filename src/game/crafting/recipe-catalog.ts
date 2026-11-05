@@ -1,6 +1,6 @@
 import type { Recipe } from './recipes';
 
-export type RecipeItemId = 'BED' | 'BEEF' | 'BONE' | 'BRICK' | 'CHICKEN' | 'COAL' | 'COBBLE' | 'COOKED' | 'COPPER_BLOCK' | 'COPPER_INGOT' | 'CTABLE' | 'DIAMOND' | 'DIAMOND_BLOCK' | 'DIRT' | 'DYNAMITE' | 'EMERALD' | 'FEATHER' | 'FLINT' | 'GOLD' | 'GRAVEL' | 'GUNPOWDER' | 'IRON_BLOCK' | 'IRON_INGOT' | 'LEATHER' | 'MUTTON' | 'PLANKS' | 'PORK' | 'RAW_COPPER' | 'RAW_IRON' | 'SAND' | 'SANDSTONE' | 'STICK' | 'STONE' | 'STONEBRICK' | 'STRING' | 'TNT' | 'TORCH' | 'WOOD' | 'WOOL';
+export type RecipeItemId = 'ACACIA_WOOD' | 'BIRCH_WOOD' | 'DARK_WOOD' | 'WILLOW_WOOD' | 'BED' | 'BEEF' | 'BONE' | 'BRICK' | 'CHICKEN' | 'COAL' | 'COBBLE' | 'COOKED' | 'COPPER_BLOCK' | 'COPPER_INGOT' | 'CTABLE' | 'DIAMOND' | 'DIAMOND_BLOCK' | 'DIRT' | 'DYNAMITE' | 'EMERALD' | 'FEATHER' | 'FLINT' | 'GOLD' | 'GRAVEL' | 'GUNPOWDER' | 'IRON_BLOCK' | 'IRON_INGOT' | 'LEATHER' | 'MUTTON' | 'PLANKS' | 'PORK' | 'RAW_COPPER' | 'RAW_IRON' | 'SAND' | 'SANDSTONE' | 'STICK' | 'STONE' | 'STONEBRICK' | 'STRING' | 'TNT' | 'TORCH' | 'WOOD' | 'WOOL';
 export type RecipeItemIds = Record<RecipeItemId, number>;
 export interface RecipeCatalogDependencies {
   items: RecipeItemIds;
@@ -10,12 +10,17 @@ export interface RecipeCatalogDependencies {
 
 /** Canonical crafting recipes, including shaped and shapeless recipes. */
 export function createRecipeCatalog(deps: RecipeCatalogDependencies): Recipe[] {
-  const { BED, BEEF, BONE, BRICK, CHICKEN, COAL, COBBLE, COOKED, COPPER_BLOCK, COPPER_INGOT, CTABLE, DIAMOND, DIAMOND_BLOCK, DIRT, DYNAMITE, EMERALD, FEATHER, FLINT, GOLD, GRAVEL, GUNPOWDER, IRON_BLOCK, IRON_INGOT, LEATHER, MUTTON, PLANKS, PORK, RAW_COPPER, RAW_IRON, SAND, SANDSTONE, STICK, STONE, STONEBRICK, STRING, TNT, TORCH, WOOD, WOOL } = deps.items;
+  const { ACACIA_WOOD, BIRCH_WOOD, DARK_WOOD, WILLOW_WOOD, BED, BEEF, BONE, BRICK, CHICKEN, COAL, COBBLE, COOKED, COPPER_BLOCK, COPPER_INGOT, CTABLE, DIAMOND, DIAMOND_BLOCK, DIRT, DYNAMITE, EMERALD, FEATHER, FLINT, GOLD, GRAVEL, GUNPOWDER, IRON_BLOCK, IRON_INGOT, LEATHER, MUTTON, PLANKS, PORK, RAW_COPPER, RAW_IRON, SAND, SANDSTONE, STICK, STONE, STONEBRICK, STRING, TNT, TORCH, WOOD, WOOL } = deps.items;
   const TOOL_TIERS = deps.toolTiers;
   const toolId = deps.toolId;
   // Crafting recipes. Shaped ones use a pattern (they work mirrored); shapeless ones just need the right items.
   const RECIPES: Recipe[] = [
-    { out: PLANKS, n: 4, shapeless: [WOOD] },
+    // Every tree species should feed the same early-game crafting progression.
+    ...[WOOD, DARK_WOOD, BIRCH_WOOD, ACACIA_WOOD, WILLOW_WOOD].map(log =>
+      ({ out: PLANKS, n: 4, shapeless: [log] } as Recipe)),
+    // Quick starter recipe; the usual two-planks-to-four-sticks recipe remains.
+    ...[WOOD, DARK_WOOD, BIRCH_WOOD, ACACIA_WOOD, WILLOW_WOOD].map(log =>
+      ({ out: STICK, n: 4, shapeless: [log] } as Recipe)),
     { out: CTABLE, n: 1, shape: ['pp', 'pp'], key: { p: PLANKS } },
     { out: STICK, n: 4, shape: ['p', 'p'], key: { p: PLANKS } },
     { out: TORCH, n: 4, shape: ['w', 's'], key: { w: WOOD, s: STICK } },
