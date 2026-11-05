@@ -530,8 +530,10 @@ const frame = createFrameLoop({
   updateRainSound,
   updateRelics,
   updateInfo: fps => {
+    const landmark = worldServices.nearestLandmark();
+    const biomeInfo = worldServices.biomeLabel();
     const state = mode === 'creative' ? (player.fly ? 'Flying' : 'Walking') : (isNight && hasHealth() ? 'Night' : (mode === 'spectator' ? 'x' + specSpeed.toFixed(2) : 'Day'));
-        infoEl.textContent = LABEL[mode] + (hasHealth() ? ' \u00b7 ' + DIFF[difficulty].label : '') + '  ' + state + '\nX ' + player.x.toFixed(1) + '  Y ' + player.y.toFixed(1) + '  Z ' + player.z.toFixed(1) + '\n' + fps + ' fps' + (weather === 'clear' ? '' : ' \u00b7 ' + WEATHER_LABEL[weather]) + '\nNearby: ' + nearestStructure();
+        infoEl.textContent = LABEL[mode] + (hasHealth() ? ' \u00b7 ' + DIFF[difficulty].label : '') + '  ' + state + '\nX ' + player.x.toFixed(1) + '  Y ' + player.y.toFixed(1) + '  Z ' + player.z.toFixed(1) + '\n' + fps + ' fps' + (weather === 'clear' ? '' : ' \u00b7 ' + WEATHER_LABEL[weather]) + '\nBiome: ' + biomeInfo + '\nNearby: ' + nearestStructure() + (landmark ? '\nLandmark: ' + landmark : '');
     if (mode === 'adventure') objEl.textContent = objectiveText();
   },
   render: () => renderer.render(scene, camera),
