@@ -44,13 +44,14 @@ import { registerGeneralCommands } from './commands/general-commands';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { createPortalSystem } from './portals/portal-system';
-import { restorePortals, snapshotPortals } from './portals/persistence';
+import { snapshotPortals } from './portals/persistence';
 import { createGameRenderer } from './rendering/game-renderer';
 import { createExplosionSystem } from './effects/explosions';
 import { createChunkMesher } from './rendering/chunk-mesher';
 import { openWorldStorage } from './storage/world-storage';
 import { createWorldSession } from './session/world-session';
 import { snapshotWorldState, collectWorldSaveBatch } from './session/world-persistence';
+import { createWorldRestore } from './session/world-restore';
 import { createAudioEngine } from './audio/sound-engine';
 
 
@@ -788,65 +789,33 @@ function collectSaveBatch(world) {
 function saveWorld() { return worldSession.saveWorld(); }
 function refreshWorlds() { return worldSession.refreshWorlds(); }
 
-function applyWorld(m) {
-  const p = m.player || { x: 0.5, y: 60, z: 0.5, yaw: 0, pitch: 0, fly: false };
-  dimension = ['overworld', 'nether', 'end'].includes(m.dimension) ? m.dimension : 'overworld';
-  enderDragonDefeated = !!m.enderDragonDefeated;
-  portals.length = 0; portals.push(...restorePortals(m.portals));
-  clearPortalVisuals(); portals.forEach(showPortalVisual);
-  resetWorld(m.seed, Math.floor(p.x / 16), Math.floor(p.z / 16));
-  clearMobs();
-  player.x = p.x; player.y = p.y; player.z = p.z; player.vx = player.vy = player.vz = 0;
-  player.yaw = p.yaw || 0; player.pitch = p.pitch || 0; player.fallStart = null;
-  for (const k in inv) delete inv[k];
-  Object.keys(m.inv || {}).forEach(function (k) { inv[k] = m.inv[k]; });
-  if (m.hotbar && m.hotbar.length === 9) for (let i = 0; i < 9; i++) hotbar[i] = m.hotbar[i];
-  selected = m.selected || 0;
-  tod = (typeof m.tod === 'number') ? m.tod : 0.22;
-  for (const k in toolWear) delete toolWear[k];
-  Object.keys(m.toolWear || {}).forEach(function (k) { toolWear[k] = m.toolWear[k]; });
-  mode = m.mode || 'creative';
-  difficulty = DIFF[m.difficulty] ? m.difficulty : 'normal';
-  spawnPoint = m.spawn || null; omen = !!m.omen;
-  if (m.weather && WEATHER_LABEL[m.weather.w]) { weather = m.weather.w; weatherT = m.weather.t || 300; rainLevel = m.weather.r || 0; }
-  else { weather = 'clear'; weatherT = 420; rainLevel = 0; }
-  rainTarget = weather === 'clear' ? 0 : (weather === 'rain' ? 0.75 : 1); updateWeatherUI();
-  clearRelics();
-  (m.relics || []).forEach(function (r) { addRelic(r.x, r.y, r.z, r.got); });
-  ready = true; dead = false;
-  if (!relics.length) createRelics();
-  setMode(mode);
-  hp = (m.hp > 0) ? m.hp : MAX_HEALTH; updateHearts();
-  hunger = (typeof m.hunger === 'number') ? m.hunger : 20; sat = (typeof m.sat === 'number') ? m.sat : 5; renderFood();
-  (m.golems || []).forEach(function (g) {
-    if (!KINDS[g.kind] || Math.hypot(g.x - player.x, g.z - player.z) > 60 || !chunkAt(Math.floor(g.x) >> 4, Math.floor(g.z) >> 4)) return;
-    const gm = addMob(g.kind, g.x, g.y, g.z, null); gm.hp = g.hp; gm.persist = true; gm.hx = g.hx; gm.hz = g.hz;
-  });
-  if (mode === 'creative') player.fly = !!p.fly;
-}
-
-function prepareNewWorld(world) {
-  savedChunks.clear();
-  resetWorld(world.seed, 0, 0);
-  spawnPoint = null;
-  omen = false;
-  weather = 'clear';
-  weatherT = 420 + Math.random() * 300;
-  rainLevel = 0;
-  rainTarget = 0;
-  updateWeatherUI();
-  respawn();
-  clearMobs();
-  for (const itemId in inv) delete inv[itemId];
-  for (let slotIndex = 0; slotIndex < 9; slotIndex++) hotbar[slotIndex] = ALL_BLOCKS[slotIndex];
-  selected = 0;
-  tod = 0.22;
-  for (const toolId in toolWear) delete toolWear[toolId];
-  createRelics();
-  ready = true;
-  dead = false;
-  setMode(mode);
-}
+const { applyWorld, prepareNewWorld } = createWorldRestore({
+  state: {
+    get dimension() { return dimension; }, set dimension(value) { dimension = value; },
+    get enderDragonDefeated() { return enderDragonDefeated; }, set enderDragonDefeated(value) { enderDragonDefeated = value; },
+    get selected() { return selected; }, set selected(value) { selected = value; },
+    get tod() { return tod; }, set tod(value) { tod = value; },
+    get mode() { return mode; }, set mode(value) { mode = value; },
+    get difficulty() { return difficulty; }, set difficulty(value) { difficulty = value; },
+    get spawnPoint() { return spawnPoint; }, set spawnPoint(value) { spawnPoint = value; },
+    get omen() { return omen; }, set omen(value) { omen = value; },
+    get weather() { return weather; }, set weather(value) { weather = value; },
+    get weatherT() { return weatherT; }, set weatherT(value) { weatherT = value; },
+    get rainLevel() { return rainLevel; }, set rainLevel(value) { rainLevel = value; },
+    get rainTarget() { return rainTarget; }, set rainTarget(value) { rainTarget = value; },
+    get ready() { return ready; }, set ready(value) { ready = value; },
+    get dead() { return dead; }, set dead(value) { dead = value; },
+    get hp() { return hp; }, set hp(value) { hp = value; },
+    get hunger() { return hunger; }, set hunger(value) { hunger = value; },
+    get sat() { return sat; }, set sat(value) { sat = value; },
+  },
+  player, portals, inventory: inv, toolWear, hotbar, allBlocks: ALL_BLOCKS,
+  savedChunks, validDifficulties: DIFF, weatherLabels: WEATHER_LABEL,
+  kinds: KINDS, mobs, relics, maximumHealth: MAX_HEALTH,
+  resetWorld, clearPortalVisuals, showPortalVisual, clearMobs, clearRelics,
+  addRelic, createRelics, setMode, updateHearts, renderFood, updateWeatherUI,
+  addMob, hasChunk: (cx, cz) => !!chunkAt(cx, cz), respawn,
+});
 
 const worldSession = createWorldSession({
   openStorage: openWorldStorage,
