@@ -49,12 +49,8 @@
   #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s;
     background: radial-gradient(ellipse at center, rgba(200,0,0,0) 40%, rgba(200,0,0,.75) 100%); }
 
-  #info {
-    position: fixed; left: 12px; top: calc(env(safe-area-inset-top, 0px) + 10px);
-    padding: 6px 10px; font-size: 14px; line-height: 1.35;
-    background: var(--panel); border: 2px solid var(--panel-edge); color: var(--text);
-    pointer-events: none; white-space: pre;
-  }
+  /* Hide the developer stats panel during normal gameplay. */
+  #info { display: none !important; }
   #objective {
     position: fixed; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 10px);
     padding: 6px 10px; font-size: 14px; line-height: 1.35; text-align: right;
@@ -327,12 +323,14 @@ const portals = []; // { x, y, z, axis, width, height, targetDimension, paired }
 const portalVisuals = [];
 let portalCooldown = 0;
 
+// --- Portal visuals and lighting ---
 function makePortalMesh(p) {
   const geometry = new THREE.PlaneGeometry(p.width, p.height);
   const material = new THREE.MeshBasicMaterial({
-    color: 0x5ee7ff,
+    color: 0x9b5cff,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.92,
+    blending: THREE.AdditiveBlending,
     depthWrite: false,
     side: THREE.DoubleSide
   });
@@ -343,18 +341,19 @@ function makePortalMesh(p) {
     p.y + p.height / 2,
     p.axis === 'x' ? p.z + 0.5 : p.z + p.width / 2
   );
+  mesh.rotation.y = p.axis === 'x' ? Math.PI / 2 : 0;
 
-  if (p.axis === 'x') {
-    mesh.rotation.y = Math.PI / 2;
-  } else {
-    mesh.rotation.y = 0;
-  }
+  // A point light makes the portal illuminate nearby blocks and the player.
+  const glow = new THREE.PointLight(0x9b5cff, 2.4, 10, 2);
+  glow.position.set(0, 0, 0.35);
+  mesh.add(glow);
 
   scene.add(mesh);
   portalVisuals.push(mesh);
   return mesh;
 }
 
+// Remove portal meshes and their attached glow lights when changing dimensions.
 function clearPortalVisuals() {
   for (const v of portalVisuals) scene.remove(v);
   for (const v of portalVisuals) {
