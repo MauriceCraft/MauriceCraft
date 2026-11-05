@@ -20,6 +20,7 @@ import { createBlockCatalog } from './world/block-catalog';
 import { createRecipeMatcher } from './crafting/recipes';
 import { createRecipeCatalog } from './crafting/recipe-catalog';
 import { createInventoryUi } from './ui/inventory-ui';
+import { createInputControls } from './input/game-controls';
 import { coord } from './commands/coordinates';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
@@ -708,10 +709,10 @@ import { createAudioEngine } from './audio/sound-engine';
   let playing = false, locked = false, fallback = false, ready = false;
   const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
   let invOpen = false, tradeOpen = false, craftOpen = false, cmdOpen = false;
-  let lastSpace = 0;
   let mining = false, placing = false, pulseMine = false, pulsePlace = false;
   let mineCd = 0, placeCd = 0, attackCd = 0;
   let drag = null;
+  let stick = null, lookT = null;
   const mine = { x: -1, y: -1, z: -1, t: 0 };
 
   const canInteract = () => mode === 'creative' || mode === 'survival';
@@ -809,6 +810,13 @@ import { createAudioEngine } from './audio/sound-engine';
     toolTiers: TOOL_TIERS, toolId,
   });
   const inventoryUiState = {
+    get locked() { return locked; }, set locked(value) { locked = value; },
+    get fallback() { return fallback; }, set fallback(value) { fallback = value; },
+    get specSpeed() { return specSpeed; }, set specSpeed(value) { specSpeed = value; },
+    get pulseMine() { return pulseMine; }, set pulseMine(value) { pulseMine = value; },
+    get pulsePlace() { return pulsePlace; }, set pulsePlace(value) { pulsePlace = value; },
+    get mineCd() { return mineCd; }, set mineCd(value) { mineCd = value; },
+    get placeCd() { return placeCd; }, set placeCd(value) { placeCd = value; },
     get selected() { return selected; }, set selected(value) { selected = value; },
     get playing() { return playing; }, set playing(value) { playing = value; },
     get invOpen() { return invOpen; }, set invOpen(value) { invOpen = value; },
@@ -839,108 +847,11 @@ import { createAudioEngine } from './audio/sound-engine';
   });
 
   /* ---------- Keyboard / mouse / touch ---------- */
-  window.addEventListener('keydown', function (e) {
-    if (!playing) return;
-    keys[e.code] = true;
-    if (e.code === 'Space' || e.code.indexOf('Arrow') === 0) e.preventDefault();
-    if (e.code.indexOf('Digit') === 0 && canInteract()) {
-      const n = parseInt(e.code.slice(5), 10);
-      if (n >= 1 && n <= 9) { selected = n - 1; updateHotbar(true); }
-    }
-    if (e.code === 'Space' && !e.repeat) { doubleTapFly(); }
-    if (e.code === 'KeyF' && !e.repeat) toggleFly();
-    if (e.code === 'KeyE' && !e.repeat) pulsePlace = true;
-    if (e.code === 'KeyQ' && !e.repeat) pulseMine = true;
-    if (e.code === 'KeyP' && fallback) pause();
+  const { touchUI, jumpButton: bJump, toggleFly } = createInputControls({
+    canvas, keys, touchMove, player, state: inventoryUiState, isTouch,
+    getMode: () => mode, canInteract, updateHotbar, showHint,
+    openInventory, openCommand: (command) => openCmd(command), pause,
   });
-  window.addEventListener('keyup', function (e) { keys[e.code] = false; });
-  window.addEventListener('blur', function () { for (const k in keys) keys[k] = false; mining = placing = false; });
-  window.addEventListener('wheel', function (e) {
-    if (!playing) return;
-    if (mode === 'spectator') {
-      specSpeed = Math.max(0.25, Math.min(6, specSpeed * (e.deltaY > 0 ? 0.8 : 1.25)));
-      showHint('Fly speed x' + specSpeed.toFixed(2), 1200);
-    } else if (canInteract()) {
-      selected = (selected + (e.deltaY > 0 ? 1 : 8)) % 9; updateHotbar(true);
-    }
-  }, { passive: true });
-  window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-
-  // Double-tap jump to start or stop flying in Creative
-  function doubleTapFly() {
-    const t = performance.now();
-    if (mode === 'creative' && t - lastSpace < 320) { toggleFly(); lastSpace = 0; }
-    else lastSpace = t;
-  }
-  function toggleFly() { if (mode !== 'creative') return; player.fly = !player.fly; player.vy = 0; }
-  function look(dx, dy, k) {
-    player.yaw -= dx * k; player.pitch -= dy * k;
-    player.pitch = Math.max(-1.55, Math.min(1.55, player.pitch));
-  }
-
-  canvas.addEventListener('mousedown', function (e) {
-    if (!playing) return;
-    const placeBtn = e.button === 2 || (e.button === 0 && (e.ctrlKey || e.metaKey || e.altKey));
-    if (!locked) drag = { place: placeBtn, moved: 0, t0: performance.now() };
-    if (placeBtn) { placing = true; placeCd = 0; } else if (e.button === 0) { mining = true; mineCd = 0; }
-  });
-  window.addEventListener('mouseup', function () {
-    if (drag && drag.moved < 6 && performance.now() - drag.t0 <= 160) {
-      if (drag.place) pulsePlace = true; else pulseMine = true;
-    }
-    drag = null; mining = false; placing = false;
-  });
-  window.addEventListener('mousemove', function (e) {
-    if (!playing) return;
-    if (locked) look(e.movementX, e.movementY, 0.0023);
-    else if (drag) { drag.moved += Math.abs(e.movementX) + Math.abs(e.movementY); if (drag.moved >= 6) look(e.movementX, e.movementY, 0.0028); }
-  });
-
-  const touchUI = document.getElementById('touchui');
-  let stick = null, lookT = null;
-  canvas.addEventListener('touchstart', function (e) {
-    if (!playing) return;
-    e.preventDefault();
-    for (const t of e.changedTouches) {
-      if (t.clientX < window.innerWidth * 0.4 && !stick) stick = { id: t.identifier, sx: t.clientX, sy: t.clientY };
-      else if (!lookT) lookT = { id: t.identifier, lx: t.clientX, ly: t.clientY, t0: performance.now(), moved: 0 };
-    }
-  }, { passive: false });
-  canvas.addEventListener('touchmove', function (e) {
-    if (!playing) return;
-    e.preventDefault();
-    for (const t of e.changedTouches) {
-      if (stick && t.identifier === stick.id) {
-        touchMove.x = Math.max(-1, Math.min(1, (t.clientX - stick.sx) / 50));
-        touchMove.z = Math.max(-1, Math.min(1, (t.clientY - stick.sy) / 50));
-      } else if (lookT && t.identifier === lookT.id) {
-        look(t.clientX - lookT.lx, t.clientY - lookT.ly, 0.0055);
-        lookT.moved += Math.abs(t.clientX - lookT.lx) + Math.abs(t.clientY - lookT.ly);
-        lookT.lx = t.clientX; lookT.ly = t.clientY;
-      }
-    }
-  }, { passive: false });
-  function endTouch(e) {
-    for (const t of e.changedTouches) {
-      if (stick && t.identifier === stick.id) { stick = null; touchMove.x = 0; touchMove.z = 0; }
-      else if (lookT && t.identifier === lookT.id) {
-        if (performance.now() - lookT.t0 < 260 && lookT.moved < 10) pulseMine = true;
-        lookT = null;
-      }
-    }
-  }
-  canvas.addEventListener('touchend', endTouch);
-  canvas.addEventListener('touchcancel', endTouch);
-  const bJump = document.getElementById('btnJump'), bPlace = document.getElementById('btnPlace'), bFly = document.getElementById('btnFly'), bInv = document.getElementById('btnInv');
-  bJump.addEventListener('touchstart', function (e) { e.preventDefault(); touchJump = true; doubleTapFly(); }, { passive: false });
-  bJump.addEventListener('touchend', function () { touchJump = false; });
-  bPlace.addEventListener('touchstart', function (e) { e.preventDefault(); pulsePlace = true; }, { passive: false });
-  bFly.addEventListener('touchstart', function (e) { e.preventDefault(); toggleFly(); }, { passive: false });
-  bPlace.addEventListener('click', function () { if (!isTouch) pulsePlace = true; });
-  bFly.addEventListener('click', function () { if (!isTouch) toggleFly(); });
-  bInv.addEventListener('touchstart', function (e) { e.preventDefault(); if (playing) openInventory(); }, { passive: false });
-  bInv.addEventListener('click', function () { if (!isTouch && playing) openInventory(); });
-  document.getElementById('btnCmd').addEventListener('touchstart', function (e) { e.preventDefault(); if (playing) openCmd('/'); }, { passive: false });
 
   /* ---------- Block interaction ---------- */
   const dirV = new THREE.Vector3();
