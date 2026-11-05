@@ -55,6 +55,7 @@ export interface MobCombatDependencies {
   isDaylight: () => boolean;
   isNight: () => boolean;
   getRainLevel: () => number;
+  canTakeDamage: () => boolean;
   removeMobAt: (index: number) => void;
   damagePlayer: (amount: number, scaled: boolean) => void;
   showHint: (message: string, milliseconds: number) => void;
@@ -110,7 +111,7 @@ export function createMobSimulation(deps: MobCombatDependencies) {
       continue;
     }
     if (m.y < -30) { removeMobAt(i); continue; }
-    if (m.hostile && D.cap === 0 && hasHealth()) { removeMobAt(i); continue; }   // Peaceful: no monsters at all
+    if (m.hostile && D.cap === 0 && deps.canTakeDamage()) { removeMobAt(i); continue; }   // Peaceful: no monsters at all
     if (m.kind === 'villager' || m.village) { if (dist > 140) { if (m.village) m.village.vSpawned = false; removeMobAt(i); continue; } }
     else if (dist > (m.persist ? 120 : (K.illager ? 130 : (m.hostile ? 70 : 95)))) { removeMobAt(i); continue; }
     m.snd -= dt;
@@ -163,19 +164,21 @@ export function createMobSimulation(deps: MobCombatDependencies) {
       }
     } else if (K.golem) {
       // Golems fight any monster nearby. Copper and diamond golems tag along with you; iron golems guard their post.
-      let tgt = null, td = K.range;
-      for (const o of hostileActors.near(m.x, m.z, K.range)) {
+      const golemAttack = K.melee;
+      const golemRange = K.range ?? 0;
+      let tgt = null, td = golemRange;
+      for (const o of hostileActors.near(m.x, m.z, golemRange)) {
         const d2 = Math.hypot(o.x - m.x, o.z - m.z);
         if (d2 < td) { td = d2; tgt = o; }
       }
       m.atk -= dt; m.ai -= dt;
       if (tgt) {
         const ex = tgt.x - m.x, ez = tgt.z - m.z;
-        if (td > K.melee.d * 0.7) { tx = ex / td * K.speed; tz = ez / td * K.speed; }
-        if (td < K.melee.d && Math.abs(tgt.y - m.y) < 3 && m.atk <= 0) {
-          m.atk = K.melee.cd;
-          tgt.vx += ex / (td || 1) * 6; tgt.vz += ez / (td || 1) * 6; tgt.vy = K.melee.lift;
-          pendingHits.push({ m: tgt, d: K.melee.dmg });
+        if (td > (golemAttack?.d ?? 0) * 0.7) { tx = ex / td * K.speed; tz = ez / td * K.speed; }
+        if (td < (golemAttack?.d ?? 0) && Math.abs(tgt.y - m.y) < 3 && m.atk <= 0) {
+          m.atk = golemAttack?.cd ?? 1;
+          tgt.vx += ex / (td || 1) * 6; tgt.vz += ez / (td || 1) * 6; tgt.vy = golemAttack?.lift ?? 0;
+          pendingHits.push({ m: tgt, d: golemAttack?.dmg ?? 0 });
           sfxAt('hit', tgt.x, tgt.y + 1, tgt.z);
         }
       } else if (K.follow) {

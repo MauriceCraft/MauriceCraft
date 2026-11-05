@@ -35,6 +35,7 @@ function fixture(actors: MobActor[]) {
     raid: { st: null }, hostileActors, defenders,
     getDifficulty: () => ({ cap: 8, dmg: 1, fuse: 1.5, speed: 1, aggro: 32, shoot: 1 }),
     isDaylight: () => false, isNight: () => true, getRainLevel: () => 0,
+    canTakeDamage: () => true,
     removeMobAt: index => { mobs.splice(index, 1); },
     damagePlayer, showHint: () => undefined, playSoundAt: () => undefined,
     hasLineOfSight: () => true, shootArrow: () => undefined,

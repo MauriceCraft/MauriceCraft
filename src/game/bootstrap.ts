@@ -437,6 +437,7 @@ const stepMobActors = createMobSimulation({
   mobs, player, kinds: KINDS, raid, hostileActors, defenders,
   getDifficulty: () => DIFF[difficulty],
   isDaylight: () => isDay, isNight: () => isNight, getRainLevel: () => rainLevel,
+  canTakeDamage: hasHealth,
   removeMobAt, damagePlayer, showHint,
   playSoundAt: (sound, x, y, z) => sfxAt(sound, x, y, z),
   hasLineOfSight: hasLOS, shootArrow,
