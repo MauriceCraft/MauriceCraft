@@ -1,6 +1,4 @@
-// @ts-nocheck
-// This legacy gameplay loop is being migrated to typed, focused modules.
-// Keep IndexedDB store names/keys and world serialization compatible.
+// Typed application wiring. Keep persisted world identifiers and block IDs compatible.
 import * as THREE from 'three';
 import { createFrameLoop, startFrameLoop } from './runtime/frame-loop';
 import { createGameTick } from './runtime/game-tick';
