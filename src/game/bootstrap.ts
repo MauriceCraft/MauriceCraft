@@ -15,7 +15,14 @@ import { createCollisionEngine } from './world/collision';
 import { createToolUsage } from './items/tool-usage';
 import { createBlockInteractions } from './interactions/block-interactions';
 import { createActionController } from './input/action-controller';
-import { createGameMenu, MODE_LABELS } from './ui/game-menu';
+import { createGameMenu, MODE_LABELS, type GameMode, type Difficulty } from './ui/game-menu';
+import type { WeatherMode } from './rendering/weather-system';
+import type { WorldDimension } from './portals/portal-system';
+import type { PortalFrame } from './portals/frame';
+import type { BlockRayHit } from './world/raycast';
+import type { DragGesture, MovementTouch, CameraTouch } from './input/game-controls';
+import type { WorldRecord } from './storage/world-storage';
+import type { SpawnMob } from './entities/mob-spawning';
 import { createGameUiComposition } from './ui/game-ui-composition';
 import { coord } from './commands/coordinates';
 import { createCommandConsole } from './commands/command-console';
@@ -37,8 +44,8 @@ import { createAudioEngine } from './audio/sound-engine';
 const WORLD_HEIGHT = 48, CHUNK_SIZE = 16, SEA_LEVEL = 14, VIEW_DISTANCE = 5;
 let seed = 1;
 let generatorVersion = 1;
-let dimension = 'overworld';
-const portals = []; // Persistent portal pairs, stored with each world.
+let dimension: WorldDimension = 'overworld';
+const portals: PortalFrame[] = []; // Persistent portal pairs, stored with each world.
 const {
   GRASS, DIRT, STONE, SAND, WOOD, LEAVES, PLANKS, BRICK,
   COBBLE, STONEBRICK, SANDSTONE, GRAVEL, HAY, GOLD, MOSSY, TNT,
@@ -67,11 +74,13 @@ const {
 });
 
 /* ---------- Game state ---------- */
-let mode = 'creative';
-let difficulty = 'normal';
-let spawnPoint = null, sleepT = 0, slept = false, omen = false;
+let mode: GameMode = 'creative';
+let difficulty: Difficulty = 'normal';
+let spawnPoint: { x: number; y: number; z: number } | null = null;
+let sleepT = 0, slept = false, omen = false;
 let hunger = 20, sat = 5, exhaust = 0, starveT = 0, shownHunger = -1;
-let weather = 'clear', weatherT = 420, rainLevel = 0, rainTarget = 0, lightningT = 0, nextBolt = 8;   // rain and thunderstorms   // Survival hunger: 20 = full   // bed respawn point, sleeping timer, raid omen
+let weather: WeatherMode = 'clear';
+let weatherT = 420, rainLevel = 0, rainTarget = 0, lightningT = 0, nextBolt = 8;   // rain and thunderstorms   // Survival hunger: 20 = full   // bed respawn point, sleeping timer, raid omen
 // Difficulty only matters in Survival and Adventure (the modes with health and monsters)
 const DIFF = {
   peaceful: { label: 'Peaceful', cap: 0, every: 99, dmg: 0, speed: 1, aggro: 32, fuse: 1.5, shoot: 1, regenAfter: 1, regenEvery: 1, raid: 0, patrol: [1e9, 1e9] },
@@ -81,15 +90,15 @@ const DIFF = {
 };
 const MAX_HEALTH = 20;
 let hp = MAX_HEALTH, sinceHurt = 99, regenT = 0, dead = false;
-const inv = {};
+const inv: Record<number, number> = {};
 let specSpeed = 1;
 // Shared with the weather engine, time commands, sleeping and saved worlds.
 // The legacy bootstrap still owns this state until the final typed extraction.
 let tod = 0.22;
 let isNight = false, isDay = true;
 
-const player = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: false, fly: false, fallStart: null };
-function respawn() {
+const player = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: false, fly: false, fallStart: null as number | null };
+function respawn(): void {
   if (spawnPoint) {
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) getOrGen((spawnPoint.x >> 4) + dx, (spawnPoint.z >> 4) + dz);
     if (isBed(get(spawnPoint.x, spawnPoint.y, spawnPoint.z))) {
@@ -157,10 +166,10 @@ const { mobs, KINDS, addMob, removeMobAt, clearMobs, updateMobs, raycastMobs,
   increaseShake: amount => { shake = Math.max(shake, amount); },
   setShake: amount => { shake = amount; },
 });
-function giveItem(id, n) { inv[id] = (inv[id] || 0) + n; updateHotbar(false); }
+function giveItem(id: number, n: number): void { inv[id] = (inv[id] || 0) + n; updateHotbar(false); }
 
 /* ---------- Input state ---------- */
-const keys = {};
+const keys: Record<string, boolean> = {};
 const touchMove = { x: 0, z: 0 };
 let touchJump = false;
 let selected = 0;
@@ -169,8 +178,8 @@ const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let invOpen = false, tradeOpen = false, craftOpen = false, cmdOpen = false;
 let mining = false, placing = false, pulseMine = false, pulsePlace = false;
 let mineCd = 0, placeCd = 0, attackCd = 0;
-let drag = null;
-let stick = null, lookT = null;
+let drag: DragGesture | null = null;
+let stick: MovementTouch | null = null, lookT: CameraTouch | null = null;
 const mine = { x: -1, y: -1, z: -1, t: 0 };
 
 const canInteract = () => mode === 'creative' || mode === 'survival';
@@ -232,7 +241,7 @@ const { hotbarEl, heartsEl, foodEl, flashEl, mineBar,
 });
 
 // Hunger drains slowly with activity (a lot when sprinting). Eat to refill it; at zero you starve.
-function exert(n) {
+function exert(n: number): void {
   if (mode !== 'survival' || difficulty === 'peaceful') return;
   exhaust += n;
   while (exhaust >= 4) {
@@ -242,13 +251,13 @@ function exert(n) {
 }
 // Hunger and health displays are provided by the HUD adapter.
 function renderFood(): void { shownHunger = hunger; updateFood(); }
-function damagePlayer(n, scaled) {
+function damagePlayer(n: number, scaled = false): void {
   if (scaled) n = Math.round(n * DIFF[difficulty].dmg);   // monster hits scale with difficulty
   if (!hasHealth() || dead || n <= 0) return;
-  if (sleepT > 0) { sleepT = 0; fadeEl.style.opacity = 0; }
+  if (sleepT > 0) { sleepT = 0; fadeEl.style.opacity = '0'; }
   hp = Math.max(0, hp - n); sinceHurt = 0; regenT = 0; sfx('hurt');
-  flashEl.style.opacity = 0.9;
-  setTimeout(function () { flashEl.style.opacity = 0; }, 140);
+  flashEl.style.opacity = '0.9';
+  setTimeout(function () { flashEl.style.opacity = '0'; }, 140);
   updateHearts();
   if (hp <= 0) die();
 }
@@ -256,8 +265,8 @@ function damagePlayer(n, scaled) {
 
 /* ---------- Block interaction ---------- */
 const dirV = new THREE.Vector3();
-let blockHit = null, target = null;
-function raycast(maxD) {
+let blockHit: BlockRayHit | null = null, target: BlockRayHit | null = null;
+function raycast(maxD: number): BlockRayHit | null {
   camera.getWorldDirection(dirV);
   return raycastBlocks(camera.position, dirV, maxD, get, solid, WORLD_HEIGHT);
 }
@@ -274,6 +283,7 @@ const { heldTool, toolSpeed, canCollect, wearTool, attackDamage, spendItem } = c
   playSound: event => sfx(event), exert,
 });
 const fadeEl = document.getElementById('fade');
+if (!fadeEl) throw new Error('Missing game fade overlay');
 const { doBreak, useBed, useSelected, healGolem } = createBlockInteractions({
   camera, player, mobs, portals, hotbar, inventory: inv,
   names: NAMES, tools: TOOLS, kinds: KINDS, jobs: JOBS,
@@ -372,7 +382,7 @@ const update = createGameTick({
   getBlock: get, canInteract, hasHealth,
   raycast, setBlockHit: hit => { blockHit = hit; }, setTarget: hit => { target = hit; },
   damagePlayer, setWeather: () => setWeather('clear'),
-  showHint, playSound: event => sfx(event), flashName,
+  showHint: (message, ms) => showHint(message, ms), playSound: event => sfx(event), flashName,
   updatePlayerMovement, updateMobs, updateBlasts, updateArrows, updateFx, updateMusic,
   updateHearts, exert, checkRelics, handleActions,
 });
@@ -452,12 +462,12 @@ const sessionControls = createGameSessionControls({
 });
 
 // Keep stable callable names for controls and menu callback registration.
-function setMode(m) { sessionControls.setMode(m); }
-function setDifficulty(d) { sessionControls.setDifficulty(d); }
-function requestLock() { sessionControls.requestLock(); }
-function startGame() { sessionControls.startGame(); }
-function pause() { sessionControls.pause(); }
-function die() { sessionControls.die(); }
+function setMode(m: GameMode): void { sessionControls.setMode(m); }
+function setDifficulty(d: Difficulty): void { sessionControls.setDifficulty(d); }
+function requestLock(): void { sessionControls.requestLock(); }
+function startGame(): void { sessionControls.startGame(); }
+function pause(): void { sessionControls.pause(); }
+function die(): void { sessionControls.die(); }
 
 /* ---------- Commands (press T or /) ---------- */
 const { commands: CMDS, commandBar: cmdBar, defCmd, openCmd } =
@@ -474,13 +484,13 @@ const { commands: CMDS, commandBar: cmdBar, defCmd, openCmd } =
     isTouch,
   });
 const { slug, itemMap, findItem } = createItemResolver(NAMES, BED);
-function spawnSpot() {
+function spawnSpot(): [number, number, number] {
   const x = player.x - Math.sin(player.yaw) * 3, z = player.z - Math.cos(player.yaw) * 3;
   getOrGen(Math.floor(x) >> 4, Math.floor(z) >> 4);
   return [x, topY(Math.floor(x), Math.floor(z)) + 1.01, z];
 }
-function ensureAround(x, z) { for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) getOrGen((Math.floor(x) >> 4) + dx, (Math.floor(z) >> 4) + dz); }
-function rebuildRegion(x1, z1, x2, z2) {
+function ensureAround(x: number, z: number): void { for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) getOrGen((Math.floor(x) >> 4) + dx, (Math.floor(z) >> 4) + dz); }
+function rebuildRegion(x1: number, z1: number, x2: number, z2: number): void {
   for (let cx = (Math.min(x1, x2) >> 4) - 1; cx <= (Math.max(x1, x2) >> 4) + 1; cx++) for (let cz = (Math.min(z1, z2) >> 4) - 1; cz <= (Math.max(z1, z2) >> 4) + 1; cz++) rebuildSet.add(cx + ',' + cz);
   flushRebuilds();
 }
@@ -515,7 +525,7 @@ registerPlayerCommands({
   inventory: inv, hotbar, names: NAMES, labels: LABEL, difficulties: DIFF,
   weatherLabels: WEATHER_LABEL, findItem, itemMap,
   setWeather, setMode, setDifficulty, refreshWorlds, saveWorld,
-  updateHotbar, updateHearts, renderFood, toggleFly, ensureAround,
+  updateHotbar: showName => updateHotbar(showName ?? false), updateHearts, renderFood, toggleFly, ensureAround,
   topBlockY: topY, collides: (x, y, z) => collides(x, y, z),
   getSeed: () => seed,
 });
@@ -560,7 +570,7 @@ registerGeneralCommands({
 });
 
 /* ---------- Saved worlds: game state adapters ---------- */
-function snapshotWorld(world) {
+function snapshotWorld(world: WorldRecord): WorldRecord {
   return snapshotWorldState(world, {
     dimension, enderDragonDefeated, portals: snapshotPortals(portals),
     mode, difficulty, spawn: spawnPoint, omen, hunger, satiety: sat,
@@ -573,13 +583,13 @@ function snapshotWorld(world) {
   });
 }
 
-function collectSaveBatch(world) {
+function collectSaveBatch(world: WorldRecord) {
   return collectWorldSaveBatch(world, dimension, chunks, savedChunks);
 }
 
 // Forwarders are declarations so earlier gameplay modules can call them.
-function saveWorld() { return worldSession.saveWorld(); }
-function refreshWorlds() { return worldSession.refreshWorlds(); }
+function saveWorld(): Promise<void> { return worldSession.saveWorld(); }
+function refreshWorlds(): Promise<void> { return worldSession.refreshWorlds(); }
 
 const { applyWorld, prepareNewWorld } = createWorldRestore({
   state: {
@@ -624,11 +634,11 @@ const worldSession = createWorldSession({
   },
   prepareNewWorld,
   startPlaying: () => startGame(),
-  modeLabel: value => LABEL[value] || 'Creative',
+  modeLabel: value => (typeof value === 'string' && value in LABEL) ? LABEL[value as GameMode] : 'Creative',
   showHint: (message, duration) => showHint(message, duration),
 });
 
-function init() { return worldSession.initialize(); }
+function init(): Promise<void> { return worldSession.initialize(); }
 
 const frame = createFrameLoop({
   isReady: () => ready,
