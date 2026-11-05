@@ -20,6 +20,7 @@ import { createRecipeMatcher } from './crafting/recipes';
 import { createRecipeCatalog } from './crafting/recipe-catalog';
 import { createInventoryUi } from './ui/inventory-ui';
 import { createInputControls } from './input/game-controls';
+import { createActionController } from './input/action-controller';
 import { createHud } from './ui/hud';
 import { createGameMenu, MODE_LABELS } from './ui/game-menu';
 import { coord } from './commands/coordinates';
@@ -272,7 +273,6 @@ function raycast(maxD) {
   camera.getWorldDirection(dirV);
   return raycastBlocks(camera.position, dirV, maxD, get, solid, WORLD_HEIGHT);
 }
-function resetMine() { mine.t = 0; mine.x = mine.y = mine.z = -1; mineBar.style.display = 'none'; }
 // The tool in the selected hotbar slot (in Survival you must own it)
 const { heldTool, toolSpeed, canCollect, wearTool, attackDamage, spendItem } = createToolUsage({
   getMode: () => mode,
@@ -320,45 +320,26 @@ const { doBreak, useBed, useSelected, healGolem } = createBlockInteractions({
   saveWorld: () => { void saveWorld(); },
   spawnTnt, addDynamite, addMob,
 });
-function handleActions(dt, tNow) {
-  mineCd -= dt; placeCd -= dt; attackCd -= dt;
-  const holdOK = !drag || (tNow - drag.t0 > 160 && drag.moved < 6);
-  const touchHold = !!(lookT && lookT.moved < 10 && tNow - lookT.t0 > 220);
-  const heldMine = (mining && holdOK) || touchHold;
-  const heldPlace = placing && holdOK;
-  const wantMine = heldMine || pulseMine;
-  const wantPlace = heldPlace || pulsePlace;
-  const pm = pulseMine, pp = pulsePlace;
-  pulseMine = false; pulsePlace = false;
-
-  if (mode === 'spectator') { resetMine(); return; }
-
-  const mobHit = raycastMobs(3.6);
-  if (wantMine) {
-    if (mobHit && (!blockHit || mobHit.t < blockHit.t + 0.01)) {
-      if (attackCd <= 0) { attackMob(mobHit.mob); attackCd = 0.45; }
-      resetMine();
-    } else if (mode === 'creative') {
-      if (target && target.y > 0 && (pm || mineCd <= 0)) { doBreak(target); mineCd = 0.2; }
-    } else if (mode === 'survival') {
-      if (heldMine && target && target.y > 0) {
-        if (mine.x === target.x && mine.y === target.y && mine.z === target.z) mine.t += dt;
-        else { mine.x = target.x; mine.y = target.y; mine.z = target.z; mine.t = dt; }
-        const tb = get(target.x, target.y, target.z), total = (BREAK_TIME[tb] || 1) / toolSpeed(tb);
-        mineBar.style.display = 'block'; mineBar.firstChild.style.width = Math.min(100, mine.t / total * 100) + '%';
-        if (mine.t >= total) { doBreak(target); resetMine(); }
-      } else resetMine();
-    }
-  } else resetMine();
-
-  if (wantPlace && canInteract() && (pp || placeCd <= 0)) {
-    if (mobHit && mobHit.mob.kind === 'villager' && (!blockHit || mobHit.t < blockHit.t)) { openTrade(mobHit.mob); placeCd = 0.4; }
-    else if (mobHit && mobHit.mob.golem && (!blockHit || mobHit.t < blockHit.t) && healGolem(mobHit.mob)) { placeCd = 0.5; }
-    else if (target && isBed(get(target.x, target.y, target.z)) && !(keys.ShiftLeft || keys.ShiftRight)) { useBed(target); placeCd = 0.6; }
-    else if (target && get(target.x, target.y, target.z) === CTABLE && !(keys.ShiftLeft || keys.ShiftRight)) { openCraft(3); placeCd = 0.4; }
-    else placeCd = useSelected();
-  }
-}
+const { handleActions, resetMine } = createActionController({
+  state: {
+    get mineCd() { return mineCd; }, set mineCd(value) { mineCd = value; },
+    get placeCd() { return placeCd; }, set placeCd(value) { placeCd = value; },
+    get attackCd() { return attackCd; }, set attackCd(value) { attackCd = value; },
+    get mining() { return mining; }, set mining(value) { mining = value; },
+    get placing() { return placing; }, set placing(value) { placing = value; },
+    get pulseMine() { return pulseMine; }, set pulseMine(value) { pulseMine = value; },
+    get pulsePlace() { return pulsePlace; }, set pulsePlace(value) { pulsePlace = value; },
+    get mode() { return mode; }, set mode(value) { mode = value; },
+    get drag() { return drag; }, set drag(value) { drag = value; },
+    get lookTouch() { return lookT; }, set lookTouch(value) { lookT = value; },
+  },
+  mine, miningBar: mineBar, keys,
+  getBlockHit: () => blockHit,
+  getTarget: () => target,
+  raycastMobs, getBlock: get, breakTimes: BREAK_TIME, toolSpeed, doBreak,
+  attackMob, canInteract, openTrade, healGolem, isBed, useBed,
+  craftingTableId: CTABLE, openCraft, useSelected,
+});
 
 /* ---------- Update loop ---------- */
 const { updateMovement: updatePlayerMovement } = createPlayerMovement({
