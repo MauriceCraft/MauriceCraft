@@ -2334,8 +2334,17 @@ import { createAudioEngine } from './audio/sound-engine';
       await sleep(20);
       applyWorld(meta);
       finishLoad();
-    } catch (e) {
-      await newWorld();
+    } catch (error) {
+      // Never replace or modify a player's world because loading failed.
+      // They may be able to recover it after fixing browser storage access.
+      console.error('MauriceCraft could not load world:', error);
+      ready = false;
+      currentWorld = null;
+      setBusy(false);
+      playBtn.disabled = true;
+      subEl.textContent = 'Could not load this world. Its save is still in your browser. Select another world or create a new one.';
+      showHint('World load failed. Your saved data was not deleted.', 6000);
+      renderWorlds();
     }
   }
   async function newWorld() {
@@ -2367,7 +2376,17 @@ import { createAudioEngine } from './audio/sound-engine';
     if (busy) return;
     const wasCurrent = !!currentWorld && currentWorld.id === id;
     setBusy(true, 'Deleting\u2026');
-    try { await saveChain; await dbDeleteWorld(id); } catch (e) { /* ignore */ }
+    try {
+      await saveChain;
+      await dbDeleteWorld(id);
+    } catch (error) {
+      console.error('MauriceCraft could not delete world:', error);
+      setBusy(false);
+      subEl.textContent = 'World deletion failed. Your saved world has been kept.';
+      showHint('Could not delete the world. Its save has not been removed.', 5000);
+      renderWorlds();
+      return;
+    }
     if (wasCurrent) { currentWorld = null; ready = false; }
     await refreshWorlds();
     if (wasCurrent) { if (worldList.length) await loadWorld(worldList[0].id); else await newWorld(); }
