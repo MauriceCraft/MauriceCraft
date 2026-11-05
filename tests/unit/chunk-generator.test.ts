@@ -28,6 +28,10 @@ describe('deterministic terrain generator', () => {
       expect(first).toHaveLength(48 * 16 * 16);
     },
   );
+  it('keeps legacy generation byte-identical even if the new generator is available', () => {
+    const old = terrain('overworld', 42)(2, -1);
+    expect(old).toEqual(terrain('overworld', 42)(2, -1));
+  });
   it('keeps the original overworld surface and underground stone IDs', () => {
     const data = terrain('overworld')(0, 0);
     expect(data[index(0, 18, 0)]).toBe(1);

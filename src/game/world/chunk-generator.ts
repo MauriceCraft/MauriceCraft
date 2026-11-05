@@ -1,12 +1,16 @@
 import { fbm, hash2, mulberry32 } from './noise';
+import type { Biome } from './biomes';
+import { createModernChunkGenerator } from './chunk-generator-v2';
 import type { GeneratedStructure } from './structure-regions';
 import type { WriteBlock } from './structure-builders';
 
 export type WorldDimension = 'overworld' | 'nether' | 'end';
-export type TerrainBlockIds = Record<'BRICK' | 'COAL_ORE' | 'COPPER_ORE' | 'DIAMOND_ORE' | 'DIRT' | 'GOLD' | 'GRASS' | 'IRON_ORE' | 'LAVA' | 'LEAVES' | 'SAND' | 'SANDSTONE' | 'STONE' | 'STONEBRICK' | 'TORCH' | 'WATER' | 'WOOD', number>;
+export type TerrainBlockIds = Record<'BRICK' | 'COAL_ORE' | 'COPPER_ORE' | 'DIAMOND_ORE' | 'DIRT' | 'GOLD' | 'GRASS' | 'IRON_ORE' | 'LAVA' | 'LEAVES' | 'SAND' | 'SANDSTONE' | 'STONE' | 'STONEBRICK' | 'TORCH' | 'WATER' | 'WOOD', number> & Partial<Record<'SNOW' | 'PINE_LEAVES' | 'RED_SAND' | 'DARK_WOOD', number>>;
 export interface ChunkGeneratorDependencies {
   getSeed: () => number;
   getDimension: () => WorldDimension;
+  getGeneratorVersion?: () => number;
+  getBiome?: (x: number, z: number) => Biome;
   maxHeight: number;
   seaLevel: number;
   regionSize: number;
@@ -28,10 +32,13 @@ export function createChunkGenerator(deps: ChunkGeneratorDependencies) {
     structureFor, buildStructure } = deps;
   const { BRICK, COAL_ORE, COPPER_ORE, DIAMOND_ORE, DIRT, GOLD, GRASS, IRON_ORE, LAVA, LEAVES, SAND, SANDSTONE, STONE, STONEBRICK, TORCH, WATER, WOOD } = deps.blocks;
   const H = deps.maxHeight, SEA = deps.seaLevel, REG = deps.regionSize;
+  const modern = deps.getBiome ? createModernChunkGenerator({ ...deps, getBiome: deps.getBiome }) : null;
   function generateChunkData(cx: number, cz: number): Uint8Array {
     const seed = getSeed(), dimension = getDimension();
     const data = new Uint8Array(16 * H * 16);
     const x0 = cx * 16, z0 = cz * 16;
+    if (dimension === 'overworld' && (deps.getGeneratorVersion?.() ?? 1) >= 2 && modern)
+      return modern(cx, cz);
     // Separate Nether and End terrain generators. They reuse the game's block atlas,
     // but create distinct landscapes and keep the normal Overworld generator unchanged.
     if (dimension === 'nether' || dimension === 'end') {
