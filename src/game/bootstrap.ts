@@ -9,6 +9,7 @@ import { SpatialIndex } from './entities/spatial-index';
 import { bg, bm, part, JOBS, JOB_NAMES, makeZombie, makeCow, makePig, makeSheep, makeChicken, makeCreeper, makeSkeleton, makeSpider, makePillager, makeVindicator, makeIronGolem, makeCopperGolem, makeDiamondGolem, makeVillager, makeEnderDragon } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
 import { createChunkStreamer } from './world/chunk-streamer';
+import { primeWorldChunks } from './world/prime-chunks';
 import { createStructureRegions } from './world/structure-regions';
 import { createStructureBuilders } from './world/structure-builders';
 import { createChunkGenerator } from './world/chunk-generator';
@@ -130,8 +131,7 @@ function resetWorld(newSeed, ox, oz) {
   chunks.forEach(function (c) { disposeMesh(c); });
   chunks.clear(); resetChunkCache();
   seed = newSeed; structCache.clear();
-  for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) genChunk(ox + dx, oz + dz);
-  for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) buildChunk(ox + dx, oz + dz);
+  primeWorldChunks(ox, oz, genChunk, buildChunk);
 }
 
 const streamChunks = createChunkStreamer({
