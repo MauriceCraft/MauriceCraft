@@ -27,6 +27,7 @@ import { createInputControls } from './input/game-controls';
 import { createHud } from './ui/hud';
 import { createGameMenu, MODE_LABELS } from './ui/game-menu';
 import { coord } from './commands/coordinates';
+import { createCommandConsole } from './commands/command-console';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { createPortalSystem } from './portals/portal-system';
@@ -1277,21 +1278,19 @@ function die() {
 }
 
 /* ---------- Commands (press T or /) ---------- */
-const chatEl = document.getElementById('chatlog'), cmdBar = document.getElementById('cmdbar'), cmdInput = document.getElementById('cmdinput');
-const cmdHist = []; let cmdHistI = 0;
-const chatLines = [];
-function chat(msg, kind) {
-  const line = document.createElement('div');
-  line.className = 'cl' + (kind ? ' ' + kind : ''); line.textContent = msg;
-  chatEl.appendChild(line); chatLines.push(line);
-  while (chatLines.length > 9) chatEl.removeChild(chatLines.shift());
-  setTimeout(function () { const i = chatLines.indexOf(line); if (i >= 0) { chatLines.splice(i, 1); chatEl.removeChild(line); } }, 12000);
-}
-const CMDS = {};
-function defCmd(names, usage, desc, fn, choices) {
-  const c = { name: names[0], usage: usage, desc: desc, fn: fn, choices: choices };
-  names.forEach(function (n) { CMDS[n] = c; });
-}
+const { commands: CMDS, commandBar: cmdBar, defCmd, openCmd } =
+  createCommandConsole({
+    onOpen: () => {
+      invOpen = true; cmdOpen = true; playing = false; mining = placing = false; drag = null;
+      for (const code in keys) keys[code] = false;
+      touchMove.x = 0; touchMove.z = 0; touchJump = false; stick = null; lookT = null;
+    },
+    onClose: resume => closeInventory(resume),
+    isDead: () => dead,
+    canOpen: () => playing && !invOpen,
+    isCommandOpen: () => cmdOpen,
+    isTouch,
+  });
 const { slug, itemMap, findItem } = createItemResolver(NAMES, BED);
 function spawnSpot() {
   const x = player.x - Math.sin(player.yaw) * 3, z = player.z - Math.cos(player.yaw) * 3;
@@ -1492,60 +1491,6 @@ defCmd(['locate'], '/locate <village|temple|tower|dungeon|cabin|circle> [tp]', '
 }, function (i) { return i === 1 ? Object.keys(STRUCT_NAMES) : (i === 2 ? ['tp'] : []); });
 defCmd(['save'], '/save', 'Save the world now', function () { saveWorld().then(refreshWorlds); return storageOK ? 'Saving the world...' : 'Saving is not available in this browser'; });
 defCmd(['say'], '/say <message>', 'Write a message in the chat', function (a) { return '[You] ' + a.join(' '); });
-
-function execute(line) {
-  line = line.trim();
-  if (!line) return;
-  if (line.charAt(0) !== '/') { chat('[You] ' + line); return; }
-  chat(line, 'echo');
-  const parts = line.slice(1).trim().split(/\s+/), name = (parts.shift() || '').toLowerCase();
-  if (!name) return;
-  const c = CMDS[name];
-  if (!c) { chat('Unknown command "' + name + '". Type /help for the list.', 'bad'); return; }
-  try { const out = c.fn(parts); if (out) chat(out); }
-  catch (err) { chat(err.message || String(err), 'bad'); }
-}
-function openCmd(prefill) {
-  invOpen = true; cmdOpen = true; playing = false; mining = placing = false; drag = null;
-  for (const k in keys) keys[k] = false;
-  touchMove.x = 0; touchMove.z = 0; touchJump = false; stick = null; lookT = null;
-  cmdBar.classList.remove('hidden'); cmdInput.value = prefill || ''; cmdHistI = cmdHist.length;
-  if (document.pointerLockElement) document.exitPointerLock();
-  setTimeout(function () { cmdInput.focus(); }, 0);
-}
-function completeCmd() {
-  const raw = cmdInput.value.replace(/^\//, ''), parts = raw.split(/\s+/);
-  if (parts.length === 1) {
-    const names = Object.keys(CMDS).filter(function (n) { return n.indexOf(parts[0].toLowerCase()) === 0; });
-    if (names.length === 1) cmdInput.value = '/' + names[0] + ' '; else if (names.length > 1) chat(names.join('  '), 'echo');
-    return;
-  }
-  const c = CMDS[parts[0].toLowerCase()];
-  if (!c || !c.choices) return;
-  const cur = (parts[parts.length - 1] || '').toLowerCase();
-  const opts = c.choices(parts.length - 1, parts).filter(function (x) { return String(x).indexOf(cur) === 0; });
-  if (opts.length === 1) { parts[parts.length - 1] = opts[0]; cmdInput.value = '/' + parts.join(' ') + ' '; }
-  else if (opts.length > 1) chat(opts.slice(0, 14).join('  ') + (opts.length > 14 ? '  ...' : ''), 'echo');
-}
-cmdInput.addEventListener('keydown', function (e) {
-  e.stopPropagation();   // typing here must not trigger game keys
-  if (e.key === 'Enter') {
-    const line = cmdInput.value;
-    if (line.trim()) { cmdHist.push(line); if (cmdHist.length > 50) cmdHist.shift(); }
-    execute(line);
-    closeInventory(!dead);   // if a command killed you, stay on the respawn screen
-  } else if (e.key === 'Escape') { e.preventDefault(); closeInventory(false); }
-  else if (e.key === 'Tab') { e.preventDefault(); completeCmd(); }
-  else if (e.key === 'ArrowUp') { e.preventDefault(); if (cmdHistI > 0) { cmdHistI--; cmdInput.value = cmdHist[cmdHistI]; } }
-  else if (e.key === 'ArrowDown') { e.preventDefault(); if (cmdHistI < cmdHist.length - 1) { cmdHistI++; cmdInput.value = cmdHist[cmdHistI]; } else { cmdHistI = cmdHist.length; cmdInput.value = ''; } }
-});
-cmdInput.addEventListener('keyup', function (e) { e.stopPropagation(); });
-window.addEventListener('keydown', function (e) {
-  if (cmdOpen || !playing || invOpen || e.repeat) return;
-  if (e.code === 'KeyT') { e.preventDefault(); openCmd(''); }
-  else if (e.key === '/') { e.preventDefault(); openCmd('/'); }
-});
-document.getElementById('btnCmd').addEventListener('click', function () { if (!isTouch && playing) openCmd('/'); });
 
 /* ---------- Saved worlds (IndexedDB, kept in this browser) ---------- */
 const worldsEl = document.getElementById('worlds');
