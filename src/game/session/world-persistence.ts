@@ -1,4 +1,4 @@
-import { ckey } from '../world/chunk-key';
+import { savedChunkKey } from './dimension-chunk-records';
 import type { WritableChunk } from '../world/block-access';
 import type { WorldRecord, ChunkRecord } from '../storage/world-storage';
 import type { SaveBatch } from './world-session';
@@ -56,36 +56,43 @@ export function snapshotWorldState(world: WorldRecord, state: WorldSnapshotState
 
 /**
  * Preserve historical chunk keys, and re-mark unsaved edits on write failure.
- * When in the Nether or End, snapshot cached Overworld chunks instead of
- * writing temporary dimension data into the persistent Overworld slots.
+ * Persist edits from all dimensions under unique keys. The original Overworld
+ * key format stays intact so pre-upgrade saves can be read unchanged.
  */
 export function collectWorldSaveBatch(
   world: WorldRecord,
   dimension: string,
   chunks: ReadonlyMap<number, WritableChunk>,
   savedChunks: ReadonlyMap<number, Uint8Array>,
+  dimensionChunks: ReadonlyMap<string, ReadonlyMap<number, Uint8Array>> = new Map(),
 ): SaveBatch {
   const dirtyChunks: WritableChunk[] = [];
-  if (dimension === 'overworld') {
-    for (const chunk of chunks.values()) if (chunk.dirty) dirtyChunks.push(chunk);
+  for (const chunk of chunks.values()) if (chunk.dirty) dirtyChunks.push(chunk);
+  const records = new Map<string, ChunkRecord>();
+  function remember(dim: string, cx: number, cz: number, data: Uint8Array): void {
+    const k = savedChunkKey(world.id, dim, cx, cz);
+    records.set(k, { k, w: world.id, cx, cz, data: data.slice(),
+      ...(dim === 'overworld' ? {} : { dimension: dim as 'nether' | 'end' }) });
   }
-  const records = new Map<number, ChunkRecord>();
+  function unpack(key: number): [number, number] {
+    return [((key >> 16) << 16) >> 16, (key << 16) >> 16];
+  }
+  // The older save pipeline buffered edited Overworld chunks during portal travel.
+  if (dimension !== 'overworld') for (const [key, data] of savedChunks) {
+    const [cx, cz] = unpack(key);
+    remember('overworld', cx, cz, data);
+  }
+  for (const [dim, cache] of dimensionChunks) {
+    if (dim === 'overworld' || (dim !== 'nether' && dim !== 'end')) continue;
+    for (const [key, data] of cache) {
+      const [cx, cz] = unpack(key);
+      remember(dim, cx, cz, data);
+    }
+  }
+  // Current-dimension writes override any older cached copy of that same chunk.
   for (const chunk of dirtyChunks) {
     chunk.dirty = false;
-    records.set(ckey(chunk.cx, chunk.cz), {
-      k: world.id + ':' + chunk.cx + ',' + chunk.cz,
-      w: world.id, cx: chunk.cx, cz: chunk.cz, data: chunk.data.slice(),
-    });
-  }
-  if (dimension !== 'overworld') {
-    for (const [chunkKey, data] of savedChunks) {
-      const chunkX = ((chunkKey >> 16) << 16) >> 16;
-      const chunkZ = (chunkKey << 16) >> 16;
-      records.set(chunkKey, {
-        k: world.id + ':' + chunkX + ',' + chunkZ,
-        w: world.id, cx: chunkX, cz: chunkZ, data: data.slice(),
-      });
-    }
+    remember(dimension, chunk.cx, chunk.cz, chunk.data);
   }
   return {
     records: [...records.values()],
