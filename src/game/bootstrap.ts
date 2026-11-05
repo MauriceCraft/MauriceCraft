@@ -36,6 +36,7 @@ import { createGameRenderer } from './rendering/game-renderer';
 import { createExplosionSystem } from './effects/explosions';
 import { createChunkMesher } from './rendering/chunk-mesher';
 import { openWorldStorage } from './storage/world-storage';
+import { createWorldSession } from './session/world-session';
 import { createAudioEngine } from './audio/sound-engine';
 
 
@@ -1489,24 +1490,12 @@ defCmd(['locate'], '/locate <village|temple|tower|dungeon|cabin|circle> [tp]', '
   }
   return 'Nearest ' + STRUCT_NAMES[type].toLowerCase() + ': x ' + best.cx + ', z ' + best.cz + ' (' + Math.round(bd) + ' blocks away)';
 }, function (i) { return i === 1 ? Object.keys(STRUCT_NAMES) : (i === 2 ? ['tp'] : []); });
-defCmd(['save'], '/save', 'Save the world now', function () { saveWorld().then(refreshWorlds); return storageOK ? 'Saving the world...' : 'Saving is not available in this browser'; });
+defCmd(['save'], '/save', 'Save the world now', function () { saveWorld().then(refreshWorlds); return worldSession.isStorageAvailable() ? 'Saving the world...' : 'Saving is not available in this browser'; });
 defCmd(['say'], '/say <message>', 'Write a message in the chat', function (a) { return '[You] ' + a.join(' '); });
 
-/* ---------- Saved worlds (IndexedDB, kept in this browser) ---------- */
-const worldsEl = document.getElementById('worlds');
-const saveNote = document.getElementById('saveNote');
-let db = null, storageOK = false, currentWorld = null, worldList = [], saveChain = Promise.resolve(), busy = false;
-const sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
-
-// Dexie uses the existing v1 database/stores without a destructive upgrade.
-function openDB() { return openWorldStorage(); }
-function dbListWorlds() { return db.listWorlds(); }
-function dbGetWorld(id) { return db.getWorld(id); }
-function dbGetChunks(id) { return db.getChunks(id); }
-function dbDeleteWorld(id) { return db.deleteWorld(id); }
-
-function snapshot() {
-  const m = currentWorld;
+/* ---------- Saved worlds: game state adapters ---------- */
+function snapshotWorld(world) {
+  const m = world;
   m.dimension = dimension; m.enderDragonDefeated = enderDragonDefeated; m.portals = snapshotPortals(portals); m.mode = mode; m.difficulty = difficulty; m.spawn = spawnPoint; m.omen = omen; m.hunger = hunger; m.sat = sat; m.weather = { w: weather, t: weatherT, r: rainLevel }; m.lastPlayed = Date.now(); m.tod = tod; m.hp = dead ? MAX_HEALTH : hp;
   m.selected = selected; m.hotbar = hotbar.slice(); m.inv = Object.assign({}, inv);
   m.player = { x: player.x, y: player.y, z: player.z, yaw: player.yaw, pitch: player.pitch, fly: !!player.fly };
@@ -1515,88 +1504,45 @@ function snapshot() {
   m.golems = mobs.filter(function (g) { return g.golem && g.persist; }).map(function (g) { return { kind: g.kind, x: g.x, y: g.y, z: g.z, hp: g.hp, hx: g.hx, hz: g.hz }; });
   return m;
 }
-function doSave() {
-  if (!storageOK || !currentWorld || !ready) return Promise.resolve();
-  const meta = snapshot();
-  const dirty = [];
-  if (dimension === 'overworld') chunks.forEach(function (c) { if (c.dirty) dirty.push(c); });
-  const recMap = new Map();
-  dirty.forEach(function (c) {
-    c.dirty = false;
-    recMap.set(ckey(c.cx, c.cz), { k: meta.id + ':' + c.cx + ',' + c.cz, w: meta.id, cx: c.cx, cz: c.cz, data: c.data.slice() });
-  });
-  // Keep modified Overworld chunks safe while the player explores other dimensions.
-  if (dimension !== 'overworld') savedChunks.forEach(function (data, key) {
-    const parts = key; // key is the packed chunk coordinate used by the chunk cache
-    const cx = (parts >> 16) << 16 >> 16, cz = (parts << 16) >> 16;
-    const k = meta.id + ':' + cx + ',' + cz;
-    recMap.set(key, { k: k, w: meta.id, cx: cx, cz: cz, data: data.slice() });
-  });
-  const recs = Array.from(recMap.values());
-  return db.saveWorld(meta, recs).catch(function (err) {
-    // Keep dirty chunks in memory if the transaction fails; retry on autosave.
-    dirty.forEach(function (c) { c.dirty = true; });
-    throw err;
-  });
-}
-function saveWorld() {
-  saveChain = saveChain.then(doSave).catch(function (err) {
-    console.error('MauriceCraft save failed:', err);
-    showHint('Saving failed. Your changes are still in memory; please keep this tab open and try again.', 6500);
-  });
-  return saveChain;
-}
 
-
-function ago(t) {
-  const sec = Math.max(0, (Date.now() - t) / 1000);
-  if (sec < 60) return 'just now';
-  if (sec < 3600) return Math.floor(sec / 60) + ' min ago';
-  if (sec < 86400) return Math.floor(sec / 3600) + ' h ago';
-  return Math.floor(sec / 86400) + ' d ago';
-}
-function renderWorlds() {
-  worldsEl.innerHTML = '';
-  saveNote.textContent = storageOK
-    ? 'Worlds save automatically in this browser, including every block you change.'
-    : 'Saving is not available in this browser, so this world will be lost when you leave.';
-  worldList.forEach(function (w) {
-    const isCur = !!currentWorld && currentWorld.id === w.id;
-    const row = document.createElement('div'); row.className = 'world' + (isCur ? ' on' : '');
-    const main = document.createElement('button'); main.type = 'button'; main.className = 'wmain';
-    main.appendChild(document.createTextNode(w.name));
-    const sm = document.createElement('small'); sm.textContent = (LABEL[w.mode] || 'Creative') + ' \u00b7 played ' + ago(w.lastPlayed || w.created || Date.now()); main.appendChild(sm);
-    main.addEventListener('click', function () { if (busy) return; if (isCur) startGame(); else loadWorld(w.id); });
-    const del = document.createElement('button'); del.type = 'button'; del.className = 'wdel'; del.textContent = 'Delete';
-    del.setAttribute('aria-label', 'Delete ' + w.name);
-    let armed = false, t = 0;
-    del.addEventListener('click', function () {
-      if (busy) return;
-      if (!armed) { armed = true; del.textContent = 'Sure?'; del.classList.add('armed'); t = setTimeout(function () { armed = false; del.textContent = 'Delete'; del.classList.remove('armed'); }, 2500); }
-      else { clearTimeout(t); deleteWorld(w.id); }
-    });
-    row.appendChild(main); row.appendChild(del); worldsEl.appendChild(row);
-  });
-}
-async function refreshWorlds() {
-  if (storageOK) {
-    try { worldList = (await dbListWorlds()).sort(function (a, b) { return (b.lastPlayed || 0) - (a.lastPlayed || 0); }); } catch (e) { /* keep old list */ }
+/**
+ * Only modified chunk data is copied to IndexedDB. The world manager owns
+ * transactions and retries; gameplay continues to own its chunk cache.
+ */
+function collectSaveBatch(world) {
+  const dirtyChunks = [];
+  if (dimension === 'overworld') {
+    for (const chunk of chunks.values()) {
+      if (chunk.dirty) dirtyChunks.push(chunk);
+    }
   }
-  renderWorlds();
+  const records = new Map();
+  for (const chunk of dirtyChunks) {
+    chunk.dirty = false;
+    records.set(ckey(chunk.cx, chunk.cz), {
+      k: world.id + ':' + chunk.cx + ',' + chunk.cz,
+      w: world.id, cx: chunk.cx, cz: chunk.cz, data: chunk.data.slice(),
+    });
+  }
+  if (dimension !== 'overworld') {
+    for (const [chunkKey, data] of savedChunks) {
+      const chunkX = ((chunkKey >> 16) << 16) >> 16;
+      const chunkZ = (chunkKey << 16) >> 16;
+      records.set(chunkKey, {
+        k: world.id + ':' + chunkX + ',' + chunkZ,
+        w: world.id, cx: chunkX, cz: chunkZ, data: data.slice(),
+      });
+    }
+  }
+  return {
+    records: [...records.values()],
+    restoreDirty: () => { for (const chunk of dirtyChunks) chunk.dirty = true; },
+  };
 }
-function setBusy(b, text) {
-  busy = b;
-  playBtn.disabled = newBtn.disabled = b;
-  worldsEl.classList.toggle('busy', b);
-  if (b) { playBtn.textContent = 'Loading\u2026'; subEl.textContent = text || 'Loading\u2026'; }
-}
-function finishLoad() {
-  subEl.textContent = currentWorld.name + '. Choose a mode and play.';
-  playBtn.textContent = 'Play';
-  setBusy(false);
-  renderWorlds();
-  playBtn.focus({ preventScroll: true });
-}
+
+// Forwarders are declarations so earlier gameplay modules can call them.
+function saveWorld() { return worldSession.saveWorld(); }
+function refreshWorlds() { return worldSession.refreshWorlds(); }
 
 function applyWorld(m) {
   const p = m.player || { x: 0.5, y: 60, z: 0.5, yaw: 0, pitch: 0, fly: false };
@@ -1634,91 +1580,50 @@ function applyWorld(m) {
   });
   if (mode === 'creative') player.fly = !!p.fly;
 }
-async function loadWorld(id) {
-  setBusy(true, 'Loading world\u2026');
-  try {
-    await saveWorld();
-    ready = false;
-    const meta = await dbGetWorld(id);
-    if (!meta) throw new Error('missing');
-    const recs = await dbGetChunks(id);
-    savedChunks.clear();
-    recs.forEach(function (r) { savedChunks.set(ckey(r.cx, r.cz), r.data); });
-    currentWorld = meta;
-    await sleep(20);
-    applyWorld(meta);
-    finishLoad();
-  } catch (error) {
-    // Never replace or modify a player's world because loading failed.
-    // They may be able to recover it after fixing browser storage access.
-    console.error('MauriceCraft could not load world:', error);
-    ready = false;
-    currentWorld = null;
-    setBusy(false);
-    playBtn.disabled = true;
-    subEl.textContent = 'Could not load this world. Its save is still in your browser. Select another world or create a new one.';
-    showHint('World load failed. Your saved data was not deleted.', 6000);
-    renderWorlds();
-  }
-}
-async function newWorld() {
-  setBusy(true, 'Building your world\u2026');
-  try { await saveWorld(); } catch (e) { /* ignore */ }
-  ready = false;
-  await sleep(20);
-  let maxN = 0;
-  worldList.forEach(function (w) { const mm = /^World (\d+)$/.exec(w.name); if (mm) maxN = Math.max(maxN, +mm[1]); });
-  const sd = (Math.random() * 1e6) | 0;
+
+function prepareNewWorld(world) {
   savedChunks.clear();
-  currentWorld = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), name: 'World ' + (maxN + 1), seed: sd, created: Date.now(), lastPlayed: Date.now() };
-  resetWorld(sd, 0, 0);
-  spawnPoint = null; omen = false;
-  weather = 'clear'; weatherT = 420 + Math.random() * 300; rainLevel = 0; rainTarget = 0; updateWeatherUI();
-  respawn(); clearMobs();
-  for (const k in inv) delete inv[k];
-  for (let i = 0; i < 9; i++) hotbar[i] = ALL_BLOCKS[i];
-  selected = 0; tod = 0.22;
-  for (const k in toolWear) delete toolWear[k];
+  resetWorld(world.seed, 0, 0);
+  spawnPoint = null;
+  omen = false;
+  weather = 'clear';
+  weatherT = 420 + Math.random() * 300;
+  rainLevel = 0;
+  rainTarget = 0;
+  updateWeatherUI();
+  respawn();
+  clearMobs();
+  for (const itemId in inv) delete inv[itemId];
+  for (let slotIndex = 0; slotIndex < 9; slotIndex++) hotbar[slotIndex] = ALL_BLOCKS[slotIndex];
+  selected = 0;
+  tod = 0.22;
+  for (const toolId in toolWear) delete toolWear[toolId];
   createRelics();
-  ready = true; dead = false;
+  ready = true;
+  dead = false;
   setMode(mode);
-  await saveWorld();
-  await refreshWorlds();
-  finishLoad();
 }
-async function deleteWorld(id) {
-  if (busy) return;
-  const wasCurrent = !!currentWorld && currentWorld.id === id;
-  setBusy(true, 'Deleting\u2026');
-  try {
-    await saveChain;
-    await dbDeleteWorld(id);
-  } catch (error) {
-    console.error('MauriceCraft could not delete world:', error);
-    setBusy(false);
-    subEl.textContent = 'World deletion failed. Your saved world has been kept.';
-    showHint('Could not delete the world. Its save has not been removed.', 5000);
-    renderWorlds();
-    return;
-  }
-  if (wasCurrent) { currentWorld = null; ready = false; }
-  await refreshWorlds();
-  if (wasCurrent) { if (worldList.length) await loadWorld(worldList[0].id); else await newWorld(); }
-  else setBusy(false);
-}
-newBtn.addEventListener('click', function () { if (!busy) newWorld(); });
-async function init() {
-  try { db = await openDB(); storageOK = true; } catch (e) { storageOK = false; }
-  if (storageOK) {
-    try { worldList = (await dbListWorlds()).sort(function (a, b) { return (b.lastPlayed || 0) - (a.lastPlayed || 0); }); }
-    catch (e) { storageOK = false; worldList = []; }
-  }
-  renderWorlds();
-  if (storageOK && worldList.length) await loadWorld(worldList[0].id); else await newWorld();
-}
-setInterval(function () { if (ready && playing) saveWorld(); }, 15000);
-document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') saveWorld(); });
-window.addEventListener('pagehide', function () { saveWorld(); });
+
+const worldSession = createWorldSession({
+  openStorage: openWorldStorage,
+  isWorldReady: () => ready,
+  setWorldReady: value => { ready = value; },
+  snapshotWorld,
+  collectSaveBatch,
+  applyLoadedWorld: (world, records) => {
+    savedChunks.clear();
+    for (const record of records) {
+      savedChunks.set(ckey(record.cx, record.cz), record.data);
+    }
+    applyWorld(world);
+  },
+  prepareNewWorld,
+  startPlaying: () => startGame(),
+  modeLabel: value => LABEL[value] || 'Creative',
+  showHint: (message, duration) => showHint(message, duration),
+});
+
+function init() { return worldSession.initialize(); }
 
 let frames = 0, fpsT = 0, fps = 0, infoT = 0;
 let last = performance.now();
