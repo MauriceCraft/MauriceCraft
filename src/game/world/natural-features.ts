@@ -25,10 +25,15 @@ export function createNaturalFeatures(deps: NaturalFeatureDependencies) {
   const { getSeed, biomeAt, heightAt, inStructureZone } = deps;
   const lakeCache = new Map<string, Lake | null>();
   let cachedSeed: number | null = null;
+  let cachedVersion: number | null = null;
 
   function lakeFor(rx: number, rz: number): Lake | null {
-    const seed = getSeed();
-    if (cachedSeed !== seed) { lakeCache.clear(); cachedSeed = seed; }
+    const seed = getSeed(), version = deps.getGeneratorVersion?.() ?? 2;
+    if (cachedSeed !== seed || cachedVersion !== version) {
+      lakeCache.clear();
+      cachedSeed = seed;
+      cachedVersion = version;
+    }
     const key = rx + ',' + rz;
     if (lakeCache.has(key)) return lakeCache.get(key) ?? null;
     const result = makeLake(rx, rz, seed);
