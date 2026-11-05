@@ -23,7 +23,7 @@ export interface MobDropIds {
 /** Preserve existing mob balance and loot IDs when changing the game runtime. */
 export function createMobCatalog(ids: MobDropIds) {
   const { GUNPOWDER, BONE, STRING, EMERALD, IRON_INGOT, COPPER_INGOT, DIAMOND, BEEF, LEATHER, PORK, MUTTON, WOOL, CHICKEN, FEATHER } = ids;
-  const randomCountUpTo = (maximum: number) => 1 + Math.floor(Math.random() * n);
+  const randomCountUpTo = (maximum: number) => 1 + Math.floor(Math.random() * maximum);
   const KINDS = {
     zombie: { hostile: true, r: 0.3, h: 1.8, hp: 20, speed: 2.7, melee: { d: 1.15, dmg: 3, cd: 1.1 }, make: makeZombie, drops: function () { return [[GUNPOWDER, Math.random() < 0.5 ? 1 : 0]]; } },
     enderdragon: { hostile: true, r: 2.8, h: 5.5, hp: 300, speed: 5.0, make: makeEnderDragon, drops: function () { return []; } },
