@@ -8,7 +8,6 @@ import { createPlayerMovement } from './player/player-movement';
 import { createWeatherSystem } from './rendering/weather-system';
 import { JOBS, JOB_NAMES } from './entities/mob-models';
 import { createMobRuntime } from './entities/mob-runtime';
-import { ckey } from './world/chunk-key';
 import { createWorldRuntime } from './world/world-runtime';
 import { raycastBlocks } from './world/raycast';
 import { createCollisionEngine } from './world/collision';
@@ -21,7 +20,6 @@ import type { WorldDimension } from './portals/portal-system';
 import type { PortalFrame } from './portals/frame';
 import type { BlockRayHit } from './world/raycast';
 import type { DragGesture, MovementTouch, CameraTouch } from './input/game-controls';
-import type { WorldRecord } from './storage/world-storage';
 import type { SpawnMob } from './entities/mob-spawning';
 import { createGameUiComposition } from './ui/game-ui-composition';
 import { coord } from './commands/coordinates';
@@ -33,10 +31,7 @@ import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { createPortalSystem } from './portals/portal-system';
 import { snapshotPortals } from './portals/persistence';
-import { openWorldStorage } from './storage/world-storage';
-import { createWorldSession } from './session/world-session';
-import { snapshotWorldState, collectWorldSaveBatch } from './session/world-persistence';
-import { createWorldRestore } from './session/world-restore';
+import { createGameplayWorldSession } from './session/gameplay-world-session';
 import { createAudioEngine } from './audio/sound-engine';
 
 
@@ -574,29 +569,12 @@ registerGeneralCommands({
   addMob, removeMobAt,
 });
 
-/* ---------- Saved worlds: game state adapters ---------- */
-function snapshotWorld(world: WorldRecord): WorldRecord {
-  return snapshotWorldState(world, {
-    dimension, enderDragonDefeated, portals: snapshotPortals(portals),
-    mode, difficulty, spawn: spawnPoint, omen, hunger, satiety: sat,
-    weather: { w: weather, t: weatherT, r: rainLevel },
-    timeOfDay: tod, health: dead ? MAX_HEALTH : hp,
-    selected, hotbar, inventory: inv,
-    player: { x: player.x, y: player.y, z: player.z, yaw: player.yaw,
-      pitch: player.pitch, fly: !!player.fly },
-    relics, toolWear, golems: mobs,
-  });
-}
-
-function collectSaveBatch(world: WorldRecord) {
-  return collectWorldSaveBatch(world, dimension, chunks, savedChunks);
-}
-
-// Forwarders are declarations so earlier gameplay modules can call them.
+/* ---------- World persistence and restoration ---------- */
+// Declarations let earlier gameplay systems save without retaining the manager.
 function saveWorld(): Promise<void> { return worldSession.saveWorld(); }
 function refreshWorlds(): Promise<void> { return worldSession.refreshWorlds(); }
 
-const { applyWorld, prepareNewWorld } = createWorldRestore({
+const worldSession = createGameplayWorldSession({
   state: {
     get dimension() { return dimension; }, set dimension(value) { dimension = value; },
     get enderDragonDefeated() { return enderDragonDefeated; }, set enderDragonDefeated(value) { enderDragonDefeated = value; },
@@ -616,32 +594,27 @@ const { applyWorld, prepareNewWorld } = createWorldRestore({
     get hunger() { return hunger; }, set hunger(value) { hunger = value; },
     get sat() { return sat; }, set sat(value) { sat = value; },
   },
+  snapshot: () => ({
+    dimension, enderDragonDefeated, portals: snapshotPortals(portals),
+    mode, difficulty, spawn: spawnPoint, omen, hunger, satiety: sat,
+    weather: { w: weather, t: weatherT, r: rainLevel },
+    timeOfDay: tod, health: dead ? MAX_HEALTH : hp,
+    selected, hotbar, inventory: inv,
+    player: { x: player.x, y: player.y, z: player.z, yaw: player.yaw,
+      pitch: player.pitch, fly: !!player.fly },
+    relics, toolWear, golems: mobs,
+  }),
   player, portals, inventory: inv, toolWear, hotbar, allBlocks: ALL_BLOCKS,
-  savedChunks, validDifficulties: DIFF, weatherLabels: WEATHER_LABEL,
+  savedChunks, chunks, getDimension: () => dimension,
+  validDifficulties: DIFF, weatherLabels: WEATHER_LABEL,
   kinds: KINDS, mobs, relics, maximumHealth: MAX_HEALTH,
   resetWorld, clearPortalVisuals, showPortalVisual, clearMobs, clearRelics,
   addRelic, createRelics,
   setMode: value => setMode(value in MODE_LABELS ? value as GameMode : 'creative'),
   updateHearts, renderFood, updateWeatherUI,
   addMob, hasChunk: (cx, cz) => !!chunkAt(cx, cz), respawn,
-});
-
-const worldSession = createWorldSession({
-  openStorage: openWorldStorage,
-  isWorldReady: () => ready,
-  setWorldReady: value => { ready = value; },
-  snapshotWorld,
-  collectSaveBatch,
-  applyLoadedWorld: (world, records) => {
-    savedChunks.clear();
-    for (const record of records) {
-      savedChunks.set(ckey(record.cx, record.cz), record.data);
-    }
-    applyWorld(world);
-  },
-  prepareNewWorld,
   startPlaying: () => startGame(),
-  modeLabel: value => (typeof value === 'string' && value in LABEL) ? LABEL[value as GameMode] : 'Creative',
+  modeLabel: value => typeof value === 'string' && value in LABEL ? LABEL[value as GameMode] : 'Creative',
   showHint: (message, duration) => showHint(message, duration),
 });
 
