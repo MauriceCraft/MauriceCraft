@@ -100,10 +100,20 @@ export function createWeatherSystem(deps: WeatherDependencies) {
     state.rainLevel += Math.sign(diff) * Math.min(Math.abs(diff), dt / 12);
     if (state.weather === 'storm') { state.nextBolt -= dt; if (state.nextBolt <= 0) { state.nextBolt = 5 + Math.random() * 12; strike(); } }
     if (state.lightningT > 0) state.lightningT = Math.max(0, state.lightningT - dt * 3);
-    setLightningOpacity(state.state.lightningT * 0.5);
+    setLightningOpacity(state.lightningT * 0.5);
     for (let i = bolts.length - 1; i >= 0; i--) {
       bolts[i].life -= dt;
-      if (bolts[i].life <= 0) { scene.remove(bolts[i].mesh); bolts[i].mesh.geometry.dispose(); bolts[i].mesh.material.dispose(); bolts.splice(i, 1); }
+      if (bolts[i].life <= 0) {
+        const lightningMesh = bolts[i].mesh;
+        scene.remove(lightningMesh);
+        lightningMesh.geometry.dispose();
+        if (Array.isArray(lightningMesh.material)) {
+          lightningMesh.material.forEach(material => material.dispose());
+        } else {
+          lightningMesh.material.dispose();
+        }
+        bolts.splice(i, 1);
+      }
     }
   }
   // Raindrops fall around the camera and stop at the first surface above them, so roofs keep the rain off
