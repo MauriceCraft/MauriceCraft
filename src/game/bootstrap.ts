@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { createFrameLoop, startFrameLoop } from './runtime/frame-loop';
 import { createGameTick } from './runtime/game-tick';
+import { createGameSessionControls } from './runtime/game-session-controls';
 import { showStartupFailure } from '../startup/startup-health';
 import { raycastActors } from './entities/actor-targeting';
 import { createMobCatalog } from './entities/mob-catalog';
@@ -603,69 +604,43 @@ const { overlay, playBtn, newBtn, subEl, infoEl, objEl,
   onPlay: () => startGame(),
 });
 
-function setMode(m) {
-  mode = m;
-  mining = placing = pulseMine = pulsePlace = false;
-  clearMobs();
-  hp = MAX_HEALTH; sinceHurt = 99; regenT = 0; hunger = 20; sat = 5; exhaust = 0; starveT = 0;
-  player.fly = (m === 'spectator'); player.vy = 0; player.fallStart = null;
-  if (dead) { dead = false; respawn(); playBtn.textContent = ready ? 'Play' : 'Loading\u2026'; subEl.textContent = 'Mode changed to ' + LABEL[m] + '.'; }
-  if (ready && m !== 'spectator' && collides(player.x, player.y, player.z)) player.y = topY(Math.floor(player.x), Math.floor(player.z)) + 1.01;
-  updateModeUI();
-}
-function setDifficulty(d) {
-  if (!DIFF[d]) return;
-  difficulty = d;
-  if (DIFF[d].cap === 0 && hasHealth()) for (let i = mobs.length - 1; i >= 0; i--) if (mobs[i].hostile) removeMobAt(i);
-  updateDiffUI();
-  sfx('click');
-  saveWorld().then(refreshWorlds);
-}
-function enterFallback() {
-  if (fallback || isTouch) return;
-  fallback = true; locked = false;
-  playing = true; overlay.classList.add('hidden');
-  showHint('Mouse capture is blocked here. Drag to look, click to break, right-click to place.', 6000);
-}
-function requestLock() {
-  try {
-    const p = canvas.requestPointerLock && canvas.requestPointerLock();
-    if (p && p.catch) p.catch(enterFallback);
-    if (!canvas.requestPointerLock) enterFallback();
-  } catch (err) { enterFallback(); }
-  setTimeout(function () { if (playing && !locked && !fallback && !isTouch) enterFallback(); }, 500);
-}
-document.addEventListener('pointerlockerror', enterFallback);
-document.addEventListener('pointerlockchange', function () {
-  if (document.pointerLockElement === canvas) locked = true;
-  else if (locked) { locked = false; mining = placing = false; if (!fallback && !invOpen) pause(); }
+const sessionControls = createGameSessionControls({
+  state: {
+    get mode() { return mode; }, set mode(value) { mode = value; },
+    get difficulty() { return difficulty; }, set difficulty(value) { difficulty = value; },
+    get mining() { return mining; }, set mining(value) { mining = value; },
+    get placing() { return placing; }, set placing(value) { placing = value; },
+    get pulseMine() { return pulseMine; }, set pulseMine(value) { pulseMine = value; },
+    get pulsePlace() { return pulsePlace; }, set pulsePlace(value) { pulsePlace = value; },
+    get dead() { return dead; }, set dead(value) { dead = value; },
+    get hp() { return hp; }, set hp(value) { hp = value; },
+    get sinceHurt() { return sinceHurt; }, set sinceHurt(value) { sinceHurt = value; },
+    get regenT() { return regenT; }, set regenT(value) { regenT = value; },
+    get hunger() { return hunger; }, set hunger(value) { hunger = value; },
+    get sat() { return sat; }, set sat(value) { sat = value; },
+    get exhaust() { return exhaust; }, set exhaust(value) { exhaust = value; },
+    get starveT() { return starveT; }, set starveT(value) { starveT = value; },
+    get locked() { return locked; }, set locked(value) { locked = value; },
+    get fallback() { return fallback; }, set fallback(value) { fallback = value; },
+    get playing() { return playing; }, set playing(value) { playing = value; },
+    get drag() { return drag; }, set drag(value) { drag = value; },
+    get ready() { return ready; }, set ready(value) { ready = value; },
+    get invOpen() { return invOpen; }, set invOpen(value) { invOpen = value; },
+  },
+  player, keys, canvas, document, overlay, playButton: playBtn, subtitle: subEl,
+  labels: LABEL, difficulties: DIFF, maximumHealth: MAX_HEALTH, isTouch,
+  hasHealth, clearMobs, removeMobAt, mobs,
+  respawn, collides, topY, updateModeUI, updateDiffUI, updateHearts, renderFood,
+  saveWorld, refreshWorlds, audioInit, playSound: event => sfx(event), showHint,
 });
 
-function startGame() {
-  if (!ready) return;
-  audioInit();
-  if (dead) { dead = false; respawn(); hp = MAX_HEALTH; hunger = 20; sat = 5; exhaust = 0; sinceHurt = 99; clearMobs(); updateHearts(); renderFood(); }
-  overlay.classList.add('hidden');
-  playing = true;
-  if (mode === 'spectator') showHint('Space up, Shift down, scroll changes speed. You fly where you look.', 5000);
-  else if (mode === 'adventure') showHint('Find the glowing beams. Each one marks a relic.', 5000);
-  if (!isTouch && !fallback) requestLock();
-}
-function pause() {
-  playing = false; mining = placing = false; drag = null;
-  for (const k in keys) keys[k] = false;
-  subEl.textContent = 'Paused. Pick a mode or keep playing.';
-  playBtn.textContent = 'Resume';
-  overlay.classList.remove('hidden');
-  if (document.pointerLockElement) document.exitPointerLock();
-  saveWorld().then(refreshWorlds);
-}
-function die() {
-  dead = true;
-  pause();
-  subEl.textContent = 'You died. Respawn to try again.';
-  playBtn.textContent = 'Respawn';
-}
+// Keep stable callable names for controls and menu callback registration.
+function setMode(m) { sessionControls.setMode(m); }
+function setDifficulty(d) { sessionControls.setDifficulty(d); }
+function requestLock() { sessionControls.requestLock(); }
+function startGame() { sessionControls.startGame(); }
+function pause() { sessionControls.pause(); }
+function die() { sessionControls.die(); }
 
 /* ---------- Commands (press T or /) ---------- */
 const { commands: CMDS, commandBar: cmdBar, defCmd, openCmd } =
