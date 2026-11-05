@@ -19,6 +19,7 @@ import { blockKind } from './world/block-kind';
 import { createBlockCatalog } from './world/block-catalog';
 import { createRecipeMatcher } from './crafting/recipes';
 import { createRecipeCatalog } from './crafting/recipe-catalog';
+import { createInventoryUi } from './ui/inventory-ui';
 import { coord } from './commands/coordinates';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
@@ -800,252 +801,38 @@ import { createAudioEngine } from './audio/sound-engine';
     if (hp <= 0) die();
   }
 
-  /* ---------- Inventory ---------- */
-  const invEl = document.getElementById('inv');
-  const invGrid = document.getElementById('invGrid');
-  const invTitle = document.getElementById('invTitle');
-  const invHelp = document.getElementById('invHelp');
-  const invMsg = document.getElementById('invMsg');
-  const craftEl = document.getElementById('craft');
-  const invHot = document.getElementById('invHotbar');
   const RECIPES = createRecipeCatalog({
     items: { BED, BEEF, BONE, BRICK, CHICKEN, COAL, COBBLE, COOKED, COPPER_BLOCK, COPPER_INGOT, CTABLE, DIAMOND, DIAMOND_BLOCK, DIRT, DYNAMITE, EMERALD, FEATHER, FLINT, GOLD, GRAVEL, GUNPOWDER, IRON_BLOCK, IRON_INGOT, LEATHER, MUTTON, PLANKS, PORK, RAW_COPPER, RAW_IRON, SAND, SANDSTONE, STICK, STONE, STONEBRICK, STRING, TNT, TORCH, WOOD, WOOL },
     toolTiers: TOOL_TIERS, toolId,
   });
-  function iconCanvas(b, size) {
-    const c = document.createElement('canvas'); c.width = size; c.height = size;
-    const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
-    g.drawImage(atlasCanvas, tileOf(b) * 16, 0, 16, 16, 0, 0, size, size);
-    return c;
-  }
-  /* ---------- Crafting grid (2x2 anywhere, 3x3 at a crafting table) ---------- */
-  const craftUi = document.getElementById('craftui'), craftTitle = document.getElementById('craftTitle'), craftHelp = document.getElementById('craftHelp');
-  const craftMsg = document.getElementById('craftMsg'), cgrid = document.getElementById('cgrid'), cres = document.getElementById('cres');
-  const craftBtn = document.getElementById('craftBtn'), craftItems = document.getElementById('craftItems'), craftBook = document.getElementById('craftBook');
-  const craftState = { size: 2, grid: [0, 0, 0, 0, 0, 0, 0, 0, 0], sel: 0 };
-  const { recipePattern, recipeCounts, matchRecipe } = createRecipeMatcher(RECIPES);
-  function gridCounts(size) {
-    const c = {};
-    for (let i = 0; i < size * size; i++) { const v = craftState.grid[i]; if (v) c[v] = (c[v] || 0) + 1; }
-    return c;
-  }
-  function hasAll(counts) { for (const k in counts) if ((inv[k] || 0) < counts[k]) return false; return true; }
-  function doCraft() {
-    const m = matchRecipe(craftState.grid, craftState.size), counts = gridCounts(craftState.size);
-    if (!m) return;
-    if (!hasAll(counts)) { craftMsg.textContent = 'You are missing some of those items.'; sfx('no'); return; }
-    for (const k in counts) inv[k] -= counts[k];
-    inv[m.out] = (inv[m.out] || 0) + m.n;
-    craftMsg.textContent = 'Crafted ' + m.n + ' ' + NAMES[m.out].toLowerCase() + '.';
-    sfx('pop'); updateHotbar(false); renderCraft();
-  }
-  function placeCraftItem(id) {
-    const size = craftState.size, used = gridCounts(size)[id] || 0;
-    if (used >= (inv[id] || 0)) { craftMsg.textContent = 'You have no more ' + NAMES[id].toLowerCase() + '.'; return; }
-    craftState.grid[craftState.sel] = id;
-    for (let k = 1; k <= size * size; k++) { const j = (craftState.sel + k) % (size * size); if (!craftState.grid[j]) { craftState.sel = j; break; } }
-    craftMsg.textContent = '';
-    renderCraft();
-  }
-  function fillRecipe(r) {
-    const size = craftState.size, g = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-    if (r.shapeless) {
-      if (r.shapeless.length > size * size) { craftMsg.textContent = 'That needs a crafting table (3\u00d73 grid).'; return; }
-      r.shapeless.forEach(function (id, i) { g[i] = id; });
-    } else {
-      const pat = recipePattern(r);
-      if (pat.length > size || pat[0].length > size) { craftMsg.textContent = 'That needs a crafting table (3\u00d73 grid).'; return; }
-      pat.forEach(function (row, ri) { row.forEach(function (id, ci) { g[ri * size + ci] = id; }); });
-    }
-    craftState.grid = g; craftMsg.textContent = ''; renderCraft();
-  }
-  function renderCraft() {
-    const size = craftState.size, g = craftState.grid;
-    craftTitle.textContent = size === 3 ? 'Crafting Table' : 'Crafting';
-    craftHelp.textContent = 'Pick a square, then click an item below to put it there. Click a filled square again to empty it, or press Fill on a recipe.';
-    cgrid.style.gridTemplateColumns = 'repeat(' + size + ', 58px)';
-    cgrid.innerHTML = '';
-    for (let i = 0; i < size * size; i++) {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'ccell' + (craftState.sel === i ? ' on' : '');
-      b.setAttribute('aria-label', 'Grid square ' + (i + 1) + (g[i] ? ', ' + NAMES[g[i]] : ', empty'));
-      if (g[i]) b.appendChild(iconCanvas(g[i], 40));
-      b.addEventListener('click', function () { if (craftState.sel === i && g[i]) craftState.grid[i] = 0; else craftState.sel = i; renderCraft(); });
-      cgrid.appendChild(b);
-    }
-    const m = matchRecipe(g, size), ok = !!m && hasAll(gridCounts(size));
-    cres.innerHTML = '';
-    if (m) { cres.appendChild(iconCanvas(m.out, 40)); const t = document.createElement('span'); t.textContent = m.n + ' \u00d7 ' + NAMES[m.out]; cres.appendChild(t); }
-    else cres.appendChild(document.createTextNode('No recipe'));
-    craftBtn.disabled = !ok;
-    craftItems.innerHTML = '';
-    let nItems = 0;
-    ALL_BLOCKS.forEach(function (b) {
-      const n = inv[b] || 0;
-      if (n <= 0) return;
-      nItems++;
-      const t = document.createElement('button'); t.type = 'button'; t.className = 'itile';
-      t.setAttribute('aria-label', NAMES[b] + ', ' + n + ' owned');
-      t.appendChild(iconCanvas(b, 40));
-      const l = document.createElement('span'); l.className = 'iname'; l.textContent = NAMES[b]; t.appendChild(l);
-      const c = document.createElement('span'); c.className = 'icount'; c.textContent = String(n); t.appendChild(c);
-      t.addEventListener('click', function () { placeCraftItem(b); });
-      craftItems.appendChild(t);
-    });
-    if (!nItems) { const e = document.createElement('p'); e.textContent = 'Your backpack is empty. Mine blocks and collect items first.'; craftItems.appendChild(e); }
-    craftBook.innerHTML = '';
-    RECIPES.forEach(function (r) {
-      const counts = recipeCounts(r), have = hasAll(counts);
-      const row = document.createElement('div'); row.className = 'recipe'; if (!have) row.style.opacity = '0.6';
-      const left = document.createElement('span'); left.style.display = 'inline-flex'; left.style.alignItems = 'center'; left.style.gap = '6px'; left.style.flexWrap = 'wrap';
-      const ic = iconCanvas(r.out, 24); ic.style.width = '24px'; ic.style.height = '24px'; ic.style.imageRendering = 'pixelated'; left.appendChild(ic);
-      left.appendChild(document.createTextNode(r.n + ' \u00d7 ' + NAMES[r.out] + ' \u2190 ' + Object.keys(counts).map(function (k) { return counts[k] + ' ' + NAMES[k].toLowerCase(); }).join(', ')));
-      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn small'; btn.textContent = 'Fill';
-      btn.addEventListener('click', function () { fillRecipe(r); });
-      row.appendChild(left); row.appendChild(btn); craftBook.appendChild(row);
-    });
-  }
-  function openCraft(size) {
-    if (mode !== 'survival') { showHint('Creative mode already has every item. Open the inventory with I.', 2400); return; }
-    craftState.size = size; craftState.grid = [0, 0, 0, 0, 0, 0, 0, 0, 0]; craftState.sel = 0;
-    craftOpen = true; invOpen = true; playing = false; mining = placing = false; drag = null;
-    for (const k in keys) keys[k] = false;
-    touchMove.x = 0; touchMove.z = 0; touchJump = false; stick = null; lookT = null;
-    invEl.classList.add('hidden'); tradeEl.classList.add('hidden');
-    craftMsg.textContent = '';
-    renderCraft();
-    craftUi.classList.remove('hidden');
-    if (document.pointerLockElement) document.exitPointerLock();
-    sfx('click');
-  }
-  craftBtn.addEventListener('click', doCraft);
-  document.getElementById('craftClear').addEventListener('click', function () { craftState.grid = [0, 0, 0, 0, 0, 0, 0, 0, 0]; craftState.sel = 0; craftMsg.textContent = ''; renderCraft(); });
-  document.getElementById('craftClose').addEventListener('click', function () { closeInventory(true); });
-  window.addEventListener('keydown', function (e) { if (e.code === 'KeyC' && !e.repeat && playing && !invOpen) openCraft(2); });
-  function assignSlot(b) {
-    if (mode === 'survival' && !(inv[b] > 0)) { invMsg.textContent = 'You have no ' + NAMES[b].toLowerCase() + ' yet. Mine some first.'; return; }
-    const j = hotbar.indexOf(b);
-    if (j >= 0 && j !== selected) hotbar[j] = hotbar[selected];
-    hotbar[selected] = b;
-    invMsg.textContent = NAMES[b] + ' is now in slot ' + (selected + 1) + '.';
-    updateHotbar(false); renderInventory();
-  }
-  function renderInventory() {
-    const surv = mode === 'survival';
-    invTitle.textContent = surv ? 'Backpack' : 'Creative inventory';
-    invHelp.textContent = (surv ? 'Everything you have collected.' : 'Every block and item, free to use.') + ' Choose a hotbar slot below (or press 1\u20139), then click a block to put it there.';
-    invGrid.innerHTML = '';
-    ALL_BLOCKS.forEach(function (b) {
-      const t = document.createElement('button'); t.type = 'button';
-      t.className = 'itile' + (surv && !(inv[b] > 0) ? ' empty' : '') + (hotbar[selected] === b ? ' cur' : '');
-      t.setAttribute('aria-label', NAMES[b] + (surv ? ', ' + (inv[b] || 0) + ' owned' : ''));
-      t.appendChild(iconCanvas(b, 40));
-      const l = document.createElement('span'); l.className = 'iname'; l.textContent = NAMES[b]; t.appendChild(l);
-      if (surv) { const c = document.createElement('span'); c.className = 'icount'; c.textContent = String(inv[b] || 0); t.appendChild(c); }
-      t.addEventListener('click', function () { assignSlot(b); });
-      invGrid.appendChild(t);
-    });
-    craftEl.innerHTML = '';
-    if (surv) {
-      const h = document.createElement('div'); h.className = 'invsub'; h.textContent = 'Crafting'; craftEl.appendChild(h);
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn small'; b.textContent = 'Open crafting grid (C)';
-      b.style.marginBottom = '14px';
-      b.addEventListener('click', function () { openCraft(2); });
-      craftEl.appendChild(b);
-    }
-    invHot.innerHTML = '';
-    hotbar.forEach(function (b, i) {
-      const s = document.createElement('button'); s.type = 'button';
-      s.className = 'slot' + (i === selected ? ' on' : '') + (surv && !(inv[b] > 0) ? ' empty' : '');
-      s.setAttribute('aria-label', NAMES[b] + ', slot ' + (i + 1));
-      s.appendChild(iconCanvas(b, 36));
-      const n = document.createElement('span'); n.className = 'num'; n.textContent = String(i + 1); s.appendChild(n);
-      if (surv && inv[b]) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = String(inv[b]); s.appendChild(c); }
-      s.addEventListener('click', function () { selected = i; updateHotbar(false); renderInventory(); });
-      invHot.appendChild(s);
-    });
-  }
-  function openInventory() {
-    if (!canInteract()) { showHint('There is no inventory in ' + LABEL[mode] + ' mode.', 1800); return; }
-    invOpen = true; playing = false; mining = placing = false; drag = null;
-    for (const k in keys) keys[k] = false;
-    touchMove.x = 0; touchMove.z = 0; touchJump = false; stick = null; lookT = null;
-    invMsg.textContent = '';
-    renderInventory();
-    invEl.classList.remove('hidden');
-    if (document.pointerLockElement) document.exitPointerLock();
-  }
-  function closeInventory(resume) {
-    invOpen = false; invEl.classList.add('hidden'); tradeEl.classList.add('hidden'); tradeOpen = false; craftUi.classList.add('hidden'); craftOpen = false; cmdBar.classList.add('hidden'); cmdOpen = false;
-    if (resume) { playing = true; if (!isTouch && !fallback) requestLock(); }
-    else pause();
-  }
-  // Villager trading (Survival only)
-  const tradeEl = document.getElementById('trade'), tradeTitle = document.getElementById('tradeTitle'), tradeSub = document.getElementById('tradeSub');
-  const tradeList = document.getElementById('tradeList'), tradeMsg = document.getElementById('tradeMsg');
-  let tradeMob = null;
-  const TRADES = {
-    farmer: [{ give: [HAY, 3], get: [EMERALD, 1] }, { give: [WOOL, 2], get: [EMERALD, 1] }, { give: [BONE, 4], get: [EMERALD, 1] }, { give: [EMERALD, 1], get: [COOKED, 4] }, { give: [EMERALD, 2], get: [BED, 1] }],
-    butcher: [{ give: [BEEF, 4], get: [EMERALD, 1] }, { give: [PORK, 4], get: [EMERALD, 1] }, { give: [CHICKEN, 5], get: [EMERALD, 1] }, { give: [EMERALD, 1], get: [LEATHER, 3] }],
-    mason: [{ give: [COBBLE, 8], get: [EMERALD, 1] }, { give: [EMERALD, 1], get: [STONEBRICK, 8] }, { give: [EMERALD, 1], get: [SANDSTONE, 8] }, { give: [EMERALD, 2], get: [BRICK, 8] }, { give: [COPPER_INGOT, 4], get: [EMERALD, 1] }],
-    blacksmith: [{ give: [GUNPOWDER, 3], get: [EMERALD, 1] }, { give: [EMERALD, 1], get: [TORCH, 8] }, { give: [EMERALD, 1], get: [FLINT, 1] }, { give: [EMERALD, 2], get: [DYNAMITE, 2] }, { give: [EMERALD, 3], get: [TNT, 1] }, { give: [EMERALD, 2], get: [134, 1] }, { give: [EMERALD, 2], get: [137, 1] }, { give: [IRON_INGOT, 3], get: [EMERALD, 1] }, { give: [COAL, 10], get: [EMERALD, 1] }, { give: [EMERALD, 3], get: [143, 1] }],
-    cleric: [{ give: [GOLD, 1], get: [EMERALD, 3] }, { give: [EMERALD, 8], get: [GOLD, 1] }, { give: [EMERALD, 1], heal: true }, { give: [DIAMOND, 1], get: [EMERALD, 6] }]
+  const inventoryUiState = {
+    get selected() { return selected; }, set selected(value) { selected = value; },
+    get playing() { return playing; }, set playing(value) { playing = value; },
+    get invOpen() { return invOpen; }, set invOpen(value) { invOpen = value; },
+    get tradeOpen() { return tradeOpen; }, set tradeOpen(value) { tradeOpen = value; },
+    get craftOpen() { return craftOpen; }, set craftOpen(value) { craftOpen = value; },
+    get cmdOpen() { return cmdOpen; }, set cmdOpen(value) { cmdOpen = value; },
+    get mining() { return mining; }, set mining(value) { mining = value; },
+    get placing() { return placing; }, set placing(value) { placing = value; },
+    get drag() { return drag; }, set drag(value) { drag = value; },
+    get touchJump() { return touchJump; }, set touchJump(value) { touchJump = value; },
+    get stick() { return stick; }, set stick(value) { stick = value; },
+    get lookT() { return lookT; }, set lookT(value) { lookT = value; },
   };
-  function tradeCell(pair) {
-    const w = document.createElement('span'); w.style.display = 'inline-flex'; w.style.alignItems = 'center'; w.style.gap = '4px';
-    if (pair) { const ic = iconCanvas(pair[0], 28); ic.style.width = '28px'; ic.style.height = '28px'; ic.style.imageRendering = 'pixelated'; w.appendChild(ic); w.appendChild(document.createTextNode(pair[1] + ' ' + NAMES[pair[0]])); }
-    return w;
-  }
-  function renderTrade() {
-    const job = tradeMob.job;
-    tradeTitle.textContent = JOB_NAMES[job];
-    tradeSub.textContent = 'Emeralds are the currency. Sell things to earn them.';
-    tradeList.innerHTML = '';
-    TRADES[job].forEach(function (t) {
-      const ok = (inv[t.give[0]] || 0) >= t.give[1];
-      const row = document.createElement('div'); row.className = 'recipe';
-      const left = document.createElement('span'); left.style.display = 'inline-flex'; left.style.alignItems = 'center'; left.style.gap = '8px'; left.style.flexWrap = 'wrap';
-      left.appendChild(tradeCell(t.give)); left.appendChild(document.createTextNode('\u2192'));
-      if (t.heal) left.appendChild(document.createTextNode('Full health')); else left.appendChild(tradeCell(t.get));
-      const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn small'; btn.textContent = 'Trade'; btn.disabled = !ok;
-      btn.addEventListener('click', function () { doTrade(t); });
-      row.appendChild(left); row.appendChild(btn); tradeList.appendChild(row);
-    });
-  }
-  function doTrade(t) {
-    if ((inv[t.give[0]] || 0) < t.give[1]) { tradeMsg.textContent = 'You do not have enough.'; sfx('no'); return; }
-    if (t.heal) { if (hp >= MAXHP) { tradeMsg.textContent = 'You are already at full health.'; sfx('no'); return; } hp = MAXHP; updateHearts(); }
-    inv[t.give[0]] -= t.give[1];
-    if (!t.heal) inv[t.get[0]] = (inv[t.get[0]] || 0) + t.get[1];
-    updateHotbar(false); renderTrade();
-    tradeMsg.textContent = t.heal ? 'You feel much better.' : 'Trade complete.';
-    sfx('yes');
-  }
-  function openTrade(m) {
-    if (mode !== 'survival') { sfxAt('villager', m.x, m.y + 1, m.z); showHint('The villager nods at you. Trading works in Survival mode.', 2400); return; }
-    invOpen = true; tradeOpen = true; tradeMob = m; playing = false; mining = placing = false; drag = null;
-    for (const k in keys) keys[k] = false;
-    touchMove.x = 0; touchMove.z = 0; touchJump = false; stick = null; lookT = null;
-    tradeMsg.textContent = '';
-    renderTrade();
-    tradeEl.classList.remove('hidden');
-    if (document.pointerLockElement) document.exitPointerLock();
-    sfxAt('villager', m.x, m.y + 1, m.z);
-  }
-  document.getElementById('tradeClose').addEventListener('click', function () { closeInventory(true); });
-  document.getElementById('invClose').addEventListener('click', function () { closeInventory(true); });
-  window.addEventListener('keydown', function (e) {
-    if (e.code === 'KeyI' || e.code === 'Tab') {
-      if (e.repeat) { if (invOpen || playing) e.preventDefault(); return; }
-      if (invOpen) { e.preventDefault(); closeInventory(true); }
-      else if (playing) { e.preventDefault(); openInventory(); }
-    } else if (invOpen) {
-      if (e.code === 'Escape') closeInventory(false);
-      else if ((e.code === 'KeyE' || e.code === 'KeyC') && (tradeOpen || craftOpen)) closeInventory(true);
-      else if (e.code.indexOf('Digit') === 0 && !tradeOpen && !craftOpen) {
-        const n = parseInt(e.code.slice(5), 10);
-        if (n >= 1 && n <= 9) { selected = n - 1; updateHotbar(false); renderInventory(); }
-      }
-    }
+  const { openCraft, renderCraft, openInventory, closeInventory, renderInventory,
+    openTrade, renderTrade } = createInventoryUi({
+    state: inventoryUiState, atlasCanvas, tileOf, inventory: inv, hotbar,
+    allBlocks: ALL_BLOCKS, names: NAMES, recipes: RECIPES,
+    itemIds: { HAY, WOOL, BONE, EMERALD, COOKED, BED, BEEF, PORK, CHICKEN, LEATHER, COBBLE, STONEBRICK, SANDSTONE, BRICK, COPPER_INGOT, GUNPOWDER, TORCH, FLINT, DYNAMITE, TNT, IRON_INGOT, COAL, GOLD, DIAMOND },
+    jobNames: JOB_NAMES, keys, touchMove, isTouch,
+    getMode: () => mode, getModeLabel: () => LABEL[mode],
+    getFallback: () => fallback,
+    getHealth: () => hp, setHealth: health => { hp = health; },
+    maxHealth: MAXHP, updateHearts, updateHotbar, showHint,
+    playSound: event => sfx(event),
+    playSoundAt: (event, x, y, z) => sfxAt(event, x, y, z),
+    requestPointerLock: () => requestLock(), pauseGame: () => pause(),
+    getCommandBar: () => cmdBar,
   });
 
   /* ---------- Keyboard / mouse / touch ---------- */
