@@ -45,7 +45,7 @@ export interface WorldRestoreDependencies {
   mobs: SpawnMob[];
   relics: readonly unknown[];
   maximumHealth: number;
-  resetWorld: (seed: number, x: number, z: number) => void;
+  resetWorld: (seed: number, x: number, z: number, generatorVersion?: number) => void;
   clearPortalVisuals: () => void;
   showPortalVisual: (portal: PortalFrame) => void;
   clearMobs: () => void;
@@ -84,7 +84,7 @@ export function createWorldRestore(deps: WorldRestoreDependencies) {
     portals.push(...restorePortals(m.portals));
     deps.clearPortalVisuals();
     portals.forEach(deps.showPortalVisual);
-    deps.resetWorld(m.seed, Math.floor(p.x / 16), Math.floor(p.z / 16));
+    deps.resetWorld(m.seed, Math.floor(p.x / 16), Math.floor(p.z / 16), m.generatorVersion ?? 1);
     deps.clearMobs();
     player.x = p.x; player.y = p.y; player.z = p.z;
     player.vx = player.vy = player.vz = 0;
@@ -127,7 +127,7 @@ export function createWorldRestore(deps: WorldRestoreDependencies) {
 
   function prepareNewWorld(world: WorldRecord): void {
     deps.savedChunks.clear();
-    deps.resetWorld(world.seed, 0, 0);
+    deps.resetWorld(world.seed, 0, 0, world.generatorVersion ?? 1);
     state.spawnPoint = null;
     state.omen = false;
     state.weather = 'clear';

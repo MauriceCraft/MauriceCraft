@@ -8,6 +8,7 @@ export interface ChunkLifecycleDependencies {
   height: number;
   getDimension: () => string;
   setSeed: (seed: number) => void;
+  setGeneratorVersion?: (version: number) => void;
   clearStructures: () => void;
   chunkAt: (cx: number, cz: number) => WritableChunk | null;
   resetChunkCache: () => void;
@@ -41,10 +42,12 @@ function genChunk(cx: number, cz: number): WritableChunk {
 function getOrGen(cx: number, cz: number): WritableChunk { return chunkAt(cx, cz) || genChunk(cx, cz); }
 function topY(x: number, z: number): number { for (let y = WORLD_HEIGHT - 1; y >= 0; y--) if (solid(get(x, y, z))) return y; return 0; }
 
-function resetWorld(newSeed: number, ox: number, oz: number): void {
+function resetWorld(newSeed: number, ox: number, oz: number, generatorVersion?: number): void {
   chunks.forEach(function (c) { disposeMesh(c); });
   chunks.clear(); resetChunkCache();
-  deps.setSeed(newSeed); deps.clearStructures();
+  deps.setSeed(newSeed);
+  if (generatorVersion !== undefined) deps.setGeneratorVersion?.(generatorVersion);
+  deps.clearStructures();
   primeWorldChunks(ox, oz, genChunk, buildChunk);
 }
 

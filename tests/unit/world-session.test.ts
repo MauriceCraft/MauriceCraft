@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextWorldName, timeAgo } from '../../src/game/session/world-session';
+import { nextWorldName, nextWorldSeed, CURRENT_WORLD_GENERATOR_VERSION, timeAgo } from '../../src/game/session/world-session';
 import type { WorldRecord } from '../../src/game/storage/world-storage';
 
 function world(name: string): WorldRecord {
@@ -12,6 +12,14 @@ describe('saved world session naming and history', () => {
       .toBe('World 11');
     expect(nextWorldName([world('My favorite world')])).toBe('World 1');
     expect(nextWorldName([])).toBe('World 1');
+  });
+
+  it('creates full-range deterministic testable seeds without reusing saved seeds', () => {
+    expect(CURRENT_WORLD_GENERATOR_VERSION).toBe(2);
+    expect(nextWorldSeed([], () => 0.75)).toBe(3221225472);
+    expect(nextWorldSeed([world('a')], () => 0)).toBe(0);
+    const existing = [{ ...world('a'), seed: 3221225472 }];
+    expect(nextWorldSeed(existing, () => 0.75)).toBe(0);
   });
 
   it('renders stable user-friendly save ages', () => {

@@ -49,6 +49,7 @@ import { createAudioEngine } from './audio/sound-engine';
 /* ---------- World services (typed terrain + renderer + chunk stores) ---------- */
 const WORLD_HEIGHT = 48, CHUNK_SIZE = 16, SEA_LEVEL = 14, VIEW_DISTANCE = 5;
 let seed = 1;
+let generatorVersion = 1;
 let dimension = 'overworld';
 const portals = []; // Persistent portal pairs, stored with each world.
 const {

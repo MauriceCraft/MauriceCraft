@@ -28,6 +28,20 @@ export function timeAgo(timestamp: number, now = Date.now()): string {
 }
 
 /** World names are human-readable; IDs must not depend on name or order. */
+export const CURRENT_WORLD_GENERATOR_VERSION = 2;
+
+/** Full 32-bit seeds; avoid reuse among locally saved worlds where possible. */
+export function nextWorldSeed(worlds: readonly WorldRecord[], random: () => number = Math.random): number {
+  const used = new Set(worlds.map(world => world.seed));
+  for (let attempt = 0; attempt < 32; attempt++) {
+    const seed = Math.floor(random() * 0x100000000) >>> 0;
+    if (!used.has(seed)) return seed;
+  }
+  let seed = 0;
+  while (used.has(seed)) seed = (seed + 1) >>> 0;
+  return seed;
+}
+
 export function nextWorldName(worlds: readonly WorldRecord[]): string {
   let highestNumber = 0;
   for (const world of worlds) {
@@ -193,7 +207,8 @@ export function createWorldSession(deps: WorldSessionDependencies) {
     const now = Date.now();
     const world: WorldRecord = {
       id: 'w' + now.toString(36) + Math.floor(Math.random() * 1296).toString(36),
-      name: nextWorldName(worlds), seed: Math.floor(Math.random() * 1e6),
+      name: nextWorldName(worlds), seed: nextWorldSeed(worlds),
+      generatorVersion: CURRENT_WORLD_GENERATOR_VERSION,
       created: now, lastPlayed: now,
     };
     currentWorld = world;

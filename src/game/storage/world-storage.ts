@@ -8,6 +8,8 @@ export interface WorldRecord {
   id: string;
   name: string;
   seed: number;
+  /** Missing on pre-biome worlds, which retain generator v1 forever. */
+  generatorVersion?: number;
   created: number;
   lastPlayed: number;
   [key: string]: unknown;

@@ -60,6 +60,10 @@ flowchart TD
 
 The renderer and initialization can fail on some mobile devices. An error must show a meaningful message and a reload option, never a permanently disabled **Loading…** button. Only initially needed chunks are generated synchronously; the chunk streamer fills the rest within a per-frame work budget.
 
+## Versioned world generation
+
+Worlds created before the biome upgrade have no `generatorVersion` and use generator v1. Newly created worlds explicitly store `generatorVersion: 2` and use full-range 32-bit seeds. Loading and portal travel preserve the selected version, so edits and unexplored terrain in older worlds do not unexpectedly change. Do not modify v1 terrain/structures in place; new algorithms belong behind version 2.
+
 ## Never break world saves
 
 The `blockcraft-worlds` IndexedDB database is **stored in the player's browser**. It uses Dexie over the original version-1 `worlds` and `chunks` stores, with the same keys and block IDs. The world session serializes writes and retries failed dirty chunk saves. Loading failures must never delete or replace a saved world.
