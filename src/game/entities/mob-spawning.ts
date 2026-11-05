@@ -3,7 +3,7 @@ import type { MobActor } from './mob-simulation';
 import type { GeneratedStructure } from '../world/structure-regions';
 
 export type SpawnStructure = GeneratedStructure & { vSpawned?: boolean };
-export type SpawnMob = MobActor & { leader?: boolean };
+export type SpawnMob = MobActor & { leader?: boolean; job?: string };
 
 export interface RaidDifficulty { cap: number; raid: number; }
 export interface MobSpawnDependencies {
