@@ -796,7 +796,8 @@ import { createAudioEngine } from './audio/sound-engine';
   });
 
   /* ---------- Keyboard / mouse / touch ---------- */
-  const { touchUI, jumpButton: bJump, toggleFly } = createInputControls({
+  const { touchUI, jumpButton: bJump, placeButton: bPlace, flyButton: bFly,
+    inventoryButton: bInv, toggleFly } = createInputControls({
     canvas, keys, touchMove, player, state: inventoryUiState, isTouch,
     getMode: () => mode, canInteract, updateHotbar, showHint,
     openInventory, openCommand: (command) => openCmd(command), pause,
