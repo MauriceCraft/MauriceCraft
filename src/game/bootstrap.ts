@@ -14,6 +14,7 @@ import { SpatialIndex } from './entities/spatial-index';
 import { createMobSimulation } from './entities/mob-simulation';
 import { createArrowSystem } from './entities/arrow-system';
 import { createMobSpawning } from './entities/mob-spawning';
+import { createMobWorldCycle } from './entities/mob-world-cycle';
 import { part, JOBS, JOB_NAMES } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
 import { createBlockAccess } from './world/block-access';
@@ -225,7 +226,6 @@ const { raid, endRaid, trySpawnMob, trySpawnAnimals, manageVillagers,
   playSound: event => sfx(event),
   raidElement: document.getElementById('raid'),
 });
-let spawnT = 2, animalT = 0.5, villT = 0.2, patrolT = 70;
 const pendingBlasts = [], pendingHits = [];
 const { arrows, hasLOS, shootArrow, updateArrows } = createArrowSystem({
   scene, player, mobs, getBlock: get, solid, collides,
@@ -244,44 +244,17 @@ const stepMobActors = createMobSimulation({
   hasLineOfSight: hasLOS, shootArrow,
   moveEntity: moveEnt, pendingHits, pendingBlasts,
 });
-function updateMobs(dt) {
-  const D = DIFF[difficulty];
-  if (dimension === 'end') {
-    if (!enderDragonDefeated && !mobs.some(function (m) { return m.kind === 'enderdragon'; })) {
-      addMob('enderdragon', player.x + 8, Math.max(28, player.y + 8), player.z + 1, { boss: true });
-      showHint('ENDER DRAGON! Hit it with your sword or shoot it with arrows!', 5500);
-    }
-    spawnT = Math.max(spawnT, 2); animalT = Math.max(animalT, 2); villT = Math.max(villT, 2);
-  }
-  spawnT -= dt; animalT -= dt; villT -= dt;
-  if (dimension !== 'end' && hasHealth() && spawnT <= 0) {
-    spawnT = D.every;
-    if (D.cap > 0 && (isNight || weather === 'storm') && mobs.filter(function (m) { return m.hostile && !KINDS[m.kind].illager; }).length < D.cap) trySpawnMob();
-  }
-  if (dimension !== 'end' && animalT <= 0) {
-    animalT = 2.5;
-    if (!isNight && mobs.filter(function (m) { return !m.hostile && m.kind !== 'villager'; }).length < 12) trySpawnAnimals();
-  }
-  if (dimension !== 'end' && villT <= 0) { villT = 1.5; manageVillagers(); }
-  patrolT -= dt;
-  if (dimension !== 'end' && patrolT <= 0) {
-    patrolT = D.patrol[0] + Math.random() * (D.patrol[1] - D.patrol[0]);
-    if (hasHealth() && D.cap > 0 && mobs.filter(function (m) { return KINDS[m.kind].illager && !m.raid; }).length < 6) trySpawnPatrol();
-  }
-  if (dimension !== 'end') updateRaid(dt, D);
-  // Index mobs once per frame instead of searching everyone for every AI actor.
-  hostileActors.clear();
-  defenders.clear();
-  for (const mob of mobs) {
-    if (mob.hostile) hostileActors.upsert(mob);
-    if (mob.kind === 'villager' || mob.golem) defenders.upsert(mob);
-  }
-  activeMobIndexes = { hostiles: hostileActors, defenders };
-  stepMobActors(dt);
-  while (pendingHits.length) { const ph = pendingHits.pop(); if (mobs.indexOf(ph.m) >= 0) damageMob(ph.m, ph.d); }
-  while (pendingBlasts.length) { const pb = pendingBlasts.pop(); explode(pb.x, pb.y, pb.z, pb.r, pb.p); }
-  activeMobIndexes = null;
-}
+const { updateMobs } = createMobWorldCycle({
+  mobs, player, kinds: KINDS, hostileActors, defenders, pendingHits, pendingBlasts,
+  getDifficulty: () => DIFF[difficulty], getDimension: () => dimension,
+  isDragonDefeated: () => enderDragonDefeated,
+  hasHealth: () => hasHealth(), isNight: () => isNight, getWeather: () => weather,
+  addMob, trySpawnMob, trySpawnAnimals, manageVillagers, trySpawnPatrol, updateRaid,
+  stepMobActors,
+  setActiveIndexes: indexes => { activeMobIndexes = indexes; },
+  damageMob, explode,
+  showHint: (message, ms) => showHint(message, ms),
+});
 
 const rayDir = new THREE.Vector3();
 function raycastMobs(maxDistance) {
