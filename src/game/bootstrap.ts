@@ -73,6 +73,8 @@ const {
   height: WORLD_HEIGHT, chunkSize: CHUNK_SIZE, seaLevel: SEA_LEVEL,
   viewDistance: VIEW_DISTANCE, getSeed: () => seed,
   setSeed: newSeed => { seed = newSeed; },
+  getGeneratorVersion: () => generatorVersion,
+  setGeneratorVersion: version => { generatorVersion = version; },
   getDimension: () => dimension,
   getPlayer: () => player,
 });

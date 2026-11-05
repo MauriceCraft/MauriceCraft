@@ -1,5 +1,6 @@
 import { ckey } from './chunk-key';
 import { hash2, smooth } from './noise';
+import type { Biome } from './biomes';
 
 export type StructureType = 'village' | 'temple' | 'tower' | 'dungeon' | 'cabin' | 'circle';
 export interface GeneratedStructure {
@@ -11,6 +12,8 @@ export interface GeneratedStructure {
 export interface StructureRegionDependencies {
   heightAt: (x: number, z: number) => number;
   getSeed: () => number;
+  getGeneratorVersion?: () => number;
+  getBiome?: (x: number, z: number) => Biome;
   getPlayer: () => { x: number; z: number };
   seaLevel: number;
   maxHeight: number;
@@ -43,25 +46,31 @@ export function createStructureRegions(deps: StructureRegionDependencies) {
     return { spread: mx - mn, avg: Math.round(sum / n), min: mn };
   }
   function makeStructure(rx: number, rz: number): GeneratedStructure | null {
-    const r = hash2(rx, rz, getSeed() + 500), jx = hash2(rx, rz, getSeed() + 501), jz = hash2(rx, rz, getSeed() + 502);
+    const modern = (deps.getGeneratorVersion?.() ?? 1) >= 2;
+    const r = hash2(rx, rz, getSeed() + (modern ? 1510 : 500));
+    const jx = hash2(rx, rz, getSeed() + (modern ? 1511 : 501));
+    const jz = hash2(rx, rz, getSeed() + (modern ? 1512 : 502));
     const ox = rx * REG, oz = rz * REG;
     let st: (Omit<GeneratedStructure, 'rx' | 'rz' | 'zone'> & { zone?: number }) | null = null;
-    if (r < 0.22) {
+    if (r < (modern ? 0.16 : 0.22)) {
       const cx = ox + 28 + Math.floor(jx * 25), cz = oz + 28 + Math.floor(jz * 25), f = sampleGround(cx, cz, 16);
-      if (f.min > SEA + 2 && f.spread <= 9) st = { type: 'village', cx: cx, cz: cz, gy: f.avg, pad: 20, blend: 8, reach: 22 };
-    } else if (r < 0.30) {
+      if (f.min > SEA + 2 && f.spread <= 9 &&
+        (!modern || !['volcanic', 'highlands', 'marsh', 'tundra'].includes(deps.getBiome?.(cx, cz) ?? 'plains'))) st = { type: 'village', cx: cx, cz: cz, gy: f.avg, pad: 20, blend: 8, reach: 22 };
+    } else if (r < (modern ? 0.23 : 0.30)) {
       const cx = ox + 22 + Math.floor(jx * 37), cz = oz + 22 + Math.floor(jz * 37), f = sampleGround(cx, cz, 10);
-      if (f.avg <= 30 && f.spread <= 9) st = { type: 'temple', cx: cx, cz: cz, gy: Math.max(f.avg, 5), pad: 15, blend: 6, reach: 16 };
-    } else if (r < 0.40) {
+      if (f.avg <= 30 && f.spread <= 9 &&
+        (!modern || ['desert', 'badlands'].includes(deps.getBiome?.(cx, cz) ?? 'plains'))) st = { type: 'temple', cx: cx, cz: cz, gy: Math.max(f.avg, 5), pad: 15, blend: 6, reach: 16 };
+    } else if (r < (modern ? 0.32 : 0.40)) {
       const cx = ox + 14 + Math.floor(jx * 53), cz = oz + 14 + Math.floor(jz * 53), f = sampleGround(cx, cz, 6);
       if (f.min > SEA + 1 && f.spread <= 8) st = { type: 'tower', cx: cx, cz: cz, gy: f.avg, pad: 7, blend: 5, reach: 8 };
-    } else if (r < 0.50) {
+    } else if (r < (modern ? 0.42 : 0.50)) {
       const cx = ox + 8 + Math.floor(jx * 52), cz = oz + 8 + Math.floor(jz * 64), gy = heightAt(cx, cz);
       if (gy >= 14 && gy <= H - 14) st = { type: 'dungeon', cx: cx, cz: cz, gy: gy, pad: 0, blend: 0, reach: 20, zone: 4 };
-    } else if (r < 0.60) {
+    } else if (r < (modern ? 0.51 : 0.60)) {
       const cx = ox + 14 + Math.floor(jx * 53), cz = oz + 14 + Math.floor(jz * 53), f = sampleGround(cx, cz, 6);
-      if (f.min > SEA + 1 && f.spread <= 6) st = { type: 'cabin', cx: cx, cz: cz, gy: f.avg, pad: 8, blend: 5, reach: 10 };
-    } else if (r < 0.68) {
+      if (f.min > SEA + 1 && f.spread <= 6 &&
+        (!modern || ['forest', 'taiga', 'marsh', 'meadow'].includes(deps.getBiome?.(cx, cz) ?? 'plains'))) st = { type: 'cabin', cx: cx, cz: cz, gy: f.avg, pad: 8, blend: 5, reach: 10 };
+    } else if (r < (modern ? 0.60 : 0.68)) {
       const cx = ox + 14 + Math.floor(jx * 53), cz = oz + 14 + Math.floor(jz * 53), f = sampleGround(cx, cz, 6);
       if (f.min > SEA + 1 && f.spread <= 7) st = { type: 'circle', cx: cx, cz: cz, gy: f.avg, pad: 8, blend: 5, reach: 9 };
     }

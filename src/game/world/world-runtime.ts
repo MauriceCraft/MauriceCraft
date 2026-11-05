@@ -6,6 +6,7 @@ import { createChunkStreamer } from './chunk-streamer';
 import { createStructureRegions } from './structure-regions';
 import { createStructureBuilders } from './structure-builders';
 import { fbm } from './noise';
+import { biomeAt, biomeHeightAt } from './biomes';
 import { createGameRenderer } from '../rendering/game-renderer';
 import { createChunkMesher } from '../rendering/chunk-mesher';
 
@@ -16,6 +17,8 @@ export interface WorldRuntimeDependencies {
   viewDistance: number;
   getSeed: () => number;
   setSeed: (seed: number) => void;
+  getGeneratorVersion: () => number;
+  setGeneratorVersion: (version: number) => void;
   getDimension: () => WorldDimension;
   getPlayer: () => { x: number; z: number };
 }
@@ -32,7 +35,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     BRICK, COBBLE, CTABLE, DIRT, GOLD, GRAVEL, HAY, LEAVES,
     MOSSY, PLANKS, SANDSTONE, STONEBRICK, TORCH, WOOD,
     COAL_ORE, COPPER_ORE, DIAMOND_ORE, GRASS, IRON_ORE, LAVA,
-    SAND, STONE, WATER, toolTile, ALL_BLOCKS, TILES,
+    SAND, STONE, WATER, SNOW, PINE_LEAVES, RED_SAND, DARK_WOOD, toolTile, ALL_BLOCKS, TILES,
     ATLAS_N, BED_H, isBed, opq, solid,
   } = catalog;
   const hotbar = ALL_BLOCKS.slice(0, 9);
@@ -53,6 +56,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
 
   function heightAt(x: number, z: number): number {
     const seed = deps.getSeed();
+    if (deps.getGeneratorVersion() >= 2) return biomeHeightAt(x, z, seed, WORLD_HEIGHT);
     const n = fbm(x / 40, z / 40, seed);
     const n2 = fbm(x / 170, z / 170, seed + 300);
     const m = fbm(x / 12, z / 12, seed + 50);
@@ -62,6 +66,8 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
 
   const regions = createStructureRegions({
     heightAt, getSeed: deps.getSeed, getPlayer: deps.getPlayer,
+    getGeneratorVersion: deps.getGeneratorVersion,
+    getBiome: (x, z) => biomeAt(x, z, deps.getSeed()),
     seaLevel: SEA_LEVEL, maxHeight: WORLD_HEIGHT,
   });
   const { REG: STRUCTURE_REGION_SIZE, groundH, forceSand,
@@ -72,16 +78,19 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
   });
   const generateChunkData = createChunkGenerator({
     getSeed: deps.getSeed, getDimension: deps.getDimension,
+    getGeneratorVersion: deps.getGeneratorVersion,
+    getBiome: (x, z) => biomeAt(x, z, deps.getSeed()),
     maxHeight: WORLD_HEIGHT, seaLevel: SEA_LEVEL,
     regionSize: STRUCTURE_REGION_SIZE, groundH, heightAt,
     forceSand, inStructZone, structureFor, buildStructure,
     blocks: { BRICK, COAL_ORE, COPPER_ORE, DIAMOND_ORE, DIRT,
       GOLD, GRASS, IRON_ORE, LAVA, LEAVES, SAND, SANDSTONE,
-      STONE, STONEBRICK, TORCH, WATER, WOOD },
+      STONE, STONEBRICK, TORCH, WATER, WOOD, SNOW, PINE_LEAVES, RED_SAND, DARK_WOOD },
   });
   const lifecycle = createChunkLifecycle({
     chunks, savedChunks, height: WORLD_HEIGHT,
     getDimension: deps.getDimension, setSeed: deps.setSeed,
+    setGeneratorVersion: deps.setGeneratorVersion,
     clearStructures: () => regions.structCache.clear(),
     chunkAt, resetChunkCache, generateChunkData, buildChunk,
     disposeMesh, solid, getBlock: get,
