@@ -22,9 +22,23 @@ export interface NaturalFeatureDependencies {
 export function createNaturalFeatures(deps: NaturalFeatureDependencies) {
   const LAKE_CELL = 96, FALL_CELL = 112;
   const { getSeed, biomeAt, heightAt, inStructureZone } = deps;
+  const lakeCache = new Map<string, Lake | null>();
+  let cachedSeed: number | null = null;
 
   function lakeFor(rx: number, rz: number): Lake | null {
-    const seed = getSeed(), roll = hash2(rx, rz, seed + 2110);
+    const seed = getSeed();
+    if (cachedSeed !== seed) { lakeCache.clear(); cachedSeed = seed; }
+    const key = rx + ',' + rz;
+    if (lakeCache.has(key)) return lakeCache.get(key) ?? null;
+    const result = makeLake(rx, rz, seed);
+    // Bounds memory use while exploring very long distances.
+    if (lakeCache.size > 512) lakeCache.clear();
+    lakeCache.set(key, result);
+    return result;
+  }
+
+  function makeLake(rx: number, rz: number, seed: number): Lake | null {
+    const roll = hash2(rx, rz, seed + 2110);
     if (roll > 0.34) return null;
     const x = rx * LAKE_CELL + 20 + Math.floor(hash2(rx, rz, seed + 2111) * 56);
     const z = rz * LAKE_CELL + 20 + Math.floor(hash2(rx, rz, seed + 2112) * 56);
