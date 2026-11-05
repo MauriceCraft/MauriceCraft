@@ -83,7 +83,7 @@ export function createMobRuntime(deps: MobRuntimeDependencies) {
 
 
 const mobs: SpawnMob[] = [];
-const hostileActors = new SpatialIndex(16);
+const hostileActors = new SpatialIndex<SpawnMob>(16);
 const defenders = new SpatialIndex(16);
 let activeMobIndexes: { hostiles: SpatialIndex<SpawnMob>; defenders: SpatialIndex<SpawnMob> } | null = null;
 const { KINDS, ANIMALS } = createMobCatalog(deps.mobDropIds);
@@ -203,7 +203,7 @@ function attackMob(m: SpawnMob): void {
 
 const { blasts, fx, rebuildSet, spawnTnt, addDynamite, removeBlastAt, removeFxAt,
   queueRebuild, flushRebuilds, explode, updateBlasts, updateFx } = createExplosionSystem({
-  scene, texture: deps.texture, tntId: deps.tntId, torchId: deps.torchId, worldHeight: deps.worldHeight,
+  scene, texture: deps.texture, tntId: deps.tntId, torchId: deps.torchBlock, worldHeight: deps.worldHeight,
   breakTimes: deps.breakTimes, blockGeometry: deps.blockGeometry,
   getBlock: get, setBlock: deps.setBlock, hasChunk: (x, z) => !!chunkAt(x, z), buildChunk: deps.buildChunk,
   getMobs: () => mobs, getPlayer: () => player,
