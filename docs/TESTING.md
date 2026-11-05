@@ -1,37 +1,53 @@
-# Testing
+# Testing MauriceCraft
 
-Automated tests are added after the initial source hierarchy refactor so changes can be reviewed separately.
+Treat existing saved worlds and mobile controls as important game features. Write regression tests for every bug before calling it fixed.
 
-## Unit tests
+## Run tests on your computer
 
-`npm test` runs Vitest once. `npm run test:watch` reruns tests while editing and `npm run test:coverage` checks coverage of extracted pure gameplay rules.
-
-The unit suite protects the saved-world chunk-key encoding, deterministic terrain noise, mining classification, crafting-grid pattern matching, and command coordinate parsing. When extracting more functions from `src/game/bootstrap.ts`, add tests in `tests/unit/` before altering behavior. The legacy bootstrap is not counted as unit-test coverage until it becomes testable.
-
-## Browser tests
-
-Playwright smoke tests will cover the compiled production app on desktop and a mobile viewport, including startup, menu navigation, and touch UI. The browser tests are intentionally smaller than full gameplay integration tests, which require additional deterministic fixtures.
-
-## Before changing game rules
-
-Run the relevant unit tests, then the entire test suite and production build. Test world-save compatibility and a phone-size viewport when changing storage, UI, or input. New gameplay changes should not depend solely on browser smoke tests.
-
-## Shift-left quality gates
-
-Use `npm run check` on every meaningful code change to enforce lint, typecheck, unit coverage and a production build. After `npx playwright install chromium`, run `npm run check:full` for the full production-browser suite. The separate **CI** workflow runs lint, TypeScript, coverage, build and browser checks on pushes and pull requests. **Deploy GitHub Pages** is independent: it installs dependencies, typechecks, builds and publishes the site from main without waiting for unit or browser tests. A TypeScript/build failure still prevents deployment.
-
-```mermaid
-flowchart LR
-    Push["PR or main change"] --> Lint["ESLint / max 500 lines"]
-    Lint --> Types["TypeScript"]
-    Types --> Unit["Unit + regression tests + coverage"]
-    Unit --> Build["Vite production build"]
-    Build --> Browser["Playwright desktop + phone smoke"]
-    Browser --> Gate{"main branch?"}
-    Gate -- Yes --> Pages["GitHub Pages"]
-    Gate -- No --> End["PR checks complete"]
+```sh
+npm ci
+npm run check
+npx playwright install chromium
+npm run test:e2e
 ```
 
-The line-count limit applies to non-test TypeScript, with the original bootstrap temporarily excluded from lint. Browser smoke and pure unit tests are complementary: regression tests cover frame lighting and save metadata, while browser smoke detects startup, mobile input and portal-command failures.
+`npm run check` runs ESLint, TypeScript, Vitest with coverage, and a production Vite build. `npm run check:full` also runs Playwright. During development, `npm run test:watch` reruns Vitest automatically.
 
-The automated coverage gate includes world rules, commands, crafting, **portal frame/save compatibility**, and **Dexie storage**. Browser-dependent modules (WebGL, Web Audio, and the temporary legacy bootstrap) are exercised through separate integration and browser tests and will be added to coverage gates as they are made testable. Do not lower thresholds just to pass CI.
+## What each test protects
+
+| Type | Location | Catches |
+| --- | --- | --- |
+| Unit / regression | `tests/unit/` | Terrain math, block IDs, recipes, mob targeting, chunk budgets, portal dimensions, storage logic |
+| Browser integration | `tests/e2e/` | Play becoming enabled, game controls, menus, mobile touch, portal commands, saved data after reload |
+| Type and style | `npm run typecheck`, `npm run lint` | Invalid interfaces, unsafe JavaScript, unnecessarily large TypeScript files |
+| Production build | `npm run build` | Broken imports, Pages base path, TypeScript/build errors |
+
+Browser tests run the **compiled production game**, not just isolated functions. They should cover real actions and the resulting world state whenever practical. The initial **Loading…** button must become Play or a visible recoverable error. Test both desktop and a touch/mobile browser. A fake phone-sized viewport is useful but does not prove every physical phone works, so manual device checks are also valuable.
+
+## GitHub Actions
+
+**CI and GitHub Pages are separate independent workflows.** A failing unit test must not block publishing a buildable website, but a failing TypeScript check or production build must stop Pages deployment.
+
+```mermaid
+flowchart TD
+    Change["Push or pull request"] --> CI["CI workflow"]
+    Change --> Pages["Pages workflow on main"]
+    CI --> Lint["ESLint and typing"]
+    Lint --> Unit["Unit / coverage"]
+    Unit --> Browser["Desktop and mobile browser tests"]
+    Pages --> Build["Typecheck and Vite production build"]
+    Build --> Publish["Publish GitHub Pages"]
+```
+
+Continuous integration should complete with **all checks green** on the final commit. Do not rely on a canceled older run, ignore failures, lower coverage thresholds, or bypass tests to get a green badge. GitHub Pages does not prove gameplay tests passed.
+
+## When working on a bug
+
+1. Reproduce the problem in the game.
+2. Add a focused test that fails without the fix.
+3. Fix the underlying cause in the responsible module.
+4. Run unit tests, typing, lint, production build and appropriate browser scenarios.
+5. Verify the game on a mobile browser when touch, WebGL, startup or world loading changes.
+6. Explain what changed, how to try it, and which checks passed.
+
+For Minecraft-like behavior that depends on saved data, use deterministic test worlds and inspect actual IndexedDB records instead of only checking UI success messages.

@@ -17,7 +17,7 @@ Welcome! This is a game made by a young creator. **Explain changes kindly and in
 - Run `npm run check` and applicable Playwright tests before calling work finished. If something could not be run, say what and why.
 - **Write typed TypeScript.** New logic goes in focused modules, not the legacy `bootstrap.ts`. Keep production modules at or under **500 lines** unless there is a documented, temporary exception; test files are exempt.
 - Do not add `@ts-nocheck`, broad `any`, disabled tests, secrets, generated `dist/`, or unrelated changes.
-- Preserve the Vite/GitHub Pages base path `/MauriceCraft/`. Changes must pass CI before deployment.
+- Preserve the Vite/GitHub Pages base path `/MauriceCraft/`. Pages must pass its own TypeScript and production-build checks; the independent CI workflow tests gameplay without blocking deployment.
 
 ## How to work
 

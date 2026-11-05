@@ -27,9 +27,11 @@ Saves live **only in your current browser** in IndexedDB. They are not stored in
 
 - `npm run dev`: development server
 - `npm run typecheck`: TypeScript check
+- `npm run check`: lint, typecheck, unit coverage and production build
+- `npm run test:e2e`: browser regression tests on desktop and mobile
 - `npm run build`: check types and build to `dist/`
 - `npm run preview`: serve the production build
-- `npm test`: run the automated tests (added in the testing pass)
+- `npm test`: run unit and regression tests
 
 New here? Start with [**Build your game: first steps**](docs/START_HERE.md), [**copy-and-edit agent prompts**](docs/AGENT_PROMPTS.md), and [**coding-agent rules**](AGENTS.md).
 
