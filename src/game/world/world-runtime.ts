@@ -9,6 +9,7 @@ import { fbm } from './noise';
 import { createFluidSimulator } from './fluid-simulator';
 import { createCaveCarver } from './cave-carver';
 import { biomeAt, biomeHeightAt } from './biomes';
+import { volcanoHeightAt } from './volcanoes';
 import { createGameRenderer } from '../rendering/game-renderer';
 import { createChunkMesher } from '../rendering/chunk-mesher';
 
@@ -71,7 +72,10 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
 
   function heightAt(x: number, z: number): number {
     const seed = deps.getSeed();
-    if (deps.getGeneratorVersion() >= 2) return biomeHeightAt(x, z, seed, WORLD_HEIGHT);
+    if (deps.getGeneratorVersion() >= 2) {
+      const base = biomeHeightAt(x, z, seed, WORLD_HEIGHT);
+      return deps.getGeneratorVersion() >= 3 ? volcanoHeightAt(x, z, seed, base, WORLD_HEIGHT) : base;
+    }
     const n = fbm(x / 40, z / 40, seed);
     const n2 = fbm(x / 170, z / 170, seed + 300);
     const m = fbm(x / 12, z / 12, seed + 50);
