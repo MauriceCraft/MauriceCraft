@@ -145,6 +145,8 @@ const stepMobActors = createMobSimulation({
   mobs, player, kinds: KINDS, raid, hostileActors, defenders,
   getDifficulty: deps.getDifficulty,
   isDaylight: deps.isDaylight, isNight: deps.isNight, getRainLevel: deps.getRainLevel,
+  isSunExposed: (x, y, z) => y >= topY(Math.floor(x), Math.floor(z)) + 0.5,
+  getBlock: get,
   canTakeDamage: deps.hasHealth,
   removeMobAt, damagePlayer: deps.damagePlayer, showHint: deps.showHint,
   playSoundAt: deps.playSoundAt,
