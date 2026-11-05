@@ -25,10 +25,7 @@ import type { SpawnMob } from './entities/mob-spawning';
 import { createGameUiComposition } from './ui/game-ui-composition';
 import { coord } from './commands/coordinates';
 import { createCommandConsole } from './commands/command-console';
-import { registerWorldCommands } from './commands/world-commands';
-import { registerPlayerCommands } from './commands/player-commands';
-import { registerGeneralCommands } from './commands/general-commands';
-import { createItemResolver } from './commands/item-resolver';
+import { registerCoreGameCommands } from './commands/core-game-commands';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { createPortalSystem } from './portals/portal-system';
 import { snapshotPortals } from './portals/persistence';
@@ -48,6 +45,15 @@ let seed = 1;
 let generatorVersion = 1;
 let dimension: WorldDimension = 'overworld';
 const portals: PortalFrame[] = []; // Persistent portal pairs, stored with each world.
+const worldServices = createWorldRuntime({
+  height: WORLD_HEIGHT, chunkSize: CHUNK_SIZE, seaLevel: SEA_LEVEL,
+  viewDistance: VIEW_DISTANCE, getSeed: () => seed,
+  setSeed: newSeed => { seed = newSeed; },
+  getGeneratorVersion: () => generatorVersion,
+  setGeneratorVersion: version => { generatorVersion = version; },
+  getDimension: () => dimension,
+  getPlayer: () => player,
+});
 const {
   GRASS, DIRT, STONE, SAND, WOOD, LEAVES, PLANKS, BRICK,
   COBBLE, STONEBRICK, SANDSTONE, GRAVEL, HAY, GOLD, MOSSY, TNT,
@@ -65,15 +71,7 @@ const {
   STRUCTURE_REGION_SIZE, STRUCT_NAMES, structCache, structureFor, structAt, inStructZone,
   groundH, forceSand, nearestStructure,
   genChunk, getOrGen, topY, resetWorld, streamChunks,
-} = createWorldRuntime({
-  height: WORLD_HEIGHT, chunkSize: CHUNK_SIZE, seaLevel: SEA_LEVEL,
-  viewDistance: VIEW_DISTANCE, getSeed: () => seed,
-  setSeed: newSeed => { seed = newSeed; },
-  getGeneratorVersion: () => generatorVersion,
-  setGeneratorVersion: version => { generatorVersion = version; },
-  getDimension: () => dimension,
-  getPlayer: () => player,
-});
+} = worldServices;
 
 /* ---------- Game state ---------- */
 let mode: GameMode = 'creative';
@@ -463,12 +461,6 @@ const { commands: CMDS, commandBar: cmdBar, defCmd, openCmd } =
     isCommandOpen: () => cmdOpen,
     isTouch,
   });
-const { slug, itemMap, findItem } = createItemResolver(NAMES, BED);
-function spawnSpot(): [number, number, number] {
-  const x = player.x - Math.sin(player.yaw) * 3, z = player.z - Math.cos(player.yaw) * 3;
-  getOrGen(Math.floor(x) >> 4, Math.floor(z) >> 4);
-  return [x, topY(Math.floor(x), Math.floor(z)) + 1.01, z];
-}
 function ensureAround(x: number, z: number): void { for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) getOrGen((Math.floor(x) >> 4) + dx, (Math.floor(z) >> 4) + dz); }
 function rebuildRegion(x1: number, z1: number, x2: number, z2: number): void {
   for (let cx = (Math.min(x1, x2) >> 4) - 1; cx <= (Math.max(x1, x2) >> 4) + 1; cx++) for (let cz = (Math.min(z1, z2) >> 4) - 1; cz <= (Math.max(z1, z2) >> 4) + 1; cz++) rebuildSet.add(cx + ',' + cz);
@@ -486,55 +478,21 @@ const { clearPortalVisuals, showPortalVisual, buildPortalFrame,
   rebuildRegion, disposeMesh, resetChunkCache, clearStructures: () => structCache.clear(),
   clearMobs, collides, saveWorld, showHint,
 });
-registerPlayerCommands({
-  register: defCmd,
-  state: gameState,
-  player, maxHeight: WORLD_HEIGHT, maxHealth: MAX_HEALTH,
-  inventory: inv, hotbar, names: NAMES, labels: LABEL, difficulties: DIFF,
-  weatherLabels: WEATHER_LABEL, findItem, itemMap,
-  setWeather, setMode, setDifficulty, refreshWorlds, saveWorld,
-  updateHotbar: showName => updateHotbar(showName ?? false), updateHearts, renderFood, toggleFly, ensureAround,
-  topBlockY: topY, collides: (x, y, z) => collides(x, y, z),
-  getSeed: () => seed,
-});
-registerWorldCommands({
-  register: defCmd,
-  player,
-  maxHeight: WORLD_HEIGHT,
-  torchBlock: TORCH,
-  names: NAMES,
-  findItem,
-  itemMap,
-  getBlock: get,
-  setBlock,
-  getOrGenerateChunk: getOrGen,
-  queueRebuild,
-  flushRebuilds,
-  rebuildRegion,
-  spawnSpot,
-  explode,
-  structureRegionSize: STRUCTURE_REGION_SIZE,
-  structureNames: STRUCT_NAMES,
-  structureFor,
-  ensureAround,
-  topBlockY: topY,
-});
-registerGeneralCommands({
+registerCoreGameCommands({
   register: defCmd, commands: CMDS,
-  player, maxHeight: WORLD_HEIGHT,
-  getDimension: () => dimension,
-  buildPortalFrame: (where, x, y, z) => buildPortalFrame(where, x, y, z),
-  changeDimension: where => changeDimension(where),
-  saveWorld: () => saveWorld(),
-  refreshWorlds: () => { void refreshWorlds(); },
-  isStorageAvailable: () => worldSession.isStorageAvailable(),
-  slug, mobs, kinds: KINDS, jobs: JOBS,
-  getDifficultyCap: () => DIFF[difficulty].cap,
-  hasHealth: () => hasHealth(),
-  setHealth: value => { hp = value; },
-  damagePlayer: amount => damagePlayer(amount),
-  spawnSpot, getOrGenerateChunk: getOrGen, topY, collides,
-  addMob, removeMobAt,
+  state: gameState, player, world: worldServices,
+  inventory: inv, hotbar, kinds: KINDS, mobs, jobs: JOBS,
+  labels: LABEL, difficulties: DIFF, weatherLabels: WEATHER_LABEL,
+  maxHeight: WORLD_HEIGHT, maxHealth: MAX_HEALTH,
+  getSeed: () => seed, getDimension: () => dimension,
+  getDifficultyCap: () => DIFF[difficulty].cap, hasHealth,
+  setMode, setDifficulty, setWeather,
+  saveWorld, refreshWorlds, isStorageAvailable: () => worldSession.isStorageAvailable(),
+  updateHotbar: showName => updateHotbar(showName ?? false),
+  updateHearts, renderFood, toggleFly, ensureAround,
+  rebuildRegion, queueRebuild, flushRebuilds, explode, collides,
+  buildPortalFrame, changeDimension,
+  damagePlayer: damage => damagePlayer(damage), addMob, removeMobAt,
 });
 
 /* ---------- World persistence and restoration ---------- */
