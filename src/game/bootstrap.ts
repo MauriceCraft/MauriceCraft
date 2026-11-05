@@ -22,7 +22,7 @@ import { coord } from './commands/coordinates';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { restorePortals, snapshotPortals } from './portals/persistence';
-import { makeAtlas } from './rendering/texture-atlas';
+import { createGameRenderer } from './rendering/game-renderer';
 import { createChunkMesher } from './rendering/chunk-mesher';
 import { openWorldStorage } from './storage/world-storage';
 import { createAudioEngine } from './audio/sound-engine';
@@ -68,61 +68,8 @@ import { createAudioEngine } from './audio/sound-engine';
   const hotbar = ALL_BLOCKS.slice(0, 9);
   const toolWear = {};
 
-  /* ---------- Texture atlas ---------- */
-  /* ---------- Renderer ---------- */
-  const canvas = document.getElementById('view');
-  const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb);
-  scene.fog = new THREE.Fog(0x87ceeb, 30, 78);
-  const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 500);
-  camera.rotation.order = 'YXZ';
-
-  const atlasCanvas = makeAtlas(toolTile);
-  const tex = new THREE.CanvasTexture(atlasCanvas);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.generateMipmaps = false;
-  const mat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true });
-  // Terrain shader: brightness = max(daylight, warm torch light), so torches really light up the dark
-  const dayUniform = { value: 1 };
-  mat.onBeforeCompile = function (shader) {
-    shader.uniforms.uDay = dayUniform;
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aLight;\nvarying float vLight;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLight = aLight;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uDay;\nvarying float vLight;')
-      .replace('#include <color_fragment>', 'diffuseColor.rgb *= vColor * max(vec3(uDay), vLight * vec3(1.0, 0.8, 0.52));');
-  };
-  const torchMat = new THREE.MeshBasicMaterial({ map: tex, vertexColors: true });   // torches keep their brightness at night
-  const glowCanvas = document.createElement('canvas'); glowCanvas.width = glowCanvas.height = 64;
-  (function () {
-    const g = glowCanvas.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gr.addColorStop(0, 'rgba(255,205,120,1)'); gr.addColorStop(0.35, 'rgba(255,150,50,0.45)'); gr.addColorStop(1, 'rgba(255,120,30,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
-  })();
-  const glowMat = new THREE.PointsMaterial({ map: new THREE.CanvasTexture(glowCanvas), size: 3.4, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xffffff });
-
-  function makeDisc(color, size) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ color: color, fog: false, depthWrite: false }));
-    scene.add(m); return m;
-  }
-  const sun = makeDisc(0xfff0a8, 34), moon = makeDisc(0xdfe7ff, 24);
-
-  const sel = new THREE.LineSegments(
-    new THREE.EdgesGeometry(new THREE.BoxGeometry(1.006, 1.006, 1.006)),
-    new THREE.LineBasicMaterial({ color: 0x000000 })
-  );
-  sel.visible = false; scene.add(sel);
-
-  function resize() {
-    const w = window.innerWidth, h = window.innerHeight;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h; camera.updateProjectionMatrix();
-  }
-  window.addEventListener('resize', resize); resize();
+  const { canvas, renderer, scene, camera, atlasCanvas, tex, mat, torchMat,
+    dayUniform, glowMat, sun, moon, sel } = createGameRenderer(toolTile);
 
   const { disposeMesh, buildChunk, refreshAround } = createChunkMesher({
     scene, mat, torchMat, glowMat, chunks, chunkAt,

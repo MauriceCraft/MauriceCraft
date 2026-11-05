@@ -91,3 +91,22 @@ test('the in-game portal command builds a frame without exceptions', async ({ pa
   await expect(page.locator('#play')).toBeEnabled({ timeout: 15_000 });
   expect(errors).toEqual([]);
 });
+
+
+test('game canvas remains sized to the viewport after resizing', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', err => errors.push(err.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./');
+  await expect(page.locator('#play')).toBeEnabled({ timeout: 15_000 });
+  const view = page.locator('#view');
+  await expect(view).toBeVisible();
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expect.poll(async () => view.evaluate(canvas => {
+    const element = canvas as HTMLCanvasElement;
+    const bounds = element.getBoundingClientRect();
+    return Math.abs(bounds.width - window.innerWidth) < 2 &&
+      Math.abs(bounds.height - window.innerHeight) < 2 && element.width > 0 && element.height > 0;
+  })).toBe(true);
+  expect(errors).toEqual([]);
+});
