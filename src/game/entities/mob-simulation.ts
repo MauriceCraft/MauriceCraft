@@ -55,6 +55,7 @@ export interface MobCombatDependencies {
   getDifficulty: () => MobDifficulty;
   isDaylight: () => boolean;
   isNight: () => boolean;
+  isSunExposed?: (x: number, y: number, z: number) => boolean;
   getRainLevel: () => number;
   canTakeDamage: () => boolean;
   removeMobAt: (index: number) => void;
@@ -122,7 +123,9 @@ export function createMobSimulation(deps: MobCombatDependencies) {
     }
     let tx = 0, tz = 0, ax = dx, az = dz, ad = dist, huntV = null;   // a*, huntV: who this monster is going after
     if (m.hostile) {
-      if (isDay && rainLevel < 0.5 && !m.persist && !K.illager) {   // rain keeps monsters from burning in daylight
+      if (isDay && rainLevel < 0.5 && !m.persist &&
+        (m.kind === 'zombie' || m.kind === 'skeleton') &&
+        (deps.isSunExposed?.(m.x, m.y, m.z) ?? true)) {   // rain keeps monsters from burning in daylight
         if (m.burn < 0) m.burn = 1 + Math.random() * 5; m.burn -= dt; if (m.burn <= 0) { removeMobAt(i); continue; } }
       else m.burn = -1;
       const ill = !!K.illager;
