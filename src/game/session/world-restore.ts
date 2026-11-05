@@ -104,7 +104,7 @@ export function createWorldRestore(deps: WorldRestoreDependencies) {
     } else {
       state.weather = 'clear'; state.weatherT = 420; state.rainLevel = 0;
     }
-    state.rainTarget = state.weather === 'clear' ? 0 : (state.weather === 'rain' ? 0.75 : 1);
+    state.rainTarget = state.weather === 'clear' ? 0 : (state.weather === 'cloudy' ? 0.16 : state.weather === 'rain' ? 0.75 : 1);
     deps.updateWeatherUI();
     deps.clearRelics();
     (m.relics || []).forEach(r => deps.addRelic(r.x, r.y, r.z, r.got));
@@ -131,7 +131,7 @@ export function createWorldRestore(deps: WorldRestoreDependencies) {
     state.spawnPoint = null;
     state.omen = false;
     state.weather = 'clear';
-    state.weatherT = 420 + random() * 300;
+    state.weatherT = 190 + random() * 340;
     state.rainLevel = 0;
     state.rainTarget = 0;
     deps.updateWeatherUI();

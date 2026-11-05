@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { createWeatherSystem, type WeatherState } from '../../src/game/rendering/weather-system';
+import { createWeatherSystem, nextWeather, weatherDuration, type WeatherState } from '../../src/game/rendering/weather-system';
 
 function fixture() {
   const scene = new THREE.Scene();
@@ -30,6 +30,19 @@ function fixture() {
     getUpdates: () => weatherUiUpdates, getOpacity: () => lightningOpacity };
 }
 describe('weather and daylight', () => {
+  it('changes naturally between four weather conditions with bounded durations', () => {
+    expect(nextWeather('clear', 0.2)).toBe('cloudy');
+    expect(nextWeather('cloudy', 0.6)).toBe('rain');
+    expect(nextWeather('rain', 0.95)).toBe('storm');
+    expect(nextWeather('storm', 0.6)).toBe('cloudy');
+    expect(weatherDuration('clear', 0)).toBeLessThan(weatherDuration('clear', 1));
+    const { system, state } = fixture();
+    system.setWeather('cloudy');
+    expect(state.rainTarget).toBe(0.16);
+    state.weatherT = 0;
+    system.updateWeather(1);
+    expect(state.weatherT).toBeGreaterThan(0);
+  });
   it('sets rain and clears weather without needing browser audio', () => {
     const { system, state, getUpdates } = fixture();
     system.setWeather('rain');

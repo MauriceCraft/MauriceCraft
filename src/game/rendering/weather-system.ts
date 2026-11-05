@@ -1,6 +1,20 @@
 import * as THREE from 'three';
 
-export type WeatherMode = 'clear' | 'rain' | 'storm';
+export type WeatherMode = 'clear' | 'cloudy' | 'rain' | 'storm';
+
+/** Weighted transitions avoid the old clear/rain/clear alternation. */
+export function nextWeather(current: WeatherMode, roll: number): WeatherMode {
+  if (current === 'clear') return roll < 0.48 ? 'cloudy' : roll < 0.88 ? 'rain' : 'storm';
+  if (current === 'cloudy') return roll < 0.48 ? 'clear' : roll < 0.90 ? 'rain' : 'storm';
+  if (current === 'rain') return roll < 0.42 ? 'cloudy' : roll < 0.84 ? 'clear' : 'storm';
+  return roll < 0.50 ? 'rain' : roll < 0.77 ? 'cloudy' : 'clear';
+}
+export function weatherDuration(mode: WeatherMode, roll: number): number {
+  return mode === 'clear' ? 190 + roll * 340 :
+    mode === 'cloudy' ? 110 + roll * 200 :
+    mode === 'rain' ? 100 + roll * 210 : 65 + roll * 135;
+}
+
 export interface WeatherState {
   weather: WeatherMode;
   weatherT: number;
@@ -60,11 +74,11 @@ export function createWeatherSystem(deps: WeatherDependencies) {
   const rainMesh = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xb4d0ee, transparent: true, opacity: 0.55, depthWrite: false }));
   rainMesh.frustumCulled = false; rainMesh.visible = false; scene.add(rainMesh);
   const bolts: LightningBolt[] = [];
-  const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Storm' };
+  const WEATHER_LABEL: Record<WeatherMode, string> = { clear: 'Clear', cloudy: 'Cloudy', rain: 'Rain', storm: 'Storm' };
   function setWeather(w: WeatherMode): void {
     state.weather = w;
-    state.rainTarget = w === 'clear' ? 0 : (w === 'rain' ? 0.75 : 1);
-    state.weatherT = w === 'clear' ? 420 + Math.random() * 480 : (w === 'rain' ? 150 + Math.random() * 270 : 100 + Math.random() * 140);
+    state.rainTarget = w === 'clear' ? 0 : (w === 'cloudy' ? 0.16 : w === 'rain' ? 0.75 : 1);
+    state.weatherT = weatherDuration(w, Math.random());
     state.nextBolt = 3 + Math.random() * 6;
     updateWeatherUI();
   }
@@ -95,7 +109,7 @@ export function createWeatherSystem(deps: WeatherDependencies) {
   }
   function updateWeather(dt: number): void {
     state.weatherT -= dt;
-    if (state.weatherT <= 0) setWeather(state.weather === 'clear' ? (Math.random() < 0.72 ? 'rain' : 'storm') : 'clear');
+    if (state.weatherT <= 0) setWeather(nextWeather(state.weather, Math.random()));
     const diff = state.rainTarget - state.rainLevel;
     state.rainLevel += Math.sign(diff) * Math.min(Math.abs(diff), dt / 12);
     if (state.weather === 'storm') { state.nextBolt -= dt; if (state.nextBolt <= 0) { state.nextBolt = 5 + Math.random() * 12; strike(); } }
@@ -122,7 +136,7 @@ export function createWeatherSystem(deps: WeatherDependencies) {
     return chunkAt(bx >> 4, bz >> 4) ? topY(bx, bz) + 1 : camera.position.y - 40;
   }
   function updateRain(dt: number): void {
-    rainMesh.visible = state.rainLevel > 0.02;
+    rainMesh.visible = state.weather !== 'cloudy' && state.rainLevel > 0.02;
     if (!rainMesh.visible) return;
     const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
     const active = Math.floor(RAIN_N * state.rainLevel);
@@ -155,7 +169,7 @@ export function createWeatherSystem(deps: WeatherDependencies) {
     }
     rainSndT -= dt;
     if (rainSndT <= 0) { rainSndT = 0.3; rainSheltered = topY(Math.floor(player.x), Math.floor(player.z)) > player.y + 2; }
-    const target = state.rainLevel * (rainSheltered ? 0.05 : 0.16);
+    const target = (state.weather === 'cloudy' ? 0 : state.rainLevel) * (rainSheltered ? 0.05 : 0.16);
     rainGain.gain.value += (target - rainGain.gain.value) * Math.min(1, dt * 2);
     rainFilter!.frequency.value = rainSheltered ? 900 : 5000;
   }
