@@ -2,6 +2,7 @@ import { hash2, mulberry32 } from './noise';
 import { biomeSurface } from './biomes';
 import { createTreeDecorator } from './tree-decorator';
 import { createNaturalFeatures } from './natural-features';
+import { volcanoCraterAt, volcanoNear } from './volcanoes';
 import type { Biome } from './biomes';
 import type { ChunkGeneratorDependencies } from './chunk-generator';
 import type { WriteBlock } from './structure-builders';
@@ -35,12 +36,16 @@ export function createModernChunkGenerator(
     for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
       const x = x0 + lx, z = z0 + lz;
       const height = groundH(x, z);
-      const lake = natural.lakeAt(x, z);
+      const modern = (deps.getGeneratorVersion?.() ?? 2) >= 3;
+      const mountain = modern ? volcanoNear(x, z, seed, H) : null;
+      const inVolcano = mountain !== null && Math.hypot(x - mountain.x, z - mountain.z) < mountain.radius;
+      const crater = modern ? volcanoCraterAt(x, z, seed, H) : null;
+      const lake = inVolcano ? null : natural.lakeAt(x, z);
       const top = lake ? Math.max(1, lake.bottom) : height;
       const beach = height <= SEA + 1 || forceSand(x, z);
       const surface = biomeSurface(getBiome(x, z), height, SEA);
       const modernColors = (deps.getGeneratorVersion?.() ?? 2) >= 3;
-      const topBlock = beach ? blocks.SAND :
+      const topBlock = inVolcano ? blocks.STONE : beach ? blocks.SAND :
         surface === 'snow' ? blocks.SNOW ?? blocks.GRASS :
         surface === 'red-sand' ? blocks.RED_SAND ?? blocks.SAND :
         surface === 'stone' ? blocks.STONE :
@@ -53,7 +58,10 @@ export function createModernChunkGenerator(
           blocks.STONE;
         data[(y * 16 + lz) * 16 + lx] = block;
       }
-      if (lake) {
+      if (crater) {
+        for (let y = crater.floor + 1; y <= Math.min(H - 1, crater.level); y++)
+          data[(y * 16 + lz) * 16 + lx] = blocks.LAVA;
+      } else if (lake) {
         for (let y = top + 1; y <= Math.min(H - 1, lake.surface); y++)
           data[(y * 16 + lz) * 16 + lx] =
             lake.liquid === 'lava' ? blocks.LAVA : blocks.WATER;
