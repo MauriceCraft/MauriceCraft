@@ -9,6 +9,7 @@ interface Cascade { x: number; z: number; dx: number; dz: number; high: number; 
 
 export interface NaturalFeatureDependencies {
   getSeed: () => number;
+  getGeneratorVersion?: () => number;
   biomeAt: (x: number, z: number) => Biome;
   heightAt: (x: number, z: number) => number;
   inStructureZone: (x: number, z: number) => boolean;
@@ -49,11 +50,23 @@ export function createNaturalFeatures(deps: NaturalFeatureDependencies) {
     const liquid: NaturalLiquid = (biome === 'volcanic' || (biome === 'badlands' && roll < 0.10)) &&
       Math.hypot(x, z) > 80 ? 'lava' : 'water';
     if (biome === 'desert' && roll > 0.09) return null;
-    return {
+    const lake = {
       x, z, rx: 7 + Math.floor(hash2(rx, rz, seed + 2113) * 10),
       rz: 7 + Math.floor(hash2(rx, rz, seed + 2114) * 10),
       level: h - 1, liquid,
     };
+    // New worlds reject lakes that would form unsupported walls over a cliff.
+    // Keep the original algorithm unchanged for existing version-2 saves.
+    if ((deps.getGeneratorVersion?.() ?? 2) >= 3) {
+      for (let i = 0; i < 12; i++) {
+        const angle = i * Math.PI / 6;
+        const shoreX = Math.round(x + Math.cos(angle) * lake.rx);
+        const shoreZ = Math.round(z + Math.sin(angle) * lake.rz);
+        const shore = heightAt(shoreX, shoreZ);
+        if (shore < lake.level - 2 || shore > lake.level + 7) return null;
+      }
+    }
+    return lake;
   }
 
   /** Height of a carved lakebed plus the height/type of its liquid surface. */
