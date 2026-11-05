@@ -158,3 +158,17 @@ test('a device without WebGL shows a safe retry rather than Loading forever', as
   await expect(page.locator('#newworld')).toBeDisabled();
   await expect(page.locator('#overlay')).toBeVisible();
 });
+
+test('unavailable WebGL reveals safe startup recovery instead of infinite Loading', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type: string, ...rest: unknown[]) {
+      if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') return null;
+      return Reflect.apply(original, this, [type, ...rest]) as ReturnType<typeof original>;
+    } as typeof original;
+  });
+  await page.goto('./');
+  await expect(page.locator('#play')).toHaveText('Retry loading', { timeout: 15_000 });
+  await expect(page.locator('#play')).toBeEnabled();
+  await expect(page.locator('#sub')).toContainText('saved worlds');
+});
