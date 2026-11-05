@@ -40,7 +40,7 @@ import { createAudioEngine } from './audio/sound-engine';
 
 
 /* ---------- World constants ---------- */
-const H = 48, CS = 16, SEA = 14, R = 5;   // R = view distance in chunks
+const WORLD_HEIGHT = 48, CHUNK_SIZE = 16, SEA_LEVEL = 14, VIEW_DISTANCE = 5;   // VIEW_DISTANCE = view distance in chunks
 const chunks = new Map();
 let _ck = null, _cc = null;
 function chunkAt(cx, cz) { const k = ckey(cx, cz); if (k === _ck) return _cc; _ck = k; _cc = chunks.get(k) || null; return _cc; }
@@ -48,18 +48,18 @@ function resetChunkCache() { _ck = null; _cc = null; }
 // Unloaded space counts as solid, so nothing can walk into it
 function get(x, y, z) {
   if (y < 0) return 3;
-  if (y >= H) return 0;
+  if (y >= WORLD_HEIGHT) return 0;
   const c = chunkAt(x >> 4, z >> 4);
   if (!c) return 3;
   return c.data[(y * 16 + (z & 15)) * 16 + (x & 15)];
 }
 function setBlock(x, y, z, b) {
-  if (y < 0 || y >= H) return;
+  if (y < 0 || y >= WORLD_HEIGHT) return;
   const c = chunkAt(x >> 4, z >> 4);
   if (!c) return;
   c.data[(y * 16 + (z & 15)) * 16 + (x & 15)] = b; c.edited = true; c.dirty = true; c.torches = null;
 }
-function inBounds(x, y, z) { return y >= 0 && y < H; }
+function inBounds(x, y, z) { return y >= 0 && y < WORLD_HEIGHT; }
 
 // Persistent items, blocks, and mining rules live in a typed catalog.
 const {
@@ -82,7 +82,7 @@ const { canvas, renderer, scene, camera, atlasCanvas, tex, mat, torchMat,
 
 const { disposeMesh, buildChunk, refreshAround, blockGeo } = createChunkMesher({
   scene, mat, torchMat, glowMat, chunks, chunkAt,
-  getBlock: get, opq, isBed, tiles: TILES, height: H, chunkSize: CS,
+  getBlock: get, opq, isBed, tiles: TILES, height: WORLD_HEIGHT, chunkSize: CHUNK_SIZE,
   atlasTiles: ATLAS_N, bedHeight: BED_H, torchId: TORCH,
 });
 
@@ -94,12 +94,12 @@ const savedChunks = new Map();   // edited chunks loaded from a saved world, key
 function heightAt(x, z) {
   const n = fbm(x / 40, z / 40, seed), n2 = fbm(x / 170, z / 170, seed + 300), m = fbm(x / 12, z / 12, seed + 50);
   const h = Math.floor(5 + (n * 0.72 + n2 * 0.28) * 34 + m * 4);
-  return Math.max(3, Math.min(H - 12, h));
+  return Math.max(3, Math.min(WORLD_HEIGHT - 12, h));
 }
 /* ---------- Structures: villages, temples, towers, dungeons ---------- */
-const { REG, STRUCT_NAMES, structCache, structureFor, structAt, inStructZone,
+const { REG: STRUCTURE_REGION_SIZE, STRUCT_NAMES, structCache, structureFor, structAt, inStructZone,
   groundH, forceSand, nearestStructure } = createStructureRegions({
-  heightAt, getSeed: () => seed, getPlayer: () => player, seaLevel: SEA, maxHeight: H,
+  heightAt, getSeed: () => seed, getPlayer: () => player, seaLevel: SEA_LEVEL, maxHeight: WORLD_HEIGHT,
 });
 
 const { buildStructure } = createStructureBuilders(() => seed, {
@@ -109,7 +109,7 @@ const { buildStructure } = createStructureBuilders(() => seed, {
 const generateChunkData = createChunkGenerator({
   getSeed: () => seed,
   getDimension: () => dimension,
-  maxHeight: H, seaLevel: SEA, regionSize: REG,
+  maxHeight: WORLD_HEIGHT, seaLevel: SEA_LEVEL, regionSize: STRUCTURE_REGION_SIZE,
   groundH, heightAt, forceSand, inStructZone, structureFor, buildStructure,
   blocks: { BRICK, COAL_ORE, COPPER_ORE, DIAMOND_ORE, DIRT, GOLD, GRASS, IRON_ORE, LAVA, LEAVES, SAND, SANDSTONE, STONE, STONEBRICK, TORCH, WATER, WOOD },
 });
@@ -127,7 +127,7 @@ function genChunk(cx, cz) {
   return generated;
 }
 function getOrGen(cx, cz) { return chunkAt(cx, cz) || genChunk(cx, cz); }
-function topY(x, z) { for (let y = H - 1; y >= 0; y--) if (solid(get(x, y, z))) return y; return 0; }
+function topY(x, z) { for (let y = WORLD_HEIGHT - 1; y >= 0; y--) if (solid(get(x, y, z))) return y; return 0; }
 
 function resetWorld(newSeed, ox, oz) {
   chunks.forEach(function (c) { disposeMesh(c); });
@@ -137,7 +137,7 @@ function resetWorld(newSeed, ox, oz) {
 }
 
 const streamChunks = createChunkStreamer({
-  chunks, viewDistance: R,
+  chunks, viewDistance: VIEW_DISTANCE,
   getPlayer: () => player,
   getOrGen, genChunk, buildChunk, disposeMesh, resetChunkCache,
 });
@@ -155,8 +155,8 @@ const DIFF = {
   normal: { label: 'Normal', cap: 8, every: 2.2, dmg: 1, speed: 1, aggro: 32, fuse: 1.5, shoot: 1, regenAfter: 6, regenEvery: 3, raid: 1, patrol: [90, 160] },
   hard: { label: 'Hard', cap: 12, every: 1.6, dmg: 1.5, speed: 1.15, aggro: 42, fuse: 1.1, shoot: 0.75, regenAfter: 9, regenEvery: 4.5, raid: 1.5, patrol: [60, 110] }
 };
-const MAXHP = 20;
-let hp = MAXHP, sinceHurt = 99, regenT = 0, dead = false;
+const MAX_HEALTH = 20;
+let hp = MAX_HEALTH, sinceHurt = 99, regenT = 0, dead = false;
 const inv = {};
 let specSpeed = 1;
 // Shared with the weather engine, time commands, sleeping and saved worlds.
@@ -181,9 +181,9 @@ function respawn() {
   player.x = x + 0.5; player.z = z + 0.5; player.y = topY(x, z) + 1.01;
   player.vx = player.vy = player.vz = 0; player.yaw = 0; player.pitch = -0.1; player.fallStart = null;
 }
-const PR = 0.3, PH = 1.8, EYE = 1.62;
+const PLAYER_RADIUS = 0.3, PLAYER_HEIGHT = 1.8, EYE_HEIGHT = 1.62;
 const { collides, moveEnt } = createCollisionEngine({
-  getBlock: get, solid, defaultRadius: PR, defaultHeight: PH, bedHeight: BED_H,
+  getBlock: get, solid, defaultRadius: PLAYER_RADIUS, defaultHeight: PLAYER_HEIGHT, bedHeight: BED_H,
 });
 
 /* ---------- Sound ---------- */
@@ -333,7 +333,7 @@ function spawnVillagers(st) {
   }
 }
 function manageVillagers() {
-  const prx = Math.floor(player.x / REG), prz = Math.floor(player.z / REG);
+  const prx = Math.floor(player.x / STRUCTURE_REGION_SIZE), prz = Math.floor(player.z / STRUCTURE_REGION_SIZE);
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
     const st = structureFor(prx + dx, prz + dz);
     if (!st || st.type !== 'village') continue;
@@ -392,7 +392,7 @@ function updateRaid(dt, D) {
   if (!raid.active) {
     raidEl.style.display = 'none';
     if (omen && hasHealth() && D.cap > 0 && !dead) {
-      const prx = Math.floor(player.x / REG), prz = Math.floor(player.z / REG);
+      const prx = Math.floor(player.x / STRUCTURE_REGION_SIZE), prz = Math.floor(player.z / STRUCTURE_REGION_SIZE);
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
         const st = structureFor(prx + dx, prz + dz);
         if (st && st.type === 'village' && Math.hypot(st.cx - player.x, st.cz - player.z) < 30) {
@@ -668,7 +668,7 @@ function attackMob(m) {
 let shake = 0;
 const { blasts, fx, rebuildSet, spawnTnt, addDynamite, removeBlastAt, removeFxAt,
   queueRebuild, flushRebuilds, explode, updateBlasts, updateFx } = createExplosionSystem({
-  scene, texture: tex, tntId: TNT, torchId: TORCH, worldHeight: H,
+  scene, texture: tex, tntId: TNT, torchId: TORCH, worldHeight: WORLD_HEIGHT,
   breakTimes: BREAK_TIME, blockGeometry: blockGeo,
   getBlock: get, setBlock, hasChunk: (x, z) => !!chunkAt(x, z), buildChunk,
   getMobs: () => mobs, getPlayer: () => player,
@@ -712,7 +712,7 @@ const { hotbarEl, heartsEl, foodEl, flashEl, mineBar,
   getMode: () => mode, getSelected: () => selected,
   setSelected: slot => { selected = slot; },
   getHunger: () => hunger, getHealth: () => hp,
-  canInteract, maxHealth: MAXHP,
+  canInteract, maxHealth: MAX_HEALTH,
 });
 
 // Hunger drains slowly with activity (a lot when sprinting). Eat to refill it; at zero you starve.
@@ -771,7 +771,7 @@ const { openCraft, renderCraft, openInventory, closeInventory, renderInventory,
   getMode: () => mode, getModeLabel: () => LABEL[mode],
   getFallback: () => fallback,
   getHealth: () => hp, setHealth: health => { hp = health; },
-  maxHealth: MAXHP, updateHearts, updateHotbar, showHint,
+  maxHealth: MAX_HEALTH, updateHearts, updateHotbar, showHint,
   playSound: event => sfx(event),
   playSoundAt: (event, x, y, z) => sfxAt(event, x, y, z),
   requestPointerLock: () => requestLock(), pauseGame: () => pause(),
@@ -791,7 +791,7 @@ const dirV = new THREE.Vector3();
 let blockHit = null, target = null;
 function raycast(maxD) {
   camera.getWorldDirection(dirV);
-  return raycastBlocks(camera.position, dirV, maxD, get, solid, H);
+  return raycastBlocks(camera.position, dirV, maxD, get, solid, WORLD_HEIGHT);
 }
 function resetMine() { mine.t = 0; mine.x = mine.y = mine.z = -1; mineBar.style.display = 'none'; }
 function doBreak(t) {
@@ -877,7 +877,7 @@ function lightPortalAt(px, py, pz) {
   // Both the final obsidian placement and flint-and-steel use this one
   // validator, so the two controls cannot disagree about valid frames.
   ensureAround(px, pz);
-  const portal = findPortalFrame(get, { x: px, y: py, z: pz }, dimension, OBSIDIAN, H);
+  const portal = findPortalFrame(get, { x: px, y: py, z: pz }, dimension, OBSIDIAN, WORLD_HEIGHT);
   if (!portal) return false;
   const already = portals.some(p => p.dimension === portal.dimension && p.axis === portal.axis &&
     p.x === portal.x && p.y === portal.y && p.z === portal.z);
@@ -983,7 +983,7 @@ function placeBed(x, y, z) {
   const dv = BED_DIR[dir], hx = x + dv[0], hz = z + dv[1];
   if (!chunkAt(hx >> 4, hz >> 4) || get(hx, y, hz) || !solid(get(x, y - 1, z)) || !solid(get(hx, y - 1, hz))) { flashName('A bed needs two free spots on solid ground'); return; }
   const cells = [[x, z], [hx, hz]];
-  for (let i = 0; i < 2; i++) { const c = cells[i]; if (c[0] + 1 > player.x - PR && c[0] < player.x + PR && y + BED_H > player.y && y < player.y + PH && c[1] + 1 > player.z - PR && c[1] < player.z + PR) return; }
+  for (let i = 0; i < 2; i++) { const c = cells[i]; if (c[0] + 1 > player.x - PLAYER_RADIUS && c[0] < player.x + PLAYER_RADIUS && y + BED_H > player.y && y < player.y + PLAYER_HEIGHT && c[1] + 1 > player.z - PLAYER_RADIUS && c[1] < player.z + PLAYER_RADIUS) return; }
   if (mode === 'survival') {
     if (!(inv[BED] > 0)) { showHint('You have no bed.', 1500); return; }
     inv[BED]--; updateHotbar(false);
@@ -1000,7 +1000,7 @@ function doPlace() {
   const x = target.x + target.nx, y = target.y + target.ny, z = target.z + target.nz;
   if (!inBounds(x, y, z) || get(x, y, z)) return;
   if (hotbar[selected] === BED) { placeBed(x, y, z); return; }
-  if (hotbar[selected] !== TORCH && x + 1 > player.x - PR && x < player.x + PR && y + 1 > player.y && y < player.y + PH && z + 1 > player.z - PR && z < player.z + PR) return;
+  if (hotbar[selected] !== TORCH && x + 1 > player.x - PLAYER_RADIUS && x < player.x + PLAYER_RADIUS && y + 1 > player.y && y < player.y + PLAYER_HEIGHT && z + 1 > player.z - PLAYER_RADIUS && z < player.z + PLAYER_RADIUS) return;
   const b = hotbar[selected];
   if (b === TORCH && !solid(get(x, y - 1, z))) { flashName('Torches need something to stand on'); return; }
   if (mode === 'survival') {
@@ -1094,7 +1094,7 @@ function update(dt, tNow) {
     const k = Math.min(1, 10 * dt);
     player.vx += (tvx - player.vx) * k; player.vy += (tvy - player.vy) * k; player.vz += (tvz - player.vz) * k;
     player.x += player.vx * dt;
-    player.y = Math.max(-5, Math.min(H + 40, player.y + player.vy * dt));
+    player.y = Math.max(-5, Math.min(WORLD_HEIGHT + 40, player.y + player.vy * dt));
     player.z += player.vz * dt;
     player.onGround = false; player.fallStart = null;
   } else {
@@ -1140,7 +1140,7 @@ function update(dt, tNow) {
     } else player.fallStart = null;
   }
 
-  camera.position.set(player.x, player.y + EYE, player.z);
+  camera.position.set(player.x, player.y + EYE_HEIGHT, player.z);
   camera.rotation.set(player.pitch, player.yaw, 0);
 
   blockHit = mode === 'spectator' ? null : raycast(canInteract() ? (mode === 'creative' ? 6 : 5) : 4);
@@ -1151,9 +1151,9 @@ function update(dt, tNow) {
   updateMobs(dt); updateBlasts(dt); updateArrows(dt); updateFx(dt); updateMusic(dt);
   if (hasHealth()) {
     sinceHurt += dt;
-    if (hp < MAXHP && sinceHurt > DIFF[difficulty].regenAfter && (mode !== 'survival' || difficulty === 'peaceful' || hunger >= 15)) {
+    if (hp < MAX_HEALTH && sinceHurt > DIFF[difficulty].regenAfter && (mode !== 'survival' || difficulty === 'peaceful' || hunger >= 15)) {
       regenT += dt;
-      if (regenT >= DIFF[difficulty].regenEvery) { regenT = 0; hp = Math.min(MAXHP, hp + 1); updateHearts(); exert(1.2); }
+      if (regenT >= DIFF[difficulty].regenEvery) { regenT = 0; hp = Math.min(MAX_HEALTH, hp + 1); updateHearts(); exert(1.2); }
     }
     if (mode === 'survival' && difficulty !== 'peaceful' && hunger <= 0) {
       starveT += dt;
@@ -1217,7 +1217,7 @@ function setMode(m) {
   mode = m;
   mining = placing = pulseMine = pulsePlace = false;
   clearMobs();
-  hp = MAXHP; sinceHurt = 99; regenT = 0; hunger = 20; sat = 5; exhaust = 0; starveT = 0;
+  hp = MAX_HEALTH; sinceHurt = 99; regenT = 0; hunger = 20; sat = 5; exhaust = 0; starveT = 0;
   player.fly = (m === 'spectator'); player.vy = 0; player.fallStart = null;
   if (dead) { dead = false; respawn(); playBtn.textContent = ready ? 'Play' : 'Loading\u2026'; subEl.textContent = 'Mode changed to ' + LABEL[m] + '.'; }
   if (ready && m !== 'spectator' && collides(player.x, player.y, player.z)) player.y = topY(Math.floor(player.x), Math.floor(player.z)) + 1.01;
@@ -1254,7 +1254,7 @@ document.addEventListener('pointerlockchange', function () {
 function startGame() {
   if (!ready) return;
   audioInit();
-  if (dead) { dead = false; respawn(); hp = MAXHP; hunger = 20; sat = 5; exhaust = 0; sinceHurt = 99; clearMobs(); updateHearts(); renderFood(); }
+  if (dead) { dead = false; respawn(); hp = MAX_HEALTH; hunger = 20; sat = 5; exhaust = 0; sinceHurt = 99; clearMobs(); updateHearts(); renderFood(); }
   overlay.classList.add('hidden');
   playing = true;
   if (mode === 'spectator') showHint('Space up, Shift down, scroll changes speed. You fly where you look.', 5000);
@@ -1318,7 +1318,7 @@ defCmd(['help', '?'], '/help [command]', 'List the commands, or explain one', fu
 }, function () { return Object.keys(CMDS); });
 const { clearPortalVisuals, showPortalVisual, buildPortalFrame,
   changeDimension, checkPortal } = createPortalSystem({
-  scene, portals, chunks, savedChunks, obsidian: OBSIDIAN, worldHeight: H,
+  scene, portals, chunks, savedChunks, obsidian: OBSIDIAN, worldHeight: WORLD_HEIGHT,
   getDimension: () => dimension,
   setDimension: nextDimension => { dimension = nextDimension; },
   getPlayer: () => player,
@@ -1332,7 +1332,7 @@ defCmd(['portal'], '/portal [build]', 'Build an obsidian Nether portal frame in 
   if (a.length && a[0].toLowerCase() !== 'build') throw new Error('Usage: /portal [build]');
   const cx = Math.round(player.x - Math.sin(player.yaw) * 3);
   const cz = Math.round(player.z - Math.cos(player.yaw) * 3);
-  const by = Math.max(1, Math.min(H - 6, Math.floor(player.y) - 1));
+  const by = Math.max(1, Math.min(WORLD_HEIGHT - 6, Math.floor(player.y) - 1));
   const made = buildPortalFrame(dimension, cx, by, cz);
   saveWorld();
   return 'Built an obsidian Nether portal frame at ' + made.x + ' ' + made.y + ' ' + made.z + '. Walk through the doorway to travel.';
@@ -1390,7 +1390,7 @@ defCmd(['give'], '/give <item> [count]', 'Give yourself an item or block (Creati
   return 'Gave you ' + n + ' ' + NAMES[id];
 }, function (i) { return i === 1 ? Object.keys(itemMap()) : []; });
 defCmd(['clear'], '/clear', 'Empty your backpack', function () { for (const k in inv) delete inv[k]; updateHotbar(false); return 'Backpack cleared'; });
-defCmd(['heal'], '/heal', 'Restore your health', function () { hp = MAXHP; sinceHurt = 99; updateHearts(); return 'You feel healthy again'; });
+defCmd(['heal'], '/heal', 'Restore your health', function () { hp = MAX_HEALTH; sinceHurt = 99; updateHearts(); return 'You feel healthy again'; });
 defCmd(['feed'], '/feed', 'Fill your hunger bar', function () { hunger = 20; sat = 5; exhaust = 0; renderFood(); return 'You are no longer hungry'; });
 defCmd(['fly'], '/fly', 'Toggle flying (Creative)', function () {
   if (mode !== 'creative') throw new Error('Flying is a Creative mode ability');
@@ -1402,7 +1402,7 @@ defCmd(['tp', 'teleport'], '/tp <x> <y> <z> | <x> <z> | spawn   (~ means relativ
   else if (a.length >= 3) { x = coord(a[0], player.x); y = coord(a[1], player.y); z = coord(a[2], player.z); ensureAround(x, z); }
   else if (a.length === 2) { x = coord(a[0], player.x); z = coord(a[1], player.z); ensureAround(x, z); y = topY(Math.floor(x), Math.floor(z)) + 1.01; }
   else throw new Error('Usage: /tp <x> <y> <z>, /tp <x> <z>, or /tp spawn');
-  if (!(y > -20 && y < H + 200)) throw new Error('That height is out of range');
+  if (!(y > -20 && y < WORLD_HEIGHT + 200)) throw new Error('That height is out of range');
   for (let k = 0; k < 80 && mode !== 'spectator' && collides(x, y, z); k++) y += 1;
   player.x = x; player.y = y; player.z = z; player.vx = player.vy = player.vz = 0; player.fallStart = null;
   return 'Teleported to ' + x.toFixed(1) + ' ' + y.toFixed(1) + ' ' + z.toFixed(1);
@@ -1445,7 +1445,7 @@ defCmd(['kill'], '/kill [hostile|passive|villagers|golems|all|me]', 'Remove crea
 defCmd(['setblock'], '/setblock <x> <y> <z> <block|air>', 'Place a single block', function (a) {
   if (a.length < 4) throw new Error('Usage: /setblock <x> <y> <z> <block|air>');
   const x = Math.floor(coord(a[0], player.x)), y = Math.floor(coord(a[1], player.y)), z = Math.floor(coord(a[2], player.z));
-  if (y < 0 || y >= H) throw new Error('Height must be between 0 and ' + (H - 1));
+  if (y < 0 || y >= WORLD_HEIGHT) throw new Error('Height must be between 0 and ' + (WORLD_HEIGHT - 1));
   const id = a[3].toLowerCase() === 'air' ? 0 : findItem(a[3], true);
   getOrGen(x >> 4, z >> 4);
   const old = get(x, y, z);
@@ -1456,7 +1456,7 @@ defCmd(['fill'], '/fill <x1> <y1> <z1> <x2> <y2> <z2> <block|air>', 'Fill a box 
   if (a.length < 7) throw new Error('Usage: /fill <x1> <y1> <z1> <x2> <y2> <z2> <block|air>');
   const x1 = Math.floor(coord(a[0], player.x)), y1 = Math.floor(coord(a[1], player.y)), z1 = Math.floor(coord(a[2], player.z));
   const x2 = Math.floor(coord(a[3], player.x)), y2 = Math.floor(coord(a[4], player.y)), z2 = Math.floor(coord(a[5], player.z));
-  const lx = Math.min(x1, x2), hx = Math.max(x1, x2), lz = Math.min(z1, z2), hz = Math.max(z1, z2), ly = Math.max(0, Math.min(y1, y2)), hy = Math.min(H - 1, Math.max(y1, y2));
+  const lx = Math.min(x1, x2), hx = Math.max(x1, x2), lz = Math.min(z1, z2), hz = Math.max(z1, z2), ly = Math.max(0, Math.min(y1, y2)), hy = Math.min(WORLD_HEIGHT - 1, Math.max(y1, y2));
   const vol = (hx - lx + 1) * (hz - lz + 1) * (hy - ly + 1);
   if (vol > 32768) throw new Error('That is ' + vol + ' blocks. The limit is 32768');
   const id = a[6].toLowerCase() === 'air' ? 0 : findItem(a[6], true);
@@ -1473,7 +1473,7 @@ defCmd(['explode'], '/explode [radius]', 'Blow up the ground in front of you', f
 defCmd(['locate'], '/locate <village|temple|tower|dungeon|cabin|circle> [tp]', 'Find the nearest structure', function (a) {
   const type = (a[0] || '').toLowerCase();
   if (!STRUCT_NAMES[type]) throw new Error('Usage: /locate <' + Object.keys(STRUCT_NAMES).join('|') + '> [tp]');
-  const prx = Math.floor(player.x / REG), prz = Math.floor(player.z / REG);
+  const prx = Math.floor(player.x / STRUCTURE_REGION_SIZE), prz = Math.floor(player.z / STRUCTURE_REGION_SIZE);
   let best = null, bd = 1e9;
   for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) {
     const st = structureFor(prx + dx, prz + dz);
@@ -1507,7 +1507,7 @@ function dbDeleteWorld(id) { return db.deleteWorld(id); }
 
 function snapshot() {
   const m = currentWorld;
-  m.dimension = dimension; m.enderDragonDefeated = enderDragonDefeated; m.portals = snapshotPortals(portals); m.mode = mode; m.difficulty = difficulty; m.spawn = spawnPoint; m.omen = omen; m.hunger = hunger; m.sat = sat; m.weather = { w: weather, t: weatherT, r: rainLevel }; m.lastPlayed = Date.now(); m.tod = tod; m.hp = dead ? MAXHP : hp;
+  m.dimension = dimension; m.enderDragonDefeated = enderDragonDefeated; m.portals = snapshotPortals(portals); m.mode = mode; m.difficulty = difficulty; m.spawn = spawnPoint; m.omen = omen; m.hunger = hunger; m.sat = sat; m.weather = { w: weather, t: weatherT, r: rainLevel }; m.lastPlayed = Date.now(); m.tod = tod; m.hp = dead ? MAX_HEALTH : hp;
   m.selected = selected; m.hotbar = hotbar.slice(); m.inv = Object.assign({}, inv);
   m.player = { x: player.x, y: player.y, z: player.z, yaw: player.yaw, pitch: player.pitch, fly: !!player.fly };
   m.relics = relics.map(function (r) { return { x: r.x, y: r.y, z: r.z, got: r.got }; });
@@ -1626,7 +1626,7 @@ function applyWorld(m) {
   ready = true; dead = false;
   if (!relics.length) createRelics();
   setMode(mode);
-  hp = (m.hp > 0) ? m.hp : MAXHP; updateHearts();
+  hp = (m.hp > 0) ? m.hp : MAX_HEALTH; updateHearts();
   hunger = (typeof m.hunger === 'number') ? m.hunger : 20; sat = (typeof m.sat === 'number') ? m.sat : 5; renderFood();
   (m.golems || []).forEach(function (g) {
     if (!KINDS[g.kind] || Math.hypot(g.x - player.x, g.z - player.z) > 60 || !chunkAt(Math.floor(g.x) >> 4, Math.floor(g.z) >> 4)) return;
@@ -1727,7 +1727,7 @@ function frame(now) {
   if (ready) {
     streamChunks();
     if (playing) update(dt, now);
-    else { camera.position.set(player.x, player.y + EYE, player.z); camera.rotation.set(player.pitch, player.yaw, 0); }
+    else { camera.position.set(player.x, player.y + EYE_HEIGHT, player.z); camera.rotation.set(player.pitch, player.yaw, 0); }
     daylight(dt);
     updateWeather(dt); updateRain(dt); updateRainSound(dt);
     updateRelics(dt, now / 1000);
