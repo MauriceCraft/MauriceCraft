@@ -31,6 +31,7 @@ export interface MobSpawnDependencies {
   isDead: () => boolean;
   hasHealth: () => boolean;
   getMode: () => string;
+  canSpawnOnSurface?: () => boolean;
   giveItem: (id: number, count: number) => void;
   showHint: (message: string, ms: number) => void;
   playSound: (event: string) => void;
@@ -54,15 +55,27 @@ function nearTorch(x: number, y: number, z: number, rad: number): boolean {
   return false;
 }
 function trySpawnMob(): void {
-  const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 12;
-  const x = Math.floor(player.x + Math.cos(a) * d), z = Math.floor(player.z + Math.sin(a) * d);
-  if (!chunkAt(x >> 4, z >> 4)) return;
-  const y = topY(x, z), b = get(x, y, z);
-  if (b === LEAVES || b === WOOD) return;
-  const r = Math.random(), kind = r < 0.42 ? 'zombie' : (r < 0.62 ? 'creeper' : (r < 0.82 ? 'skeleton' : 'spider')), K = KINDS[kind];
-  if (collides(x + 0.5, y + 1.01, z + 0.5, K.r, K.h)) return;
-  if (nearTorch(x + 0.5, y + 1, z + 0.5, 8)) return;    // torches keep monsters from spawning nearby
-  addMob(kind, x + 0.5, y + 1.01, z + 0.5);
+  const surfaceAllowed = deps.canSpawnOnSurface?.() ?? true;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 18;
+    const x = Math.floor(player.x + Math.cos(a) * d);
+    const z = Math.floor(player.z + Math.sin(a) * d);
+    if (!chunkAt(x >> 4, z >> 4)) continue;
+    const top = topY(x, z);
+    const useCave = !surfaceAllowed || Math.random() < 0.45;
+    const y = useCave ? 4 + Math.floor(Math.random() * Math.max(1, top - 8)) : top;
+    if (useCave && (y >= top - 3 || get(x, y + 3, z) === 0)) continue;
+    const floor = get(x, y, z);
+    if (!solid(floor) || floor === LEAVES || floor === WOOD ||
+      get(x, y + 1, z) !== 0 || get(x, y + 2, z) !== 0) continue;
+    const r = Math.random(), kind = r < 0.42 ? 'zombie' :
+      r < 0.62 ? 'creeper' : r < 0.82 ? 'skeleton' : 'spider';
+    const K = KINDS[kind];
+    if (collides(x + 0.5, y + 1.01, z + 0.5, K.r, K.h)) continue;
+    if (nearTorch(x + 0.5, y + 1, z + 0.5, 6)) continue;
+    addMob(kind, x + 0.5, y + 1.01, z + 0.5);
+    return;
+  }
 }
 function trySpawnAnimals(): void {
   const a = Math.random() * Math.PI * 2, d = 16 + Math.random() * 26;
@@ -73,7 +86,9 @@ function trySpawnAnimals(): void {
     const x = Math.floor(bx + (Math.random() - 0.5) * 5), z = Math.floor(bz + (Math.random() - 0.5) * 5);
     if (!chunkAt(x >> 4, z >> 4)) continue;
     const y = topY(x, z);
-    if (get(x, y, z) !== GRASS) continue;
+    // topY ignores liquid, so dry air above grass must be checked explicitly.
+    if (get(x, y, z) !== GRASS || get(x, y + 1, z) !== 0 ||
+      get(x, y + 2, z) !== 0) continue;
     if (collides(x + 0.5, y + 1.01, z + 0.5, K.r, K.h)) continue;
     addMob(kind, x + 0.5, y + 1.01, z + 0.5);
   }
