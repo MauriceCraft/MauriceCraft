@@ -56,8 +56,13 @@ describe('save format compatibility', () => {
     const inNether = chunk(0, 0);
     const cache = new Map([[ckey(-1, -2), new Uint8Array([11, 12])]]);
     const batch = collectWorldSaveBatch(world(), 'nether', new Map([[ckey(0, 0), inNether]]), cache);
-    expect(batch.records.map(c => [c.k, c.cx, c.cz])).toEqual([['w-old:-1,-2', -1, -2]]);
+    expect(batch.records.map(c => [c.k, c.cx, c.cz])).toEqual([
+      ['w-old:-1,-2', -1, -2], ['w-old:nether:0,0', 0, 0],
+    ]);
     expect(batch.records[0].data).toEqual(new Uint8Array([11, 12]));
+    expect(batch.records[1].data).toEqual(new Uint8Array([3, 4, 5]));
+    expect(inNether.dirty).toBe(false);
+    batch.restoreDirty();
     expect(inNether.dirty).toBe(true);
   });
 });

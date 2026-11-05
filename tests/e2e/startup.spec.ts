@@ -66,11 +66,11 @@ test('new worlds accept a specified seed and preserve it across reloads', async 
   await page.locator('#worldSeed').fill('123456789');
   await page.locator('#newworld').click();
   await expect(page.locator('.world')).toHaveCount(2);
-  await expect(page.locator('.world').last()).toContainText('Seed 123456789');
+  await expect(page.locator('.world').first()).toContainText('Seed 123456789');
   await expect(page.locator('#worldSeed')).toHaveValue('');
   await page.reload();
   await expect(page.locator('#newworld')).toBeEnabled({ timeout: 15_000 });
-  await expect(page.locator('.world').last()).toContainText('Seed 123456789');
+  await expect(page.locator('.world').first()).toContainText('Seed 123456789');
   await page.locator('#worldSeed').fill('4294967296');
   await page.locator('#newworld').click();
   await expect(page.locator('.world')).toHaveCount(2);
