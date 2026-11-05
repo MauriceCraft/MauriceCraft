@@ -18,19 +18,11 @@ import { createMobSpawning } from './entities/mob-spawning';
 import { createMobWorldCycle } from './entities/mob-world-cycle';
 import { part, JOBS, JOB_NAMES } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
-import { createBlockAccess } from './world/block-access';
-import { createChunkLifecycle } from './world/chunk-lifecycle';
-import { createChunkStreamer } from './world/chunk-streamer';
-import { primeWorldChunks } from './world/prime-chunks';
-import { createStructureRegions } from './world/structure-regions';
-import { createStructureBuilders } from './world/structure-builders';
-import { createChunkGenerator } from './world/chunk-generator';
+import { createWorldRuntime } from './world/world-runtime';
 import { raycastBlocks } from './world/raycast';
 import { createCollisionEngine } from './world/collision';
-import { mulberry32, hash2, fbm, smooth } from './world/noise';
 import { createToolUsage } from './items/tool-usage';
 import { createBlockInteractions } from './interactions/block-interactions';
-import { createBlockCatalog } from './world/block-catalog';
 import { createRecipeMatcher } from './crafting/recipes';
 import { createRecipeCatalog } from './crafting/recipe-catalog';
 import { createInventoryUi } from './ui/inventory-ui';
@@ -46,9 +38,7 @@ import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { createPortalSystem } from './portals/portal-system';
 import { snapshotPortals } from './portals/persistence';
-import { createGameRenderer } from './rendering/game-renderer';
 import { createExplosionSystem } from './effects/explosions';
-import { createChunkMesher } from './rendering/chunk-mesher';
 import { openWorldStorage } from './storage/world-storage';
 import { createWorldSession } from './session/world-session';
 import { snapshotWorldState, collectWorldSaveBatch } from './session/world-persistence';
@@ -56,13 +46,11 @@ import { createWorldRestore } from './session/world-restore';
 import { createAudioEngine } from './audio/sound-engine';
 
 
-/* ---------- World constants ---------- */
-const WORLD_HEIGHT = 48, CHUNK_SIZE = 16, SEA_LEVEL = 14, VIEW_DISTANCE = 5;   // VIEW_DISTANCE = view distance in chunks
-const chunks = new Map();
-const { chunkAt, resetChunkCache, getBlock: get, setBlock, inBounds } =
-  createBlockAccess(chunks, WORLD_HEIGHT);
-
-// Persistent items, blocks, and mining rules live in a typed catalog.
+/* ---------- World services (typed terrain + renderer + chunk stores) ---------- */
+const WORLD_HEIGHT = 48, CHUNK_SIZE = 16, SEA_LEVEL = 14, VIEW_DISTANCE = 5;
+let seed = 1;
+let dimension = 'overworld';
+const portals = []; // Persistent portal pairs, stored with each world.
 const {
   GRASS, DIRT, STONE, SAND, WOOD, LEAVES, PLANKS, BRICK,
   COBBLE, STONEBRICK, SANDSTONE, GRAVEL, HAY, GOLD, MOSSY, TNT,
@@ -74,59 +62,18 @@ const {
   isBed, BED_H, BED_DIR, solid, opq, NAMES, ALL_BLOCKS, BREAK_TIME,
   DROPS, TOOL_KINDS, TOOL_TIERS, toolId, toolTile, TOOLS, TOOL_IDS, TOOL_MAX,
   TOOL_LVL, TOOL_SPD, TOOL_DMG, NEEDS_PICK,
-} = createBlockCatalog();
-const hotbar = ALL_BLOCKS.slice(0, 9);
-const toolWear = {};
-
-const { canvas, renderer, scene, camera, atlasCanvas, tex, mat, torchMat,
-  dayUniform, glowMat, sun, moon, sel } = createGameRenderer(toolTile);
-
-const { disposeMesh, buildChunk, refreshAround, blockGeo } = createChunkMesher({
-  scene, mat, torchMat, glowMat, chunks, chunkAt,
-  getBlock: get, opq, isBed, tiles: TILES, height: WORLD_HEIGHT, chunkSize: CHUNK_SIZE,
-  atlasTiles: ATLAS_N, bedHeight: BED_H, torchId: TORCH,
-});
-
-/* ---------- Endless world generation, one chunk at a time ---------- */
-let seed = 1;
-let dimension = 'overworld'; // overworld, nether, or end
-const portals = []; // portal frames are saved with the world and paired between Overworld and Nether
-const savedChunks = new Map();   // edited chunks loaded from a saved world, keyed like chunks
-function heightAt(x, z) {
-  const n = fbm(x / 40, z / 40, seed), n2 = fbm(x / 170, z / 170, seed + 300), m = fbm(x / 12, z / 12, seed + 50);
-  const h = Math.floor(5 + (n * 0.72 + n2 * 0.28) * 34 + m * 4);
-  return Math.max(3, Math.min(WORLD_HEIGHT - 12, h));
-}
-/* ---------- Structures: villages, temples, towers, dungeons ---------- */
-const { REG: STRUCTURE_REGION_SIZE, STRUCT_NAMES, structCache, structureFor, structAt, inStructZone,
-  groundH, forceSand, nearestStructure } = createStructureRegions({
-  heightAt, getSeed: () => seed, getPlayer: () => player, seaLevel: SEA_LEVEL, maxHeight: WORLD_HEIGHT,
-});
-
-const { buildStructure } = createStructureBuilders(() => seed, {
-  BRICK, COBBLE, CTABLE, DIRT, GOLD, GRAVEL, HAY, LEAVES, MOSSY, PLANKS, SANDSTONE, STONEBRICK, TORCH, WOOD
-});
-
-const generateChunkData = createChunkGenerator({
-  getSeed: () => seed,
+  hotbar, toolWear, canvas, renderer, scene, camera, atlasCanvas, tex, mat, torchMat,
+  dayUniform, glowMat, sun, moon, sel, disposeMesh, buildChunk, refreshAround, blockGeo,
+  chunks, savedChunks, chunkAt, resetChunkCache, get, setBlock, inBounds,
+  STRUCTURE_REGION_SIZE, STRUCT_NAMES, structCache, structureFor, structAt, inStructZone,
+  groundH, forceSand, nearestStructure,
+  genChunk, getOrGen, topY, resetWorld, streamChunks,
+} = createWorldRuntime({
+  height: WORLD_HEIGHT, chunkSize: CHUNK_SIZE, seaLevel: SEA_LEVEL,
+  viewDistance: VIEW_DISTANCE, getSeed: () => seed,
+  setSeed: newSeed => { seed = newSeed; },
   getDimension: () => dimension,
-  maxHeight: WORLD_HEIGHT, seaLevel: SEA_LEVEL, regionSize: STRUCTURE_REGION_SIZE,
-  groundH, heightAt, forceSand, inStructZone, structureFor, buildStructure,
-  blocks: { BRICK, COAL_ORE, COPPER_ORE, DIAMOND_ORE, DIRT, GOLD, GRASS, IRON_ORE, LAVA, LEAVES, SAND, SANDSTONE, STONE, STONEBRICK, TORCH, WATER, WOOD },
-});
-const { genChunk, getOrGen, topY, resetWorld } = createChunkLifecycle({
-  chunks, savedChunks, height: WORLD_HEIGHT,
-  getDimension: () => dimension,
-  setSeed: value => { seed = value; },
-  clearStructures: () => structCache.clear(),
-  chunkAt, resetChunkCache, generateChunkData, buildChunk, disposeMesh,
-  solid, getBlock: get,
-});
-
-const streamChunks = createChunkStreamer({
-  chunks, viewDistance: VIEW_DISTANCE,
   getPlayer: () => player,
-  getOrGen, genChunk, buildChunk, disposeMesh, resetChunkCache,
 });
 
 /* ---------- Game state ---------- */
