@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ckey } from '../world/chunk-key';
+import { getDimensionCache } from '../session/dimension-chunk-records';
 import { portalContains, type PortalDimension, type PortalFrame } from './frame';
 
 export type WorldDimension = PortalDimension | 'end';
@@ -19,6 +20,7 @@ export interface PortalSystemDependencies<Chunk extends PortalChunk> {
   portals: PortalFrame[];
   chunks: Map<number, Chunk>;
   savedChunks: Map<number, Uint8Array>;
+  dimensionChunks?: Map<string, Map<number, Uint8Array>>;
   obsidian: number;
   worldHeight: number;
   getDimension: () => WorldDimension;
@@ -103,10 +105,11 @@ export function createPortalSystem<Chunk extends PortalChunk>(
     destination: WorldDimension, x?: number, z?: number, y?: number,
   ): void {
     clearPortalVisuals();
-    if (getDimension() === 'overworld') {
-      for (const chunk of chunks.values()) {
-        if (chunk.edited) savedChunks.set(ckey(chunk.cx, chunk.cz), chunk.data.slice());
-      }
+    const current = getDimension();
+    const destinationCache = current === 'overworld' ? savedChunks :
+      deps.dimensionChunks ? getDimensionCache(deps.dimensionChunks, current) : null;
+    for (const chunk of chunks.values()) {
+      if (chunk.edited) destinationCache?.set(ckey(chunk.cx, chunk.cz), chunk.data.slice());
     }
     for (const chunk of chunks.values()) disposeMesh(chunk);
     chunks.clear();

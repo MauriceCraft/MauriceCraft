@@ -68,7 +68,7 @@ const {
   TOOL_SPD, TOOL_DMG, NEEDS_PICK, hotbar, toolWear, canvas,
   renderer, scene, camera, atlasCanvas, tex, dayUniform,
   glowMat, sun, moon, sel, disposeMesh, buildChunk,
-  refreshAround, blockGeo, chunks, savedChunks, chunkAt, resetChunkCache,
+  refreshAround, blockGeo, chunks, savedChunks, dimensionChunks, chunkAt, resetChunkCache,
   get, setBlock, inBounds, STRUCTURE_REGION_SIZE, structCache, structureFor,
   inStructZone, nearestStructure, getOrGen, topY, resetWorld, streamChunks,
 } = worldServices;
@@ -457,7 +457,7 @@ function rebuildRegion(x1: number, z1: number, x2: number, z2: number): void {
 
 const { clearPortalVisuals, showPortalVisual, buildPortalFrame,
   changeDimension, checkPortal } = createPortalSystem({
-  scene, portals, chunks, savedChunks, obsidian: OBSIDIAN, worldHeight: WORLD_HEIGHT,
+  scene, portals, chunks, savedChunks, dimensionChunks, obsidian: OBSIDIAN, worldHeight: WORLD_HEIGHT,
   getDimension: () => dimension,
   setDimension: nextDimension => { dimension = nextDimension; },
   getPlayer: () => player,
@@ -501,7 +501,7 @@ const worldSession = createGameplayWorldSession({
     relics, toolWear, golems: mobs,
   }),
   player, portals, inventory: inv, toolWear, hotbar, allBlocks: ALL_BLOCKS,
-  savedChunks, chunks, getDimension: () => dimension,
+  savedChunks, dimensionChunks, chunks, getDimension: () => dimension,
   validDifficulties: DIFF, weatherLabels: WEATHER_LABEL,
   kinds: KINDS, mobs, relics, maximumHealth: MAX_HEALTH,
   resetWorld, clearPortalVisuals, showPortalVisual, clearMobs, clearRelics,

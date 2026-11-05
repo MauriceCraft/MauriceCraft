@@ -6,6 +6,7 @@ import { ckey } from '../../src/game/world/chunk-key';
 function fixture() {
   const chunks = new Map<number, WritableChunk>();
   const savedChunks = new Map<number, Uint8Array>();
+  const dimensionChunks = new Map<string, Map<number, Uint8Array>>();
   const access = createBlockAccess(chunks, 48);
   let dimension = 'overworld';
   let seed = 1;
@@ -15,13 +16,13 @@ function fixture() {
   const buildChunk = vi.fn();
   const generateChunkData = vi.fn(() => new Uint8Array(16 * 16 * 48));
   const lifecycle = createChunkLifecycle({
-    chunks, savedChunks, height: 48,
+    chunks, savedChunks, dimensionChunks, height: 48,
     getDimension: () => dimension, setSeed, clearStructures,
     chunkAt: access.chunkAt, resetChunkCache: access.resetChunkCache,
     generateChunkData, buildChunk, disposeMesh,
     solid: id => id !== 0, getBlock: access.getBlock,
   });
-  return { chunks, savedChunks, access, lifecycle, setSeed, clearStructures,
+  return { chunks, savedChunks, dimensionChunks, access, lifecycle, setSeed, clearStructures,
     disposeMesh, buildChunk, generateChunkData,
     getSeed: () => seed, setDimension: (value: string) => { dimension = value; } };
 }
@@ -57,6 +58,21 @@ describe('world chunk lifecycle', () => {
     expect(chunk.edited).toBe(false);
     expect(chunk.data[0]).toBe(0);
     expect(f.generateChunkData).toHaveBeenCalledWith(1, 1);
+  });
+
+  it('loads separately saved Nether chunks without leaking overworld changes', () => {
+    const f = fixture();
+    const overworld = new Uint8Array(16 * 16 * 48).fill(3);
+    const nether = new Uint8Array(16 * 16 * 48).fill(17);
+    f.savedChunks.set(ckey(3, -2), overworld);
+    f.dimensionChunks.set('nether', new Map([[ckey(3, -2), nether]]));
+    f.setDimension('nether');
+    const loaded = f.lifecycle.genChunk(3, -2);
+    expect(loaded.data[0]).toBe(17);
+    loaded.data[0] = 90;
+    expect(nether[0]).toBe(17);
+    expect(overworld[0]).toBe(3);
+    expect(f.generateChunkData).not.toHaveBeenCalled();
   });
 
   it('releases old meshes, resets structures and primes only initial chunks', () => {

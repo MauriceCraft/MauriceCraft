@@ -1,5 +1,5 @@
 import { openWorldStorage } from '../storage/world-storage';
-import { ckey } from '../world/chunk-key';
+import { hydrateDimensionChunks } from './dimension-chunk-records';
 import type { WritableChunk } from '../world/block-access';
 import { createWorldSession } from './world-session';
 import { createWorldRestore, type WorldRestoreDependencies } from './world-restore';
@@ -8,6 +8,7 @@ import { collectWorldSaveBatch, snapshotWorldState, type WorldSnapshotState } fr
 /** Coordinates browser persistence without owning terrain or gameplay rules. */
 export interface GameplayWorldSessionDependencies extends WorldRestoreDependencies {
   chunks: Map<number, WritableChunk>;
+  dimensionChunks: Map<string, Map<number, Uint8Array>>;
   getDimension: () => string;
   snapshot: () => WorldSnapshotState;
   startPlaying: () => void;
@@ -17,21 +18,21 @@ export interface GameplayWorldSessionDependencies extends WorldRestoreDependenci
 
 export function createGameplayWorldSession(deps: GameplayWorldSessionDependencies) {
   const { applyWorld, prepareNewWorld } = createWorldRestore(deps);
-  const { savedChunks, chunks } = deps;
+  const { savedChunks, dimensionChunks, chunks } = deps;
   return createWorldSession({
     openStorage: openWorldStorage,
     isWorldReady: () => deps.state.ready,
     setWorldReady: value => { deps.state.ready = value; },
     snapshotWorld: world => snapshotWorldState(world, deps.snapshot()),
-    collectSaveBatch: world => collectWorldSaveBatch(world, deps.getDimension(), chunks, savedChunks),
+    collectSaveBatch: world => collectWorldSaveBatch(world, deps.getDimension(), chunks, savedChunks, dimensionChunks),
     applyLoadedWorld: (world, records) => {
-      savedChunks.clear();
-      for (const record of records) {
-        savedChunks.set(ckey(record.cx, record.cz), record.data);
-      }
+      hydrateDimensionChunks(records, savedChunks, dimensionChunks);
       applyWorld(world);
     },
-    prepareNewWorld,
+    prepareNewWorld: world => {
+      dimensionChunks.clear();
+      prepareNewWorld(world);
+    },
     startPlaying: deps.startPlaying,
     modeLabel: deps.modeLabel,
     showHint: deps.showHint,

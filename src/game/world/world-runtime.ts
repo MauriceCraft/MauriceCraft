@@ -70,6 +70,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     fluids.notify(x, y, z);
   };
   const savedChunks = new Map<number, Uint8Array>();
+  const dimensionChunks = new Map<string, Map<number, Uint8Array>>();
 
   function heightAt(x: number, z: number): number {
     const seed = deps.getSeed();
@@ -121,7 +122,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
       WILLOW_LEAVES, AUTUMN_LEAVES, MUD, FLOWERING_GRASS },
   });
   const lifecycle = createChunkLifecycle({
-    chunks, savedChunks, height: WORLD_HEIGHT,
+    chunks, savedChunks, dimensionChunks, height: WORLD_HEIGHT,
     getDimension: deps.getDimension, setSeed: deps.setSeed,
     setGeneratorVersion: deps.setGeneratorVersion,
     clearStructures: () => regions.structCache.clear(),
@@ -141,7 +142,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     ...regions,
     ...landmarks,
     ...lifecycle,
-    chunks, savedChunks, hotbar, toolWear,
+    chunks, savedChunks, dimensionChunks, hotbar, toolWear,
     chunkAt, resetChunkCache, get, setBlock, inBounds,
     heightAt, generateChunkData, streamChunks, stepFluids: fluids.tick,
     STRUCTURE_REGION_SIZE,

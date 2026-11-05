@@ -5,6 +5,7 @@ import type { WritableChunk } from './block-access';
 export interface ChunkLifecycleDependencies {
   chunks: Map<number, WritableChunk>;
   savedChunks: Map<number, Uint8Array>;
+  dimensionChunks?: ReadonlyMap<string, ReadonlyMap<number, Uint8Array>>;
   height: number;
   getDimension: () => string;
   setSeed: (seed: number) => void;
@@ -29,7 +30,9 @@ export function createChunkLifecycle(deps: ChunkLifecycleDependencies) {
   const disposeMesh = deps.disposeMesh, solid = deps.solid, get = deps.getBlock;
 
 function genChunk(cx: number, cz: number): WritableChunk {
-  const sv = deps.getDimension() === 'overworld' ? savedChunks.get(ckey(cx, cz)) : null;
+  const dimension = deps.getDimension();
+  const cache = dimension === 'overworld' ? savedChunks : deps.dimensionChunks?.get(dimension);
+  const sv = cache?.get(ckey(cx, cz));
   if (sv) {
     const sc = { cx: cx, cz: cz, data: new Uint8Array(sv), mesh: null, meshed: false, edited: true, dirty: false };
     chunks.set(ckey(cx, cz), sc); resetChunkCache();
