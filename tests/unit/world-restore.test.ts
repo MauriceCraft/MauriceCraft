@@ -51,7 +51,7 @@ describe('saved-world restoration', () => {
       portals: [{ dimension: 'overworld', x: 10, y: 2, z: 6 }],
     };
     f.restore.applyWorld(world);
-    expect(f.resetWorld).toHaveBeenCalledWith(501, 2, -2);
+    expect(f.resetWorld).toHaveBeenCalledWith(501, 2, -2, 1);
     expect(f.player.x).toBe(35);
     expect(f.player.vx).toBe(0);
     expect(f.state.mode).toBe('survival');
@@ -88,7 +88,7 @@ describe('saved-world restoration', () => {
     f.deps.savedChunks.set(99, new Uint8Array([1]));
     f.restore.prepareNewWorld({ id: 'new', name: 'World 2', seed: 700, created: 1, lastPlayed: 1 });
     expect(f.deps.savedChunks.size).toBe(0);
-    expect(f.resetWorld).toHaveBeenCalledWith(700, 0, 0);
+    expect(f.resetWorld).toHaveBeenCalledWith(700, 0, 0, 1);
     expect(f.state.spawnPoint).toBeNull();
     expect(f.state.omen).toBe(false);
     expect(f.state.weatherT).toBe(570);
