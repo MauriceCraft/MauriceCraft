@@ -21,6 +21,7 @@ import { createRecipeMatcher } from './crafting/recipes';
 import { createRecipeCatalog } from './crafting/recipe-catalog';
 import { createInventoryUi } from './ui/inventory-ui';
 import { createInputControls } from './input/game-controls';
+import { createHud } from './ui/hud';
 import { coord } from './commands/coordinates';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
@@ -719,53 +720,16 @@ import { createAudioEngine } from './audio/sound-engine';
   const hasHealth = () => mode === 'survival' || mode === 'adventure';
 
   /* ---------- Hotbar & hearts ---------- */
-  const hotbarEl = document.getElementById('hotbar');
-  const nameEl = document.getElementById('blockname');
-  const heartsEl = document.getElementById('hearts'), foodEl = document.getElementById('food');
-  const flashEl = document.getElementById('flash');
-  const mineBar = document.getElementById('mineBar');
-  const slotEls = [];
-  hotbar.forEach(function (b, i) {
-    const s = document.createElement('button');
-    s.type = 'button'; s.className = 'slot'; s.setAttribute('aria-label', NAMES[b] + ', slot ' + (i + 1));
-    const c = document.createElement('canvas'); c.width = 36; c.height = 36;
-    const cx = c.getContext('2d'); cx.imageSmoothingEnabled = false;
-    cx.drawImage(atlasCanvas, tileOf(b) * 16, 0, 16, 16, 0, 0, 36, 36);
-    const n = document.createElement('span'); n.className = 'num'; n.textContent = String(i + 1);
-    const ct = document.createElement('span'); ct.className = 'cnt';
-    s.appendChild(c); s.appendChild(n); s.appendChild(ct);
-    const du = document.createElement('i'); du.className = 'dur'; s.appendChild(du); s._dur = du;
-    s._cnt = ct; s._ctx = cx;
-    s.addEventListener('click', function () { if (!canInteract()) return; selected = i; updateHotbar(true); });
-    hotbarEl.appendChild(s); slotEls.push(s);
+  const { hotbarEl, heartsEl, foodEl, flashEl, mineBar,
+    updateHotbar, flashName, updateFood, updateHearts } = createHud({
+    hotbar, inventory: inv, names: NAMES, atlasCanvas, tileOf,
+    tools: TOOLS, toolMax: TOOL_MAX, toolWear,
+    getMode: () => mode, getSelected: () => selected,
+    setSelected: slot => { selected = slot; },
+    getHunger: () => hunger, getHealth: () => hp,
+    canInteract, maxHealth: MAXHP,
   });
-  let nameTimer = 0;
-  function updateHotbar(showName) {
-    slotEls.forEach(function (s, i) {
-      const b = hotbar[i];
-      s._ctx.clearRect(0, 0, 36, 36);
-      s._ctx.drawImage(atlasCanvas, tileOf(b) * 16, 0, 16, 16, 0, 0, 36, 36);
-      s.setAttribute('aria-label', NAMES[b] + ', slot ' + (i + 1));
-      s.classList.toggle('on', i === selected);
-      const surv = mode === 'survival';
-      s._cnt.textContent = surv ? (inv[b] || '') : '';
-      const T = TOOLS[b];
-      if (surv && T && toolWear[b] > 0) {
-        const pr = 1 - toolWear[b] / TOOL_MAX[T.tier];
-        s._dur.style.display = 'block'; s._dur.style.width = 'calc((100% - 6px) * ' + pr + ')';
-        s._dur.style.background = pr > 0.5 ? '#43c34a' : (pr > 0.2 ? '#e3c42f' : '#d9372b');
-      } else s._dur.style.display = 'none';
-      s.classList.toggle('empty', surv && !(inv[b] > 0));
-    });
-    if (showName) {
-      nameEl.textContent = NAMES[hotbar[selected]]; nameEl.style.opacity = 1;
-      clearTimeout(nameTimer); nameTimer = setTimeout(function () { nameEl.style.opacity = 0; }, 1400);
-    }
-  }
-  function flashName(text) {
-    nameEl.textContent = text; nameEl.style.opacity = 1;
-    clearTimeout(nameTimer); nameTimer = setTimeout(function () { nameEl.style.opacity = 0; }, 1600);
-  }
+
   // Hunger drains slowly with activity (a lot when sprinting). Eat to refill it; at zero you starve.
   function exert(n) {
     if (mode !== 'survival' || difficulty === 'peaceful') return;
@@ -775,25 +739,8 @@ import { createAudioEngine } from './audio/sound-engine';
       if (sat > 0) sat = Math.max(0, sat - 1); else hunger = Math.max(0, hunger - 1);
     }
   }
-  function updateFood() {
-    shownHunger = hunger;
-    let html = '';
-    for (let i = 0; i < 10; i++) {
-      const v = hunger - i * 2;
-      html += '<span class="food ' + (v >= 2 ? 'full' : (v >= 1 ? 'half' : 'empty')) + '">\uD83C\uDF57</span>';
-    }
-    foodEl.innerHTML = html;
-    foodEl.setAttribute('aria-label', 'Hunger ' + hunger + ' of 20');
-  }
-  function updateHearts() {
-    let html = '';
-    for (let i = 0; i < 10; i++) {
-      const v = hp - i * 2;
-      html += '<span class="heart ' + (v >= 2 ? 'full' : (v >= 1 ? 'half' : 'empty')) + '">\u2665</span>';
-    }
-    heartsEl.innerHTML = html;
-    heartsEl.setAttribute('aria-label', 'Health ' + hp + ' of ' + MAXHP);
-  }
+  // Hunger and health displays are provided by the HUD adapter.
+  function renderFood(): void { shownHunger = hunger; updateFood(); }
   function damagePlayer(n, scaled) {
     if (scaled) n = Math.round(n * DIFF[difficulty].dmg);   // monster hits scale with difficulty
     if (!hasHealth() || dead || n <= 0) return;
@@ -928,7 +875,7 @@ import { createAudioEngine } from './audio/sound-engine';
     if (mode !== 'survival') { flashName('Food only matters in Survival'); return 0.4; }
     if (hunger >= 20) { showHint('You are not hungry.', 1200); return 0.4; }
     if (!spendItem(id)) return 0.4;
-    hunger = Math.min(20, hunger + FOOD[id]); sat = Math.min(hunger, sat + FOOD[id] * 0.6); updateFood(); sfx('eat');
+    hunger = Math.min(20, hunger + FOOD[id]); sat = Math.min(hunger, sat + FOOD[id] * 0.6); renderFood(); sfx('eat');
     return 0.8;
   }
   function throwDynamite() {
@@ -1189,7 +1136,7 @@ import { createAudioEngine } from './audio/sound-engine';
       if (player.y < -30) respawn();
       const wspd = Math.hypot(player.vx, player.vz);
       exert(dt * (0.015 + (wspd > 1.2 && player.onGround ? (sprinting ? 0.13 : 0.03) : 0)));
-      if (mode === 'survival' && hunger !== shownHunger) updateFood();
+      if (mode === 'survival' && hunger !== shownHunger) renderFood();
       if (!flying && player.onGround && wspd > 1.2) {
         stepDist += wspd * dt;
         if (stepDist > 2.2) { stepDist = 0; sfx('step', 0.8, 0, get(Math.floor(player.x), Math.floor(player.y - 0.2), Math.floor(player.z))); }
@@ -1310,7 +1257,7 @@ import { createAudioEngine } from './audio/sound-engine';
     modeBtns.forEach(function (b) { const on = b.dataset.mode === mode; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     modeDescEl.textContent = DESC[mode];
     updateDiffUI();
-    updateHotbar(false); updateHearts(); updateFood();
+    updateHotbar(false); updateHearts(); renderFood();
   }
   function setMode(m) {
     mode = m;
@@ -1386,7 +1333,7 @@ import { createAudioEngine } from './audio/sound-engine';
   function startGame() {
     if (!ready) return;
     audioInit();
-    if (dead) { dead = false; respawn(); hp = MAXHP; hunger = 20; sat = 5; exhaust = 0; sinceHurt = 99; clearMobs(); updateHearts(); updateFood(); }
+    if (dead) { dead = false; respawn(); hp = MAXHP; hunger = 20; sat = 5; exhaust = 0; sinceHurt = 99; clearMobs(); updateHearts(); renderFood(); }
     overlay.classList.add('hidden');
     playing = true;
     if (mode === 'spectator') showHint('Space up, Shift down, scroll changes speed. You fly where you look.', 5000);
@@ -1582,7 +1529,7 @@ import { createAudioEngine } from './audio/sound-engine';
   }, function (i) { return i === 1 ? Object.keys(itemMap()) : []; });
   defCmd(['clear'], '/clear', 'Empty your backpack', function () { for (const k in inv) delete inv[k]; updateHotbar(false); return 'Backpack cleared'; });
   defCmd(['heal'], '/heal', 'Restore your health', function () { hp = MAXHP; sinceHurt = 99; updateHearts(); return 'You feel healthy again'; });
-  defCmd(['feed'], '/feed', 'Fill your hunger bar', function () { hunger = 20; sat = 5; exhaust = 0; updateFood(); return 'You are no longer hungry'; });
+  defCmd(['feed'], '/feed', 'Fill your hunger bar', function () { hunger = 20; sat = 5; exhaust = 0; renderFood(); return 'You are no longer hungry'; });
   defCmd(['fly'], '/fly', 'Toggle flying (Creative)', function () {
     if (mode !== 'creative') throw new Error('Flying is a Creative mode ability');
     toggleFly(); return player.fly ? 'Flying on' : 'Flying off';
@@ -1872,7 +1819,7 @@ import { createAudioEngine } from './audio/sound-engine';
     if (!relics.length) createRelics();
     setMode(mode);
     hp = (m.hp > 0) ? m.hp : MAXHP; updateHearts();
-    hunger = (typeof m.hunger === 'number') ? m.hunger : 20; sat = (typeof m.sat === 'number') ? m.sat : 5; updateFood();
+    hunger = (typeof m.hunger === 'number') ? m.hunger : 20; sat = (typeof m.sat === 'number') ? m.sat : 5; renderFood();
     (m.golems || []).forEach(function (g) {
       if (!KINDS[g.kind] || Math.hypot(g.x - player.x, g.z - player.z) > 60 || !chunkAt(Math.floor(g.x) >> 4, Math.floor(g.z) >> 4)) return;
       const gm = addMob(g.kind, g.x, g.y, g.z, null); gm.hp = g.hp; gm.persist = true; gm.hx = g.hx; gm.hz = g.hz;
