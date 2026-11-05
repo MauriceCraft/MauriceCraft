@@ -10,6 +10,8 @@ export interface ChunkLifecycleDependencies {
   setSeed: (seed: number) => void;
   setGeneratorVersion?: (version: number) => void;
   clearStructures: () => void;
+  onChunkLoaded?: (cx: number, cz: number, data: Uint8Array) => void;
+  onWorldReset?: () => void;
   chunkAt: (cx: number, cz: number) => WritableChunk | null;
   resetChunkCache: () => void;
   generateChunkData: (cx: number, cz: number) => Uint8Array;
@@ -31,18 +33,21 @@ function genChunk(cx: number, cz: number): WritableChunk {
   if (sv) {
     const sc = { cx: cx, cz: cz, data: new Uint8Array(sv), mesh: null, meshed: false, edited: true, dirty: false };
     chunks.set(ckey(cx, cz), sc); resetChunkCache();
+    deps.onChunkLoaded?.(cx, cz, sc.data);
     return sc;
   }
   const data = generateChunkData(cx, cz);
   const generated = { cx, cz, data, mesh: null, meshed: false, edited: false, dirty: false };
   chunks.set(ckey(cx, cz), generated);
   resetChunkCache();
+  deps.onChunkLoaded?.(cx, cz, data);
   return generated;
 }
 function getOrGen(cx: number, cz: number): WritableChunk { return chunkAt(cx, cz) || genChunk(cx, cz); }
 function topY(x: number, z: number): number { for (let y = WORLD_HEIGHT - 1; y >= 0; y--) if (solid(get(x, y, z))) return y; return 0; }
 
 function resetWorld(newSeed: number, ox: number, oz: number, generatorVersion?: number): void {
+  deps.onWorldReset?.();
   chunks.forEach(function (c) { disposeMesh(c); });
   chunks.clear(); resetChunkCache();
   deps.setSeed(newSeed);

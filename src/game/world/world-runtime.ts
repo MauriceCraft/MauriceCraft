@@ -6,6 +6,7 @@ import { createChunkStreamer } from './chunk-streamer';
 import { createStructureRegions } from './structure-regions';
 import { createStructureBuilders } from './structure-builders';
 import { fbm } from './noise';
+import { createFluidSimulator } from './fluid-simulator';
 import { biomeAt, biomeHeightAt } from './biomes';
 import { createGameRenderer } from '../rendering/game-renderer';
 import { createChunkMesher } from '../rendering/chunk-mesher';
@@ -43,7 +44,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
   const renderer = createGameRenderer(toolTile);
   const { scene, mat, torchMat, glowMat } = renderer;
   const chunks = new Map<number, WritableChunk>();
-  const { chunkAt, resetChunkCache, getBlock: get, setBlock, inBounds } =
+  const { chunkAt, resetChunkCache, getBlock: get, setBlock: rawSetBlock, inBounds } =
     createBlockAccess(chunks, WORLD_HEIGHT);
   const mesher = createChunkMesher({
     scene, mat, torchMat, glowMat, chunks, chunkAt,
@@ -53,6 +54,16 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     waterId: WATER, lavaId: LAVA,
   });
   const { disposeMesh, buildChunk } = mesher;
+  const fluids = createFluidSimulator({
+    height: WORLD_HEIGHT, getBlock: get, setBlock: rawSetBlock,
+    isLoaded: (x, z) => Boolean(chunkAt(x >> 4, z >> 4)),
+    refreshChunk: (cx, cz) => { if (chunkAt(cx, cz)?.meshed) buildChunk(cx, cz); },
+    getDimension: deps.getDimension, getGeneratorVersion: deps.getGeneratorVersion,
+  });
+  const setBlock = (x: number, y: number, z: number, block: number): void => {
+    rawSetBlock(x, y, z, block);
+    fluids.notify(x, y, z);
+  };
   const savedChunks = new Map<number, Uint8Array>();
 
   function heightAt(x: number, z: number): number {
@@ -93,6 +104,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     getDimension: deps.getDimension, setSeed: deps.setSeed,
     setGeneratorVersion: deps.setGeneratorVersion,
     clearStructures: () => regions.structCache.clear(),
+    onChunkLoaded: fluids.onChunkLoaded, onWorldReset: fluids.reset,
     chunkAt, resetChunkCache, generateChunkData, buildChunk,
     disposeMesh, solid, getBlock: get,
   });
@@ -109,7 +121,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     ...lifecycle,
     chunks, savedChunks, hotbar, toolWear,
     chunkAt, resetChunkCache, get, setBlock, inBounds,
-    heightAt, generateChunkData, streamChunks,
+    heightAt, generateChunkData, streamChunks, stepFluids: fluids.tick,
     STRUCTURE_REGION_SIZE,
   };
 }

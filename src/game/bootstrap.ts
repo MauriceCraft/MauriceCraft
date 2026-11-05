@@ -520,6 +520,7 @@ const frame = createFrameLoop({
   isPlaying: () => playing,
   streamChunks,
   update,
+  updateFluids: worldServices.stepFluids,
   updateIdleCamera: () => {
     camera.position.set(player.x, player.y + EYE_HEIGHT, player.z); camera.rotation.set(player.pitch, player.yaw, 0);
   },

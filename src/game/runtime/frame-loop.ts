@@ -6,6 +6,7 @@ export interface FrameLoopDependencies {
   isPlaying: () => boolean;
   streamChunks: () => void;
   update: (deltaSeconds: number, now: number) => void;
+  updateFluids?: (deltaSeconds: number) => void;
   updateIdleCamera: () => void;
   daylight: (deltaSeconds: number) => void;
   updateWeather: (deltaSeconds: number) => void;
@@ -31,7 +32,7 @@ export function createFrameLoop(deps: FrameLoopDependencies, startTime: number):
     last = now;
     if (deps.isReady()) {
       deps.streamChunks();
-      if (deps.isPlaying()) deps.update(dt, now);
+      if (deps.isPlaying()) { deps.update(dt, now); deps.updateFluids?.(dt); }
       else deps.updateIdleCamera();
       deps.daylight(dt);
       deps.updateWeather(dt);
