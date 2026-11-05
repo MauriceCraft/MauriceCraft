@@ -40,6 +40,12 @@ import { createWorldRestore } from './session/world-restore';
 import { createAudioEngine } from './audio/sound-engine';
 
 
+function requireGameElement(id: string): HTMLElement {
+  const element = document.getElementById(id);
+  if (!element) throw new Error('Missing game element #' + id);
+  return element;
+}
+
 /* ---------- World services (typed terrain + renderer + chunk stores) ---------- */
 const WORLD_HEIGHT = 48, CHUNK_SIZE = 16, SEA_LEVEL = 14, VIEW_DISTANCE = 5;
 let seed = 1;
@@ -282,8 +288,7 @@ const { heldTool, toolSpeed, canCollect, wearTool, attackDamage, spendItem } = c
   flashName, showHint: (message, ms) => showHint(message, ms),
   playSound: event => sfx(event), exert,
 });
-const fadeEl = document.getElementById('fade');
-if (!fadeEl) throw new Error('Missing game fade overlay');
+const fadeEl = requireGameElement('fade');
 const { doBreak, useBed, useSelected, healGolem } = createBlockInteractions({
   camera, player, mobs, portals, hotbar, inventory: inv,
   names: NAMES, tools: TOOLS, kinds: KINDS, jobs: JOBS,
@@ -335,7 +340,7 @@ const { handleActions, resetMine } = createActionController({
   getBlockHit: () => blockHit,
   getTarget: () => target,
   raycastMobs, getBlock: get, breakTimes: BREAK_TIME, toolSpeed, doBreak,
-  attackMob, canInteract, openTrade, healGolem, isBed, useBed,
+  attackMob, canInteract, openTrade: mob => openTrade(mob as SpawnMob & { job: string }), healGolem, isBed, useBed,
   craftingTableId: CTABLE, openCraft, useSelected,
 });
 
@@ -388,7 +393,7 @@ const update = createGameTick({
 });
 
 /* ---------- Day / night ---------- */
-const boltEl = document.getElementById('bolt');
+const boltEl = requireGameElement('bolt');
 const { WEATHER_LABEL, setWeather, updateWeather, updateRain, updateRainSound, daylight } =
   createWeatherSystem({
     scene, camera, sun, moon, dayUniform, glowMat,
@@ -406,7 +411,7 @@ const { WEATHER_LABEL, setWeather, updateWeather, updateRain, updateRainSound, d
     sound: Snd, getPlayer: () => player, getDimension: () => dimension,
     hasChunk: (chunkX, chunkZ) => !!chunkAt(chunkX, chunkZ), topY, hasHealth,
     damagePlayer: (damage) => damagePlayer(damage),
-    getMobs: () => mobs, damageMob: (mob, damage) => { damageMob(mob, damage); },
+    getMobs: () => mobs, damageMob: (mob, damage) => { damageMob(mob as SpawnMob, damage); },
     updateWeatherUI: () => updateWeatherUI(),
     setLightningOpacity: (opacity) => { boltEl.style.opacity = String(opacity); },
     tone, hiss,
