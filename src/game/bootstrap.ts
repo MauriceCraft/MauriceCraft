@@ -2,10 +2,12 @@
 import * as THREE from 'three';
 import { createFrameLoop, startFrameLoop } from './runtime/frame-loop';
 import { createGameTick } from './runtime/game-tick';
+import { DIFF, MAX_HEALTH } from './runtime/game-balance';
 import { createGameSessionControls } from './runtime/game-session-controls';
 import { showStartupFailure } from '../startup/startup-health';
 import { createPlayerMovement } from './player/player-movement';
 import { createRespawn } from './player/player-respawn';
+import { exertPlayer } from './player/hunger';
 import { createWeatherSystem } from './rendering/weather-system';
 import { JOBS, JOB_NAMES } from './entities/mob-models';
 import { createMobRuntime } from './entities/mob-runtime';
@@ -80,13 +82,6 @@ let hunger = 20, sat = 5, exhaust = 0, starveT = 0, shownHunger = -1;
 let weather: WeatherMode = 'clear';
 let weatherT = 420, rainLevel = 0, rainTarget = 0, lightningT = 0, nextBolt = 8;   // rain and thunderstorms   // Survival hunger: 20 = full   // bed respawn point, sleeping timer, raid omen
 // Difficulty only matters in Survival and Adventure (the modes with health and monsters)
-const DIFF = {
-  peaceful: { label: 'Peaceful', cap: 0, every: 99, dmg: 0, speed: 1, aggro: 32, fuse: 1.5, shoot: 1, regenAfter: 1, regenEvery: 1, raid: 0, patrol: [1e9, 1e9] },
-  easy: { label: 'Easy', cap: 4, every: 3.4, dmg: 0.6, speed: 0.9, aggro: 24, fuse: 1.9, shoot: 1.35, regenAfter: 4, regenEvery: 2.5, raid: 0.6, patrol: [150, 240] },
-  normal: { label: 'Normal', cap: 8, every: 2.2, dmg: 1, speed: 1, aggro: 32, fuse: 1.5, shoot: 1, regenAfter: 6, regenEvery: 3, raid: 1, patrol: [90, 160] },
-  hard: { label: 'Hard', cap: 12, every: 1.6, dmg: 1.5, speed: 1.15, aggro: 42, fuse: 1.1, shoot: 0.75, regenAfter: 9, regenEvery: 4.5, raid: 1.5, patrol: [60, 110] }
-};
-const MAX_HEALTH = 20;
 let hp = MAX_HEALTH, sinceHurt = 99, regenT = 0, dead = false;
 const inv: Record<number, number> = {};
 let specSpeed = 1;
@@ -264,14 +259,7 @@ const {
 });
 
 // Hunger drains slowly with activity (a lot when sprinting). Eat to refill it; at zero you starve.
-function exert(n: number): void {
-  if (mode !== 'survival' || difficulty === 'peaceful') return;
-  exhaust += n;
-  while (exhaust >= 4) {
-    exhaust -= 4;
-    if (sat > 0) sat = Math.max(0, sat - 1); else hunger = Math.max(0, hunger - 1);
-  }
-}
+function exert(n: number): void { exertPlayer(gameState, n); }
 // Hunger and health displays are provided by the HUD adapter.
 function renderFood(): void { shownHunger = hunger; updateFood(); }
 function damagePlayer(n: number, scaled = false): void {
