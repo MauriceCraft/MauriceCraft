@@ -93,6 +93,37 @@ test('the in-game portal command builds a frame without exceptions', async ({ pa
 });
 
 
+
+test('time-of-day survives the weather refactor and can be changed in game', async ({ page }) => {
+  const runtimeErrors: string[] = [];
+  page.on('pageerror', error => runtimeErrors.push(error.message));
+  await page.goto('./');
+  // Bootstrap must have initialized, not merely rendered its static Loading button.
+  await expect(page.locator('#play')).toBeEnabled({ timeout: 15_000 });
+  await page.locator('#play').click();
+  await expect(page.locator('#overlay')).toBeHidden();
+
+  async function enterCommand(command: string): Promise<void> {
+    if (await page.locator('#btnCmd').isVisible()) {
+      await page.locator('#btnCmd').tap();
+    } else {
+      await page.keyboard.press('t');
+    }
+    const input = page.locator('#cmdinput');
+    await expect(input).toBeVisible();
+    await input.fill(command);
+    await input.press('Enter');
+  }
+
+  await enterCommand('/time query');
+  await expect(page.locator('#chatlog')).toContainText('ticks into the day');
+  await enterCommand('/time set night');
+  await expect(page.locator('#chatlog')).toContainText('Time set to 13000 ticks');
+  await enterCommand('/time query');
+  await expect(page.locator('#chatlog')).toContainText('night');
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('game canvas remains sized to the viewport after resizing', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', err => errors.push(err.message));
