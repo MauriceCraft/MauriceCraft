@@ -51,7 +51,7 @@ register(['help', '?'], '/help [command]', 'List the commands, or explain one', 
     if (!c) throw new Error('No command called "' + a[0] + '"');
     return c.usage + '  -  ' + c.desc;
   }
-  const names = []; Object.keys(CMDS).forEach(function (k) { if (CMDS[k].name === k) names.push(k); });
+  const names: string[] = []; Object.keys(CMDS).forEach(function (k) { if (CMDS[k].name === k) names.push(k); });
   return 'Commands: ' + names.sort().map(function (n) { return '/' + n; }).join('  ') + '   (try /help <command>)';
 }, function () { return Object.keys(CMDS); });
 
