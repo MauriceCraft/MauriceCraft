@@ -21,7 +21,8 @@ function fixture() {
   });
   const deps: MobSpawnDependencies = {
     mobs, player,
-    kinds: { zombie: { r: 0.3, h: 1.8, hostile: true }, cow: { r: 0.45, h: 1.5 }, chicken: { r: 0.2, h: 0.8 },
+    kinds: { zombie: { r: 0.3, h: 1.8, hostile: true }, creeper: { r: 0.3, h: 1.8, hostile: true },
+      skeleton: { r: 0.3, h: 1.95, hostile: true }, spider: { r: 0.5, h: 0.8, hostile: true }, cow: { r: 0.45, h: 1.5 }, chicken: { r: 0.2, h: 0.8 },
       pig: { r: 0.4, h: 1 }, sheep: { r: 0.4, h: 1 }, villager: { r: 0.3, h: 1.95 },
       irongolem: { r: 0.45, h: 2.7 }, pillager: { r: 0.3, h: 1.95, hostile: true },
       vindicator: { r: 0.3, h: 1.95, hostile: true } },
