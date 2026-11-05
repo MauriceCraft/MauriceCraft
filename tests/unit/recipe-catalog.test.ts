@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createBlockCatalog } from '../../src/game/world/block-catalog';
 import { createRecipeCatalog } from '../../src/game/crafting/recipe-catalog';
+import { createRecipeMatcher } from '../../src/game/crafting/recipes';
 
 describe('crafting catalog compatibility', () => {
   const blocks = createBlockCatalog();
@@ -26,6 +27,21 @@ describe('crafting catalog compatibility', () => {
     // Traditional two-plank recipe still works in the 2x2 crafting grid.
     expect(recipes).toContainEqual({ out: blocks.STICK, n: 4,
       shape: ['p', 'p'], key: { p: blocks.PLANKS } });
+  });
+
+  it('lets recipe-book choices resolve the log-to-planks / log-to-sticks conflict', () => {
+    const { matchRecipe, recipeCounts } = createRecipeMatcher(recipes);
+    const log = blocks.BIRCH_WOOD;
+    const normal = matchRecipe([log, 0, 0, 0], 2);
+    const stickChoice = recipes.find(recipe => recipe.out === blocks.STICK &&
+      recipe.shapeless?.length === 1 && recipe.shapeless[0] === log);
+    expect(normal?.out).toBe(blocks.PLANKS);
+    expect(stickChoice).toBeDefined();
+    const selected = matchRecipe([log, 0, 0, 0], 2, stickChoice);
+    expect(selected?.out).toBe(blocks.STICK);
+    expect(selected?.n).toBe(4);
+    expect(recipeCounts(selected!)).toEqual({ [log]: 1 });
+    expect(matchRecipe([blocks.WOOD, 0, 0, 0], 2, stickChoice)?.out).toBe(blocks.PLANKS);
   });
 
   it('preserves ore smelting and multi-ingredient recipes', () => {

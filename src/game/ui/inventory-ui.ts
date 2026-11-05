@@ -82,7 +82,9 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
   const craftBtn = element('craftBtn') as HTMLButtonElement;
   const craftItems = element('craftItems');
   const craftBook = element('craftBook');
-  const craftState: { size: number; grid: number[]; sel: number } = { size: 2, grid: [0, 0, 0, 0, 0, 0, 0, 0, 0], sel: 0 };
+  const craftState: { size: number; grid: number[]; sel: number; preferred: Recipe | null } = {
+    size: 2, grid: [0, 0, 0, 0, 0, 0, 0, 0, 0], sel: 0, preferred: null,
+  };
   const { recipePattern, recipeCounts, matchRecipe } = createRecipeMatcher(RECIPES);
   function gridCounts(size: number): Record<number, number> {
     const c: Record<number, number> = {};
@@ -91,7 +93,7 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
   }
   function hasAll(counts: Record<number, number>): boolean { for (const k in counts) if ((inv[k] || 0) < counts[k]) return false; return true; }
   function doCraft(): void {
-    const m = matchRecipe(craftState.grid, craftState.size), counts = gridCounts(craftState.size);
+    const m = matchRecipe(craftState.grid, craftState.size, craftState.preferred), counts = gridCounts(craftState.size);
     if (!m) return;
     if (!hasAll(counts)) { craftMsg.textContent = 'You are missing some of those items.'; sfx('no'); return; }
     for (const k in counts) inv[k] -= counts[k];
@@ -102,6 +104,7 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
   function placeCraftItem(id: number): void {
     const size = craftState.size, used = gridCounts(size)[id] || 0;
     if (used >= (inv[id] || 0)) { craftMsg.textContent = 'You have no more ' + NAMES[id].toLowerCase() + '.'; return; }
+    craftState.preferred = null;
     craftState.grid[craftState.sel] = id;
     for (let k = 1; k <= size * size; k++) { const j = (craftState.sel + k) % (size * size); if (!craftState.grid[j]) { craftState.sel = j; break; } }
     craftMsg.textContent = '';
@@ -117,7 +120,7 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
       if (pat.length > size || pat[0].length > size) { craftMsg.textContent = 'That needs a crafting table (3\u00d73 grid).'; return; }
       pat.forEach(function (row, ri) { row.forEach(function (id, ci) { g[ri * size + ci] = id; }); });
     }
-    craftState.grid = g; craftMsg.textContent = ''; renderCraft();
+    craftState.grid = g; craftState.preferred = r; craftMsg.textContent = ''; renderCraft();
   }
   function renderCraft(): void {
     const size = craftState.size, g = craftState.grid;
@@ -129,10 +132,15 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'ccell' + (craftState.sel === i ? ' on' : '');
       b.setAttribute('aria-label', 'Grid square ' + (i + 1) + (g[i] ? ', ' + NAMES[g[i]] : ', empty'));
       if (g[i]) b.appendChild(iconCanvas(g[i], 40));
-      b.addEventListener('click', function () { if (craftState.sel === i && g[i]) craftState.grid[i] = 0; else craftState.sel = i; renderCraft(); });
+      b.addEventListener('click', function () {
+        craftState.preferred = null;
+        if (craftState.sel === i && g[i]) craftState.grid[i] = 0;
+        else craftState.sel = i;
+        renderCraft();
+      });
       cgrid.appendChild(b);
     }
-    const m = matchRecipe(g, size), ok = !!m && hasAll(gridCounts(size));
+    const m = matchRecipe(g, size, craftState.preferred), ok = !!m && hasAll(gridCounts(size));
     cres.innerHTML = '';
     if (m) { cres.appendChild(iconCanvas(m.out, 40)); const t = document.createElement('span'); t.textContent = m.n + ' \u00d7 ' + NAMES[m.out]; cres.appendChild(t); }
     else cres.appendChild(document.createTextNode('No recipe'));
@@ -166,7 +174,8 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
   }
   function openCraft(size: number): void {
     if (getMode() !== 'survival') { showHint('Creative mode already has every item. Open the inventory with I.', 2400); return; }
-    craftState.size = size; craftState.grid = [0, 0, 0, 0, 0, 0, 0, 0, 0]; craftState.sel = 0;
+    craftState.size = size; craftState.grid = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    craftState.sel = 0; craftState.preferred = null;
     state.craftOpen = true; state.invOpen = true; state.playing = false; state.mining = state.placing = false; state.drag = null;
     for (const k in keys) keys[k] = false;
     touchMove.x = 0; touchMove.z = 0; state.touchJump = false; state.stick = null; state.lookT = null;
@@ -178,7 +187,10 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
     sfx('click');
   }
   craftBtn.addEventListener('click', doCraft);
-  element('craftClear').addEventListener('click', function () { craftState.grid = [0, 0, 0, 0, 0, 0, 0, 0, 0]; craftState.sel = 0; craftMsg.textContent = ''; renderCraft(); });
+  element('craftClear').addEventListener('click', function () {
+    craftState.grid = [0, 0, 0, 0, 0, 0, 0, 0, 0]; craftState.sel = 0;
+    craftState.preferred = null; craftMsg.textContent = ''; renderCraft();
+  });
   element('craftClose').addEventListener('click', function () { closeInventory(true); });
   window.addEventListener('keydown', function (e) { if (e.code === 'KeyC' && !e.repeat && state.playing && !state.invOpen) openCraft(2); });
   function assignSlot(b: number): void {

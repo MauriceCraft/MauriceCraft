@@ -30,21 +30,22 @@ export function createRecipeMatcher(recipes: readonly Recipe[]) {
     }));
     return counts;
   }
-  function matchRecipe(grid: readonly number[], size: number): Recipe | null {
+  function matchRecipe(grid: readonly number[], size: number, preferred?: Recipe | null): Recipe | null {
     const crop = cropGrid(grid, size);
     if (!crop) return null;
     const flat: number[] = [];
     crop.forEach(row => row.forEach(v => { if (v) flat.push(v); }));
     const key = flat.slice().sort((a, b) => a - b).join(',');
-    for (const r of recipes) {
-      if (r.shapeless) {
-        if (r.shapeless.slice().sort((a, b) => a - b).join(',') === key) return r;
-      } else {
-        const pattern = recipePattern(r);
-        if (samePattern(crop, pattern) ||
-            samePattern(crop, pattern.map(row => row.slice().reverse()))) return r;
-      }
+    // The recipe book can explicitly select an alternate output from the same
+    // ingredients (e.g., a log can become planks or sticks).
+    function matches(r: Recipe): boolean {
+      if (r.shapeless) return r.shapeless.slice().sort((a, b) => a - b).join(',') === key;
+      const pattern = recipePattern(r);
+      return samePattern(crop, pattern) ||
+        samePattern(crop, pattern.map(row => row.slice().reverse()));
     }
+    if (preferred && recipes.includes(preferred) && matches(preferred)) return preferred;
+    for (const r of recipes) if (matches(r)) return r;
     return null;
   }
   return { recipePattern, recipeCounts, matchRecipe };
