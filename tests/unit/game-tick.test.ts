@@ -49,7 +49,7 @@ describe('active gameplay tick', () => {
     f.tick(1, 1234);
     expect(f.calls).toEqual(['move', 'mobs', 'blasts', 'arrows', 'effects', 'music']);
     expect(f.handleActions).toHaveBeenCalledWith(0.05, 1234);
-    expect(f.camera.position.y).toBe(11.62);
+    expect(f.camera.position.y).toBeCloseTo(11.62, 9);
     expect(f.selection.visible).toBe(true);
     expect(f.setTarget).toHaveBeenCalledWith(expect.objectContaining({ x: 5 }));
   });
