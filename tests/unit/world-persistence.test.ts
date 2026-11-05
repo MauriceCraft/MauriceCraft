@@ -11,11 +11,12 @@ const chunk = (x: number, z: number, edited = true): WritableChunk => ({
 
 describe('save format compatibility', () => {
   it('preserves previous metadata while copying player state and persistent golems', () => {
+    const hotbar = [1, 2, 3];
     const state: WorldSnapshotState = {
       dimension: 'overworld', enderDragonDefeated: false, portals: [],
       mode: 'survival', difficulty: 'normal', spawn: null, omen: true,
       hunger: 13, satiety: 4, weather: { w: 'rain', t: 100, r: 0.7 },
-      timeOfDay: 0.65, health: 9, selected: 2, hotbar: [1, 2, 3],
+      timeOfDay: 0.65, health: 9, selected: 2, hotbar,
       inventory: { 3: 99 }, player: { x: 2, y: 3, z: 4, yaw: 0, pitch: 0, fly: false },
       relics: [{ x: 6, y: 7, z: 8, got: true }], toolWear: { 110: 4 },
       golems: [
@@ -32,7 +33,7 @@ describe('save format compatibility', () => {
     expect(saved.tod).toBe(0.65);
     expect(saved.inv).toEqual({ 3: 99 });
     expect(saved.golems).toEqual([{ kind: 'irongolem', x: 1, y: 2, z: 3, hp: 19, hx: 1, hz: 3 }]);
-    state.hotbar[0] = 99;
+    hotbar[0] = 99;
     expect(saved.hotbar).toEqual([1, 2, 3]);
   });
 
