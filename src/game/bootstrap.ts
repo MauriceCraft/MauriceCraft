@@ -16,13 +16,9 @@ import { raycastBlocks } from './world/raycast';
 import { createCollisionEngine } from './world/collision';
 import { createToolUsage } from './items/tool-usage';
 import { createBlockInteractions } from './interactions/block-interactions';
-import { createRecipeMatcher } from './crafting/recipes';
-import { createRecipeCatalog } from './crafting/recipe-catalog';
-import { createInventoryUi } from './ui/inventory-ui';
-import { createInputControls } from './input/game-controls';
 import { createActionController } from './input/action-controller';
-import { createHud } from './ui/hud';
 import { createGameMenu, MODE_LABELS } from './ui/game-menu';
+import { createGameUiComposition } from './ui/game-ui-composition';
 import { coord } from './commands/coordinates';
 import { createCommandConsole } from './commands/command-console';
 import { registerWorldCommands } from './commands/world-commands';
@@ -182,15 +178,59 @@ const mine = { x: -1, y: -1, z: -1, t: 0 };
 const canInteract = () => mode === 'creative' || mode === 'survival';
 const hasHealth = () => mode === 'survival' || mode === 'adventure';
 
-/* ---------- Hotbar & hearts ---------- */
+/* ---------- Typed HUD, inventory, crafting and input composition ---------- */
+const inventoryUiState = {
+  get locked() { return locked; }, set locked(value) { locked = value; },
+  get fallback() { return fallback; }, set fallback(value) { fallback = value; },
+  get specSpeed() { return specSpeed; }, set specSpeed(value) { specSpeed = value; },
+  get pulseMine() { return pulseMine; }, set pulseMine(value) { pulseMine = value; },
+  get pulsePlace() { return pulsePlace; }, set pulsePlace(value) { pulsePlace = value; },
+  get mineCd() { return mineCd; }, set mineCd(value) { mineCd = value; },
+  get placeCd() { return placeCd; }, set placeCd(value) { placeCd = value; },
+  get selected() { return selected; }, set selected(value) { selected = value; },
+  get playing() { return playing; }, set playing(value) { playing = value; },
+  get invOpen() { return invOpen; }, set invOpen(value) { invOpen = value; },
+  get tradeOpen() { return tradeOpen; }, set tradeOpen(value) { tradeOpen = value; },
+  get craftOpen() { return craftOpen; }, set craftOpen(value) { craftOpen = value; },
+  get cmdOpen() { return cmdOpen; }, set cmdOpen(value) { cmdOpen = value; },
+  get mining() { return mining; }, set mining(value) { mining = value; },
+  get placing() { return placing; }, set placing(value) { placing = value; },
+  get drag() { return drag; }, set drag(value) { drag = value; },
+  get touchJump() { return touchJump; }, set touchJump(value) { touchJump = value; },
+  get stick() { return stick; }, set stick(value) { stick = value; },
+  get lookT() { return lookT; }, set lookT(value) { lookT = value; },
+};
+
 const { hotbarEl, heartsEl, foodEl, flashEl, mineBar,
-  updateHotbar, flashName, updateFood, updateHearts } = createHud({
-  hotbar, inventory: inv, names: NAMES, atlasCanvas, tileOf,
+  updateHotbar, flashName, updateFood, updateHearts,
+  openCraft, renderCraft, openInventory, closeInventory, renderInventory,
+  openTrade, renderTrade, touchUI, jumpButton: bJump, placeButton: bPlace,
+  flyButton: bFly, inventoryButton: bInv, toggleFly } = createGameUiComposition({
+  state: inventoryUiState, player, canvas, atlasCanvas, tileOf,
+  inventory: inv, hotbar, allBlocks: ALL_BLOCKS, names: NAMES,
   tools: TOOLS, toolMax: TOOL_MAX, toolWear,
-  getMode: () => mode, getSelected: () => selected,
-  setSelected: slot => { selected = slot; },
-  getHunger: () => hunger, getHealth: () => hp,
-  canInteract, maxHealth: MAX_HEALTH,
+  recipeItems: { BED, BEEF, BONE, BRICK, CHICKEN, COAL, COBBLE, COOKED,
+    COPPER_BLOCK, COPPER_INGOT, CTABLE, DIAMOND, DIAMOND_BLOCK, DIRT,
+    DYNAMITE, EMERALD, FEATHER, FLINT, GOLD, GRAVEL, GUNPOWDER,
+    IRON_BLOCK, IRON_INGOT, LEATHER, MUTTON, PLANKS, PORK,
+    RAW_COPPER, RAW_IRON, SAND, SANDSTONE, STICK, STONE,
+    STONEBRICK, STRING, TNT, TORCH, WOOD, WOOL },
+  itemIds: { HAY, WOOL, BONE, EMERALD, COOKED, BED, BEEF, PORK,
+    CHICKEN, LEATHER, COBBLE, STONEBRICK, SANDSTONE, BRICK,
+    COPPER_INGOT, GUNPOWDER, TORCH, FLINT, DYNAMITE, TNT,
+    IRON_INGOT, COAL, GOLD, DIAMOND },
+  toolTiers: TOOL_TIERS, toolId, jobNames: JOB_NAMES,
+  keys, touchMove, isTouch, maxHealth: MAX_HEALTH,
+  getMode: () => mode, getModeLabel: () => MODE_LABELS[mode],
+  getSelected: () => selected, setSelected: slot => { selected = slot; },
+  getHealth: () => hp, setHealth: health => { hp = health; },
+  getHunger: () => hunger, canInteract, getFallback: () => fallback,
+  showHint: (message, milliseconds) => showHint(message, milliseconds),
+  playSound: event => sfx(event),
+  playSoundAt: (event, x, y, z) => sfxAt(event, x, y, z),
+  requestPointerLock: () => requestLock(), pauseGame: () => pause(),
+  getCommandBar: () => cmdBar,
+  openCommand: command => openCmd(command),
 });
 
 // Hunger drains slowly with activity (a lot when sprinting). Eat to refill it; at zero you starve.
@@ -215,56 +255,6 @@ function damagePlayer(n, scaled) {
   if (hp <= 0) die();
 }
 
-const RECIPES = createRecipeCatalog({
-  items: { BED, BEEF, BONE, BRICK, CHICKEN, COAL, COBBLE, COOKED, COPPER_BLOCK, COPPER_INGOT, CTABLE, DIAMOND, DIAMOND_BLOCK, DIRT, DYNAMITE, EMERALD, FEATHER, FLINT, GOLD, GRAVEL, GUNPOWDER, IRON_BLOCK, IRON_INGOT, LEATHER, MUTTON, PLANKS, PORK, RAW_COPPER, RAW_IRON, SAND, SANDSTONE, STICK, STONE, STONEBRICK, STRING, TNT, TORCH, WOOD, WOOL },
-  toolTiers: TOOL_TIERS, toolId,
-});
-const inventoryUiState = {
-  get locked() { return locked; }, set locked(value) { locked = value; },
-  get fallback() { return fallback; }, set fallback(value) { fallback = value; },
-  get specSpeed() { return specSpeed; }, set specSpeed(value) { specSpeed = value; },
-  get pulseMine() { return pulseMine; }, set pulseMine(value) { pulseMine = value; },
-  get pulsePlace() { return pulsePlace; }, set pulsePlace(value) { pulsePlace = value; },
-  get mineCd() { return mineCd; }, set mineCd(value) { mineCd = value; },
-  get placeCd() { return placeCd; }, set placeCd(value) { placeCd = value; },
-  get selected() { return selected; }, set selected(value) { selected = value; },
-  get playing() { return playing; }, set playing(value) { playing = value; },
-  get invOpen() { return invOpen; }, set invOpen(value) { invOpen = value; },
-  get tradeOpen() { return tradeOpen; }, set tradeOpen(value) { tradeOpen = value; },
-  get craftOpen() { return craftOpen; }, set craftOpen(value) { craftOpen = value; },
-  get cmdOpen() { return cmdOpen; }, set cmdOpen(value) { cmdOpen = value; },
-  get mining() { return mining; }, set mining(value) { mining = value; },
-  get placing() { return placing; }, set placing(value) { placing = value; },
-  get drag() { return drag; }, set drag(value) { drag = value; },
-  get touchJump() { return touchJump; }, set touchJump(value) { touchJump = value; },
-  get stick() { return stick; }, set stick(value) { stick = value; },
-  get lookT() { return lookT; }, set lookT(value) { lookT = value; },
-};
-const { openCraft, renderCraft, openInventory, closeInventory, renderInventory,
-  openTrade, renderTrade } = createInventoryUi({
-  state: inventoryUiState, atlasCanvas, tileOf, inventory: inv, hotbar,
-  allBlocks: ALL_BLOCKS, names: NAMES, recipes: RECIPES,
-  itemIds: { HAY, WOOL, BONE, EMERALD, COOKED, BED, BEEF, PORK, CHICKEN, LEATHER, COBBLE, STONEBRICK, SANDSTONE, BRICK, COPPER_INGOT, GUNPOWDER, TORCH, FLINT, DYNAMITE, TNT, IRON_INGOT, COAL, GOLD, DIAMOND },
-  jobNames: JOB_NAMES, keys, touchMove, isTouch,
-  getMode: () => mode, getModeLabel: () => LABEL[mode],
-  getFallback: () => fallback,
-  getHealth: () => hp, setHealth: health => { hp = health; },
-  maxHealth: MAX_HEALTH, updateHearts, updateHotbar,
-  showHint: (message, milliseconds) => showHint(message, milliseconds),
-  playSound: event => sfx(event),
-  playSoundAt: (event, x, y, z) => sfxAt(event, x, y, z),
-  requestPointerLock: () => requestLock(), pauseGame: () => pause(),
-  getCommandBar: () => cmdBar,
-});
-
-/* ---------- Keyboard / mouse / touch ---------- */
-const { touchUI, jumpButton: bJump, placeButton: bPlace, flyButton: bFly,
-  inventoryButton: bInv, toggleFly } = createInputControls({
-  canvas, keys, touchMove, player, state: inventoryUiState, isTouch,
-  getMode: () => mode, canInteract, updateHotbar,
-  showHint: (message, milliseconds) => showHint(message, milliseconds),
-  openInventory, openCommand: (command) => openCmd(command), pause,
-});
 
 /* ---------- Block interaction ---------- */
 const dirV = new THREE.Vector3();
