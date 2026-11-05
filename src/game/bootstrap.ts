@@ -48,6 +48,7 @@ import { createExplosionSystem } from './effects/explosions';
 import { createChunkMesher } from './rendering/chunk-mesher';
 import { openWorldStorage } from './storage/world-storage';
 import { createWorldSession } from './session/world-session';
+import { snapshotWorldState, collectWorldSaveBatch } from './session/world-persistence';
 import { createAudioEngine } from './audio/sound-engine';
 
 
@@ -813,49 +814,20 @@ registerGeneralCommands({
 
 /* ---------- Saved worlds: game state adapters ---------- */
 function snapshotWorld(world) {
-  const m = world;
-  m.dimension = dimension; m.enderDragonDefeated = enderDragonDefeated; m.portals = snapshotPortals(portals); m.mode = mode; m.difficulty = difficulty; m.spawn = spawnPoint; m.omen = omen; m.hunger = hunger; m.sat = sat; m.weather = { w: weather, t: weatherT, r: rainLevel }; m.lastPlayed = Date.now(); m.tod = tod; m.hp = dead ? MAX_HEALTH : hp;
-  m.selected = selected; m.hotbar = hotbar.slice(); m.inv = Object.assign({}, inv);
-  m.player = { x: player.x, y: player.y, z: player.z, yaw: player.yaw, pitch: player.pitch, fly: !!player.fly };
-  m.relics = relics.map(function (r) { return { x: r.x, y: r.y, z: r.z, got: r.got }; });
-  m.toolWear = Object.assign({}, toolWear);
-  m.golems = mobs.filter(function (g) { return g.golem && g.persist; }).map(function (g) { return { kind: g.kind, x: g.x, y: g.y, z: g.z, hp: g.hp, hx: g.hx, hz: g.hz }; });
-  return m;
+  return snapshotWorldState(world, {
+    dimension, enderDragonDefeated, portals: snapshotPortals(portals),
+    mode, difficulty, spawn: spawnPoint, omen, hunger, satiety: sat,
+    weather: { w: weather, t: weatherT, r: rainLevel },
+    timeOfDay: tod, health: dead ? MAX_HEALTH : hp,
+    selected, hotbar, inventory: inv,
+    player: { x: player.x, y: player.y, z: player.z, yaw: player.yaw,
+      pitch: player.pitch, fly: !!player.fly },
+    relics, toolWear, golems: mobs,
+  });
 }
 
-/**
- * Only modified chunk data is copied to IndexedDB. The world manager owns
- * transactions and retries; gameplay continues to own its chunk cache.
- */
 function collectSaveBatch(world) {
-  const dirtyChunks = [];
-  if (dimension === 'overworld') {
-    for (const chunk of chunks.values()) {
-      if (chunk.dirty) dirtyChunks.push(chunk);
-    }
-  }
-  const records = new Map();
-  for (const chunk of dirtyChunks) {
-    chunk.dirty = false;
-    records.set(ckey(chunk.cx, chunk.cz), {
-      k: world.id + ':' + chunk.cx + ',' + chunk.cz,
-      w: world.id, cx: chunk.cx, cz: chunk.cz, data: chunk.data.slice(),
-    });
-  }
-  if (dimension !== 'overworld') {
-    for (const [chunkKey, data] of savedChunks) {
-      const chunkX = ((chunkKey >> 16) << 16) >> 16;
-      const chunkZ = (chunkKey << 16) >> 16;
-      records.set(chunkKey, {
-        k: world.id + ':' + chunkX + ',' + chunkZ,
-        w: world.id, cx: chunkX, cz: chunkZ, data: data.slice(),
-      });
-    }
-  }
-  return {
-    records: [...records.values()],
-    restoreDirty: () => { for (const chunk of dirtyChunks) chunk.dirty = true; },
-  };
+  return collectWorldSaveBatch(world, dimension, chunks, savedChunks);
 }
 
 // Forwarders are declarations so earlier gameplay modules can call them.
