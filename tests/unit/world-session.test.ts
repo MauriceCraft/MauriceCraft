@@ -22,13 +22,17 @@ describe('saved world session naming and history', () => {
     expect(nextWorldSeed(existing, () => 0.75)).toBe(0);
   });
 
-  it('accepts signed and unsigned seeds while treating blank as random', () => {
+  it('accepts reproducible word, phrase and numeric seeds', () => {
     expect(parseWorldSeedInput('')).toBeNull();
     expect(parseWorldSeedInput('  123456789 ')).toBe(123456789);
     expect(parseWorldSeedInput('0')).toBe(0);
     expect(parseWorldSeedInput('-1')).toBe(4294967295);
     expect(parseWorldSeedInput('4294967295')).toBe(4294967295);
-    for (const invalid of ['abc', '1.5', '0xff', '-2147483649', '4294967296', '1e3']) {
+    expect(parseWorldSeedInput('abc')).toBe(96354);
+    expect(parseWorldSeedInput(' MauriceCraft ')).toBe(parseWorldSeedInput('MauriceCraft'));
+    expect(parseWorldSeedInput('abc123')).not.toBe(parseWorldSeedInput('abc'));
+    expect(parseWorldSeedInput('Hello World')).not.toBe(parseWorldSeedInput('hello world'));
+    for (const invalid of ['-2147483649', '4294967296', 'a'.repeat(129)]) {
       expect(() => parseWorldSeedInput(invalid)).toThrow(RangeError);
     }
   });

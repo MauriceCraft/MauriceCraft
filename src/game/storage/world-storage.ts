@@ -8,6 +8,8 @@ export interface WorldRecord {
   id: string;
   name: string;
   seed: number;
+  /** Optional original phrase used to derive the numeric seed. */
+  seedText?: string;
   /** Missing on pre-biome worlds, which retain generator v1 forever. */
   generatorVersion?: number;
   created: number;

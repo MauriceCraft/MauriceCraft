@@ -74,7 +74,19 @@ test('new worlds accept a specified seed and preserve it across reloads', async 
   await page.locator('#worldSeed').fill('4294967296');
   await page.locator('#newworld').click();
   await expect(page.locator('.world')).toHaveCount(2);
-  await expect(page.locator('#worldSeed')).toHaveJSProperty('validationMessage', 'Seed must be between -2147483648 and 4294967295.');
+  await expect(page.locator('#worldSeed')).toHaveJSProperty('validationMessage', 'Numeric seeds must be between -2147483648 and 4294967295.');
+});
+
+test('phrase seeds are stored and displayed after reload', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.locator('#newworld')).toBeEnabled({ timeout: 15_000 });
+  await page.locator('#worldSeed').fill('MauriceCraft Lava Test');
+  await page.locator('#newworld').click();
+  await expect(page.locator('.world')).toHaveCount(2);
+  await expect(page.locator('.world').first()).toContainText('Seed MauriceCraft Lava Test');
+  await page.reload();
+  await expect(page.locator('#newworld')).toBeEnabled({ timeout: 15_000 });
+  await expect(page.locator('.world').first()).toContainText('Seed MauriceCraft Lava Test');
 });
 
 test('desktop and mobile can start playing', async ({ page, isMobile }) => {

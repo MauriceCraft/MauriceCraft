@@ -42,18 +42,26 @@ export function nextWorldSeed(worlds: readonly WorldRecord[], random: () => numb
   return seed;
 }
 
-/** Blank means random; negative 32-bit values use the same bits as unsigned seeds. */
+/**
+ * Text seeds use stable UTF-16 string hashing. Numeric seeds keep their prior
+ * signed/unsigned 32-bit meaning, so existing seed-sharing instructions work.
+ */
 export function parseWorldSeedInput(raw: string): number | null {
   const value = raw.trim();
   if (!value) return null;
-  if (!/^-?\d+$/.test(value)) {
-    throw new RangeError('Enter a whole-number seed, or leave this blank for a random world.');
+  if (value.length > 128) throw new RangeError('Keep seeds to 128 characters or fewer.');
+  if (/^-?\d+$/.test(value)) {
+    const seed = Number(value);
+    if (!Number.isSafeInteger(seed) || seed < -2147483648 || seed > 4294967295) {
+      throw new RangeError('Numeric seeds must be between -2147483648 and 4294967295.');
+    }
+    return seed >>> 0;
   }
-  const seed = Number(value);
-  if (!Number.isSafeInteger(seed) || seed < -2147483648 || seed > 4294967295) {
-    throw new RangeError('Seed must be between -2147483648 and 4294967295.');
+  let hash = 0;
+  for (let index = 0; index < value.length; index++) {
+    hash = (Math.imul(hash, 31) + value.charCodeAt(index)) | 0;
   }
-  return seed >>> 0;
+  return hash >>> 0;
 }
 
 export function nextWorldName(worlds: readonly WorldRecord[]): string {
@@ -138,7 +146,7 @@ export function createWorldSession(deps: WorldSessionDependencies) {
       const details = document.createElement('small');
       details.textContent = deps.modeLabel(world.mode) + ' · played ' +
         timeAgo(world.lastPlayed || world.created || Date.now()) +
-        ' · Seed ' + world.seed + ' · Terrain v' + (world.generatorVersion ?? 1);
+        ' · Seed ' + (world.seedText ?? world.seed) + ' · Terrain v' + (world.generatorVersion ?? 1);
       openButton.appendChild(details);
       openButton.addEventListener('click', () => {
         if (busy) return;
@@ -217,7 +225,7 @@ export function createWorldSession(deps: WorldSessionDependencies) {
     }
   }
 
-  async function newWorld(seedOverride: number | null = null): Promise<void> {
+  async function newWorld(seedOverride: number | null = null, seedText?: string): Promise<void> {
     setBusy(true, 'Building your world…');
     await saveWorld();
     deps.setWorldReady(false);
@@ -227,6 +235,7 @@ export function createWorldSession(deps: WorldSessionDependencies) {
       id: 'w' + now.toString(36) + Math.floor(Math.random() * 1296).toString(36),
       name: nextWorldName(worlds), seed: seedOverride ?? nextWorldSeed(worlds),
       generatorVersion: CURRENT_WORLD_GENERATOR_VERSION,
+      ...(seedText ? { seedText } : {}),
       created: now, lastPlayed: now,
     };
     currentWorld = world;
@@ -298,7 +307,8 @@ export function createWorldSession(deps: WorldSessionDependencies) {
       worldSeedInput.focus();
       return;
     }
-    void newWorld(seed).catch(error => showWorldLifecycleError(error));
+    void newWorld(seed, worldSeedInput.value.trim() || undefined)
+      .catch(error => showWorldLifecycleError(error));
   });
   function showWorldLifecycleError(error: unknown): void {
     console.error('MauriceCraft world operation failed:', error);
