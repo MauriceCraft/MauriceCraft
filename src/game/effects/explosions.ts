@@ -78,8 +78,8 @@ export function createExplosionSystem(deps: ExplosionDependencies) {
   function removeBlastAt(i: number): void {
     const b = blasts[i];
     scene.remove(b.mesh);
-    if (b.mat) b.mat.dispose();
-    if (b.tipMat) b.tipMat.dispose();
+    if (b.type === 'tnt') b.mat.dispose();
+    else b.tipMat.dispose();
     blasts.splice(i, 1);
   }
   function removeFxAt(i: number): void {
@@ -164,7 +164,8 @@ export function createExplosionSystem(deps: ExplosionDependencies) {
       const d = Math.hypot(b.x - x, b.y - y, b.z - z);
       if (d >= reach) return;
       const f = 1 - d / reach, dd = d || 1;
-      b.vx += (b.x - x) / dd * f * 8; b.vz += (b.z - z) / dd * f * 8; b.vy += 2 + f * 5; b.stuck = false; b.host = null;
+      b.vx += (b.x - x) / dd * f * 8; b.vz += (b.z - z) / dd * f * 8; b.vy += 2 + f * 5;
+      if (b.type === 'dyn') { b.stuck = false; b.host = null; }
     });
     increaseShake(Math.max(0, 1 - pd / 24));
     spawnBlastFx(x, y, z, rad);
