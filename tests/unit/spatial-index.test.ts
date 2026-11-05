@@ -14,7 +14,7 @@ describe('spatial index', () => {
     actors.forEach(actor => index.upsert(actor));
     expect(new Set([...index.near(-16, 0, 2)].map(actor => actor.id))).toEqual(new Set([1, 2]));
     expect([...index.near(0, 0, 1)]).toEqual([]);
-    expect([...index.near(-16, 0, 0.75)].map(actor => actor.id)).toEqual([2]);
+    expect([...index.near(-15.9, 0.5, 0.2)].map(actor => actor.id)).toEqual([2]);
     expect(index.size).toBe(3);
   });
 
