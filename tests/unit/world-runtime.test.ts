@@ -19,10 +19,11 @@ vi.mock('../../src/game/rendering/chunk-mesher', () => ({
 
 describe('world runtime wiring', () => {
   it('builds a coherent, cached world with stable block IDs and shared chunk access', () => {
-    let seed = 17;
+    let seed = 17, version = 1;
     const world = createWorldRuntime({
       height: 48, chunkSize: 16, seaLevel: 14, viewDistance: 5,
       getSeed: () => seed, setSeed: value => { seed = value; },
+      getGeneratorVersion: () => version, setGeneratorVersion: value => { version = value; },
       getDimension: () => 'overworld',
       getPlayer: () => ({ x: 0, z: 0 }),
     });
@@ -37,7 +38,8 @@ describe('world runtime wiring', () => {
     expect(world.get(3, 6, 4)).toBe(world.DIAMOND_BLOCK);
     expect(first.dirty).toBe(true);
     expect(world.chunks.size).toBe(1);
-    world.resetWorld(20, 0, 0);
+    world.resetWorld(20, 0, 0, 2);
+    expect(version).toBe(2);
     expect(seed).toBe(20);
     expect(disposeMesh).toHaveBeenCalled();
     expect(buildChunk).toHaveBeenCalled();
@@ -48,6 +50,7 @@ describe('world runtime wiring', () => {
     const world = createWorldRuntime({
       height: 48, chunkSize: 16, seaLevel: 14, viewDistance: 5,
       getSeed: () => 120, setSeed: () => undefined,
+      getGeneratorVersion: () => 1, setGeneratorVersion: () => undefined,
       getDimension: () => dimension,
       getPlayer: () => ({ x: 24, z: -16 }),
     });
