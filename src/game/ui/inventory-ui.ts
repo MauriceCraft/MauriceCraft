@@ -215,9 +215,9 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
     invHot.innerHTML = '';
     hotbar.forEach(function (b, i) {
       const s = document.createElement('button'); s.type = 'button';
-      s.className = 'slot' + (i === state.selected ? ' on' : '') + (surv && !(inv[b] > 0) ? ' empty' : '');
-      s.setAttribute('aria-label', NAMES[b] + ', slot ' + (i + 1));
-      s.appendChild(iconCanvas(b, 36));
+      s.className = 'slot' + (i === state.selected ? ' on' : '') + (!b || (surv && !(inv[b] > 0)) ? ' empty' : '');
+      s.setAttribute('aria-label', (b ? NAMES[b] : 'Empty') + ', slot ' + (i + 1));
+      if (b) s.appendChild(iconCanvas(b, 36));
       const n = document.createElement('span'); n.className = 'num'; n.textContent = String(i + 1); s.appendChild(n);
       if (surv && inv[b]) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = String(inv[b]); s.appendChild(c); }
       s.addEventListener('click', function () { state.selected = i; updateHotbar(false); renderInventory(); });

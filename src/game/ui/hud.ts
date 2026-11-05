@@ -47,14 +47,14 @@ export function createHud(deps: HudDependencies) {
     const button = document.createElement('button') as SlotButton;
     button.type = 'button';
     button.className = 'slot';
-    button.setAttribute('aria-label', deps.names[blockId] + ', slot ' + (slot + 1));
+    button.setAttribute('aria-label', (blockId ? deps.names[blockId] : 'Empty') + ', slot ' + (slot + 1));
     const canvas = document.createElement('canvas');
     canvas.width = 36;
     canvas.height = 36;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('HUD item icons need a 2D canvas');
     context.imageSmoothingEnabled = false;
-    context.drawImage(deps.atlasCanvas, (deps.tileOf(blockId) ?? 0) * 16, 0, 16, 16, 0, 0, 36, 36);
+    if (blockId) context.drawImage(deps.atlasCanvas, (deps.tileOf(blockId) ?? 0) * 16, 0, 16, 16, 0, 0, 36, 36);
     const number = document.createElement('span');
     number.className = 'num';
     number.textContent = String(slot + 1);
@@ -88,8 +88,8 @@ export function createHud(deps: HudDependencies) {
       const button = slotButtons[slot];
       const itemId = deps.hotbar[slot];
       button.context2d.clearRect(0, 0, 36, 36);
-      button.context2d.drawImage(deps.atlasCanvas, (deps.tileOf(itemId) ?? 0) * 16, 0, 16, 16, 0, 0, 36, 36);
-      button.setAttribute('aria-label', deps.names[itemId] + ', slot ' + (slot + 1));
+      if (itemId) button.context2d.drawImage(deps.atlasCanvas, (deps.tileOf(itemId) ?? 0) * 16, 0, 16, 16, 0, 0, 36, 36);
+      button.setAttribute('aria-label', (itemId ? deps.names[itemId] : 'Empty') + ', slot ' + (slot + 1));
       button.classList.toggle('on', slot === selected);
       button.countElement.textContent = survival ? String(deps.inventory[itemId] || '') : '';
       const tool = deps.tools[itemId];
@@ -100,10 +100,10 @@ export function createHud(deps: HudDependencies) {
         button.durabilityElement.style.background = durabilityRatio > 0.5 ? '#43c34a' :
           durabilityRatio > 0.2 ? '#e3c42f' : '#d9372b';
       } else button.durabilityElement.style.display = 'none';
-      button.classList.toggle('empty', survival && !(deps.inventory[itemId] > 0));
+      button.classList.toggle('empty', !itemId || (survival && !(deps.inventory[itemId] > 0)));
     }
     if (showName) {
-      blockName.textContent = deps.names[deps.hotbar[selected]];
+      blockName.textContent = deps.hotbar[selected] ? deps.names[deps.hotbar[selected]] : '';
       blockName.style.opacity = '1';
       clearTimeout(nameTimer);
       nameTimer = setTimeout(() => { blockName.style.opacity = '0'; }, 1400);

@@ -107,7 +107,7 @@ describe('saved-world restoration', () => {
     expect(f.state.ready).toBe(true);
     expect(f.inventory).toEqual({});
     expect(f.toolWear).toEqual({});
-    expect(f.hotbar).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(f.hotbar).toEqual(Array(9).fill(0));
   });
 
   it('loads defaults for missing fields in old saves and rejects unsupported dimensions', () => {

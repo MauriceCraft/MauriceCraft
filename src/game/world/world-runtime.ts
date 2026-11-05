@@ -44,7 +44,8 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     WILLOW_LEAVES, AUTUMN_LEAVES, MUD, FLOWERING_GRASS, toolTile, ALL_BLOCKS, TILES,
     ATLAS_N, BED_H, isBed, opq, solid,
   } = catalog;
-  const hotbar = ALL_BLOCKS.slice(0, 9);
+  // Hotbar slots are empty until the player explicitly assigns an item.
+  const hotbar = Array<number>(9).fill(0);
   const toolWear: Record<number, number> = {};
   const renderer = createGameRenderer(toolTile);
   const { scene, mat, torchMat, glowMat } = renderer;

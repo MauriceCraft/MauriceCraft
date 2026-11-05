@@ -197,6 +197,7 @@ function useBed(t: BlockPosition): void {
 // Right click / E: place a block, or use the item in the selected slot. Returns the cooldown to wait.
 function useSelected(): number {
   const it = hotbar[deps.getSelected()];
+  if (!it) return 0.22;
   if (it < 100) { doPlace(); return 0.22; }
   if (FOOD[it] !== undefined) return eatItem(it);
   if (it === DYNAMITE) return throwDynamite();
@@ -263,6 +264,7 @@ function detectObsidianPortal(px: number, py: number, pz: number): boolean {
 }
 
 function doPlace(): void {
+  if (!hotbar[deps.getSelected()]) return;
   const target = deps.getTarget();
   if (!target) return;
   const x = target.x + target.nx, y = target.y + target.ny, z = target.z + target.nz;

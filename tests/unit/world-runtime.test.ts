@@ -28,7 +28,7 @@ describe('world runtime wiring', () => {
       getPlayer: () => ({ x: 0, z: 0 }),
     });
     expect(world.STONE).toBe(3);
-    expect(world.hotbar).toHaveLength(9);
+    expect(world.hotbar).toEqual(Array(9).fill(0));
     expect(world.chunks.size).toBe(0);
     const first = world.getOrGen(0, 0);
     expect(first.data).toBeInstanceOf(Uint8Array);

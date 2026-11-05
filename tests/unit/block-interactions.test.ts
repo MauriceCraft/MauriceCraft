@@ -73,6 +73,15 @@ describe('block and item interactions', () => {
     expect(f.refreshAround).toHaveBeenCalledWith(0, 0, true);
   });
 
+  it('does not place blocks or change inventory when the selected hotbar slot is empty', () => {
+    const f = fixture();
+    f.hotbar[0] = 0;
+    f.setTarget({ x: 1, y: 0, z: 0, nx: 0, ny: 1, nz: 0 });
+    f.interactions.useSelected();
+    expect(f.setBlock).not.toHaveBeenCalled();
+    expect(f.inventory[0]).toBeUndefined();
+  });
+
   it('places ordinary blocks in creative without consuming inventory', () => {
     const f = fixture();
     f.setMode('creative');

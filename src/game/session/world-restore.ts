@@ -138,7 +138,8 @@ export function createWorldRestore(deps: WorldRestoreDependencies) {
     deps.respawn();
     deps.clearMobs();
     resetNumbers(inventory);
-    for (let i = 0; i < 9; i++) hotbar[i] = deps.allBlocks[i];
+    // Do not seed new worlds with free items or preselected Creative blocks.
+    for (let i = 0; i < 9; i++) hotbar[i] = 0;
     state.selected = 0;
     state.tod = 0.22;
     resetNumbers(toolWear);
