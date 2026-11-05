@@ -2,6 +2,7 @@
 // This legacy gameplay loop is being migrated to typed, focused modules.
 // Keep IndexedDB store names/keys and world serialization compatible.
 import * as THREE from 'three';
+import { createFrameLoop, startFrameLoop } from './runtime/frame-loop';
 import { showStartupFailure } from '../startup/startup-health';
 import { raycastActors } from './entities/actor-targeting';
 import { createMobCatalog } from './entities/mob-catalog';
@@ -1625,32 +1626,30 @@ const worldSession = createWorldSession({
 
 function init() { return worldSession.initialize(); }
 
-let frames = 0, fpsT = 0, fps = 0, infoT = 0;
-let last = performance.now();
-function frame(now) {
-  const dt = (now - last) / 1000; last = now;
-  if (ready) {
-    streamChunks();
-    if (playing) update(dt, now);
-    else { camera.position.set(player.x, player.y + EYE_HEIGHT, player.z); camera.rotation.set(player.pitch, player.yaw, 0); }
-    daylight(dt);
-    updateWeather(dt); updateRain(dt); updateRainSound(dt);
-    updateRelics(dt, now / 1000);
-    if (playing) {
-      frames++; fpsT += dt; infoT += dt;
-      if (fpsT >= 1) { fps = frames; frames = 0; fpsT = 0; }
-      if (infoT > 0.2) {
-        infoT = 0;
-        const state = mode === 'creative' ? (player.fly ? 'Flying' : 'Walking') : (isNight && hasHealth() ? 'Night' : (mode === 'spectator' ? 'x' + specSpeed.toFixed(2) : 'Day'));
+const frame = createFrameLoop({
+  isReady: () => ready,
+  isPlaying: () => playing,
+  streamChunks,
+  update,
+  updateIdleCamera: () => {
+    camera.position.set(player.x, player.y + EYE_HEIGHT, player.z); camera.rotation.set(player.pitch, player.yaw, 0);
+  },
+  daylight,
+  updateWeather,
+  updateRain,
+  updateRainSound,
+  updateRelics,
+  updateInfo: fps => {
+    const state = mode === 'creative' ? (player.fly ? 'Flying' : 'Walking') : (isNight && hasHealth() ? 'Night' : (mode === 'spectator' ? 'x' + specSpeed.toFixed(2) : 'Day'));
         infoEl.textContent = LABEL[mode] + (hasHealth() ? ' \u00b7 ' + DIFF[difficulty].label : '') + '  ' + state + '\nX ' + player.x.toFixed(1) + '  Y ' + player.y.toFixed(1) + '  Z ' + player.z.toFixed(1) + '\n' + fps + ' fps' + (weather === 'clear' ? '' : ' \u00b7 ' + WEATHER_LABEL[weather]) + '\nNearby: ' + nearestStructure();
-        if (mode === 'adventure') objEl.textContent = objectiveText();
-      }
-    }
-  }
-  renderer.render(scene, camera);
-  requestAnimationFrame(frame);
-}
+    if (mode === 'adventure') objEl.textContent = objectiveText();
+  },
+  render: () => renderer.render(scene, camera),
+}, performance.now());
 
-setMode('creative');
-setTimeout(() => { void init().catch(error => showStartupFailure(error)); }, 30);
-requestAnimationFrame(frame);
+/** Explicit application entry; importing this module no longer begins gameplay. */
+export function startGameApplication(): void {
+  setMode('creative');
+  setTimeout(() => { void init().catch(error => showStartupFailure(error)); }, 30);
+  startFrameLoop(frame);
+}
