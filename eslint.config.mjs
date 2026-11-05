@@ -1,9 +1,8 @@
 import tseslint from 'typescript-eslint';
 
-// Temporary exception: the original 4k-line single-file game remains in
-// bootstrap.ts until it can be untangled without breaking saved worlds.
+// All game source, including the composition entry, follows the same lint rules.
 export default tseslint.config(
-  { ignores: ['dist/**', 'coverage/**', 'test-results/**', 'playwright-report/**', 'src/game/bootstrap.ts'] },
+  { ignores: ['dist/**', 'coverage/**', 'test-results/**', 'playwright-report/**'] },
   ...tseslint.configs.recommended,
   {
     files: ['src/**/*.ts', 'tests/**/*.ts', '*.config.ts'],
