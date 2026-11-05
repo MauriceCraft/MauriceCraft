@@ -33,10 +33,10 @@ function fixture() {
 }
 
 describe('mob world population cycle', () => {
-  it('does not spawn daytime monsters and still manages animals and villagers', () => {
+  it('checks for cave spawns in daylight and still manages animals and villagers', () => {
     const f = fixture();
     f.updateMobs(2.1);
-    expect(f.trySpawnMob).not.toHaveBeenCalled();
+    expect(f.trySpawnMob).toHaveBeenCalledOnce();
     expect(f.trySpawnAnimals).toHaveBeenCalledTimes(1);
     expect(f.manageVillagers).toHaveBeenCalledTimes(1);
     expect(f.updateRaid).toHaveBeenCalledTimes(1);
