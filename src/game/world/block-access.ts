@@ -50,7 +50,8 @@ export function createBlockAccess<T extends WritableChunk>(
     chunk.torches = null;
   }
 
-  function inBounds(_x: number, y: number, _z: number): boolean {
+  function inBounds(...coordinates: [number, number, number]): boolean {
+    const y = coordinates[1];
     return y >= 0 && y < height;
   }
 
