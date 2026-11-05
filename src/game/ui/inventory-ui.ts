@@ -61,25 +61,27 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
 
   /* ---------- Inventory ---------- */
   const invEl = element('inv');
-  const invGrid = document.getElementById('invGrid');
-  const invTitle = document.getElementById('invTitle');
-  const invHelp = document.getElementById('invHelp');
-  const invMsg = document.getElementById('invMsg');
-  const craftEl = document.getElementById('craft');
-  const invHot = document.getElementById('invHotbar');
+  const invGrid = element('invGrid');
+  const invTitle = element('invTitle');
+  const invHelp = element('invHelp');
+  const invMsg = element('invMsg');
+  const craftEl = element('craft');
+  const invHot = element('invHotbar');
   const RECIPES = recipes;
   function iconCanvas(b: number, size: number): HTMLCanvasElement {
     const c = document.createElement('canvas'); c.width = size; c.height = size;
     const g = c.getContext('2d');
     if (!g) throw new Error('2D canvas unavailable for inventory icons');
     g.imageSmoothingEnabled = false;
-    g.drawImage(atlasCanvas, tileOf(b) * 16, 0, 16, 16, 0, 0, size, size);
+    g.drawImage(atlasCanvas, (tileOf(b) ?? 0) * 16, 0, 16, 16, 0, 0, size, size);
     return c;
   }
   /* ---------- Crafting grid (2x2 anywhere, 3x3 at a crafting table) ---------- */
-  const craftUi = document.getElementById('craftui'), craftTitle = document.getElementById('craftTitle'), craftHelp = document.getElementById('craftHelp');
-  const craftMsg = document.getElementById('craftMsg'), cgrid = document.getElementById('cgrid'), cres = document.getElementById('cres');
-  const craftBtn = element('craftBtn') as HTMLButtonElement, craftItems = document.getElementById('craftItems'), craftBook = document.getElementById('craftBook');
+  const craftUi = element('craftui'), craftTitle = element('craftTitle'), craftHelp = element('craftHelp');
+  const craftMsg = element('craftMsg'), cgrid = element('cgrid'), cres = element('cres');
+  const craftBtn = element('craftBtn') as HTMLButtonElement;
+  const craftItems = element('craftItems');
+  const craftBook = element('craftBook');
   const craftState: { size: number; grid: number[]; sel: number } = { size: 2, grid: [0, 0, 0, 0, 0, 0, 0, 0, 0], sel: 0 };
   const { recipePattern, recipeCounts, matchRecipe } = createRecipeMatcher(RECIPES);
   function gridCounts(size: number): Record<number, number> {
@@ -156,7 +158,7 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
       const row = document.createElement('div'); row.className = 'recipe'; if (!have) row.style.opacity = '0.6';
       const left = document.createElement('span'); left.style.display = 'inline-flex'; left.style.alignItems = 'center'; left.style.gap = '6px'; left.style.flexWrap = 'wrap';
       const ic = iconCanvas(r.out, 24); ic.style.width = '24px'; ic.style.height = '24px'; ic.style.imageRendering = 'pixelated'; left.appendChild(ic);
-      left.appendChild(document.createTextNode(r.n + ' \u00d7 ' + NAMES[r.out] + ' \u2190 ' + Object.keys(counts).map(function (k) { return counts[k] + ' ' + NAMES[k].toLowerCase(); }).join(', ')));
+      left.appendChild(document.createTextNode(r.n + ' \u00d7 ' + NAMES[r.out] + ' \u2190 ' + Object.keys(counts).map(function (k) { return counts[k] + ' ' + NAMES[Number(k)].toLowerCase(); }).join(', ')));
       const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn small'; btn.textContent = 'Fill';
       btn.addEventListener('click', function () { fillRecipe(r); });
       row.appendChild(left); row.appendChild(btn); craftBook.appendChild(row);
@@ -176,8 +178,8 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
     sfx('click');
   }
   craftBtn.addEventListener('click', doCraft);
-  document.getElementById('craftClear').addEventListener('click', function () { craftState.grid = [0, 0, 0, 0, 0, 0, 0, 0, 0]; craftState.sel = 0; craftMsg.textContent = ''; renderCraft(); });
-  document.getElementById('craftClose').addEventListener('click', function () { closeInventory(true); });
+  element('craftClear').addEventListener('click', function () { craftState.grid = [0, 0, 0, 0, 0, 0, 0, 0, 0]; craftState.sel = 0; craftMsg.textContent = ''; renderCraft(); });
+  element('craftClose').addEventListener('click', function () { closeInventory(true); });
   window.addEventListener('keydown', function (e) { if (e.code === 'KeyC' && !e.repeat && state.playing && !state.invOpen) openCraft(2); });
   function assignSlot(b: number): void {
     if (getMode() === 'survival' && !(inv[b] > 0)) { invMsg.textContent = 'You have no ' + NAMES[b].toLowerCase() + ' yet. Mine some first.'; return; }
@@ -223,7 +225,7 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
     });
   }
   function openInventory(): void {
-    if (!canInteract()) { showHint('There is no inventory in ' + getModeLabel() + ' mode.', 1800); return; }
+    if (getMode() !== 'creative' && getMode() !== 'survival') { showHint('There is no inventory in ' + getModeLabel() + ' mode.', 1800); return; }
     state.invOpen = true; state.playing = false; state.mining = state.placing = false; state.drag = null;
     for (const k in keys) keys[k] = false;
     touchMove.x = 0; touchMove.z = 0; state.touchJump = false; state.stick = null; state.lookT = null;
@@ -238,8 +240,8 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
     else pause();
   }
   // Villager trading (Survival only)
-  const tradeEl = document.getElementById('trade'), tradeTitle = document.getElementById('tradeTitle'), tradeSub = document.getElementById('tradeSub');
-  const tradeList = document.getElementById('tradeList'), tradeMsg = document.getElementById('tradeMsg');
+  const tradeEl = element('trade'), tradeTitle = element('tradeTitle'), tradeSub = element('tradeSub');
+  const tradeList = element('tradeList'), tradeMsg = element('tradeMsg');
   let tradeMob: TradingMob | null = null;
   const TRADES: Record<string, Trade[]> = {
     farmer: [{ give: [HAY, 3], get: [EMERALD, 1] }, { give: [WOOL, 2], get: [EMERALD, 1] }, { give: [BONE, 4], get: [EMERALD, 1] }, { give: [EMERALD, 1], get: [COOKED, 4] }, { give: [EMERALD, 2], get: [BED, 1] }],
@@ -290,8 +292,8 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
     if (document.pointerLockElement) document.exitPointerLock();
     sfxAt('villager', m.x, m.y + 1, m.z);
   }
-  document.getElementById('tradeClose').addEventListener('click', function () { closeInventory(true); });
-  document.getElementById('invClose').addEventListener('click', function () { closeInventory(true); });
+  element('tradeClose').addEventListener('click', function () { closeInventory(true); });
+  element('invClose').addEventListener('click', function () { closeInventory(true); });
   window.addEventListener('keydown', function (e) {
     if (e.code === 'KeyI' || e.code === 'Tab') {
       if (e.repeat) { if (state.invOpen || state.playing) e.preventDefault(); return; }
