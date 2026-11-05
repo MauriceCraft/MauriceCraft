@@ -5,6 +5,9 @@ describe('persisted item and block catalog', () => {
   it('preserves the historical block IDs and tool identifiers', () => {
     const catalog = createBlockCatalog();
     expect(catalog.OBSIDIAN).toBe(36);
+    expect(catalog.BIRCH_WOOD).toBe(41);
+    expect(catalog.WILLOW_LEAVES).toBe(46);
+    expect(catalog.FLOWERING_GRASS).toBe(49);
     expect([catalog.SNOW, catalog.PINE_LEAVES, catalog.RED_SAND, catalog.DARK_WOOD]).toEqual([37, 38, 39, 40]);
     expect(catalog.FLINT).toBe(111);
     expect(catalog.BED).toBe(19);
