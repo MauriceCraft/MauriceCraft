@@ -9,6 +9,7 @@ export interface MobActor extends MovableEntity {
   golem: boolean;
   persist: boolean;
   r: number; h: number;
+  hp: number;
   x: number; y: number; z: number;
   vx: number; vy: number; vz: number;
   onGround: boolean; hit: boolean;
