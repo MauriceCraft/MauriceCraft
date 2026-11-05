@@ -192,6 +192,8 @@ import { createAudioEngine } from './audio/sound-engine';
   /* ---------- Mobs: hostile monsters, villagers and farm animals ---------- */
   let enderDragonDefeated = false;
   const mobs = [];
+  const hostileActors = new SpatialIndex(16);
+  const defenders = new SpatialIndex(16);
   let activeMobIndexes = null;
   const rnd3 = n => 1 + Math.floor(Math.random() * n);
   const KINDS = {
@@ -468,8 +470,8 @@ import { createAudioEngine } from './audio/sound-engine';
     }
     if (dimension !== 'end') updateRaid(dt, D);
     // Index mobs once per frame instead of searching everyone for every AI actor.
-    const hostileActors = new SpatialIndex(16);
-    const defenders = new SpatialIndex(16);
+    hostileActors.clear();
+    defenders.clear();
     for (const mob of mobs) {
       if (mob.hostile) hostileActors.upsert(mob);
       if (mob.kind === 'villager' || mob.golem) defenders.upsert(mob);
