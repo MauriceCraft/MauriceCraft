@@ -189,8 +189,8 @@ const hasHealth = () => mode === 'survival' || mode === 'adventure';
 /* ---------- Typed HUD, inventory, crafting and input composition ---------- */
 /** Shared mutable state facade for UI, simulation, commands and saves. */
 const gameState = {
-  get mode() { return mode; }, set mode(value: string) { mode = value in MODE_LABELS ? value as GameMode : 'creative'; },
-  get difficulty() { return difficulty; }, set difficulty(value: string) { difficulty = value in DIFF ? value as Difficulty : 'normal'; },
+  get mode() { return mode; }, set mode(value: GameMode) { mode = value; },
+  get difficulty() { return difficulty; }, set difficulty(value: Difficulty) { difficulty = value; },
   get dimension() { return dimension; }, set dimension(value: string) { dimension = value as WorldDimension; },
   get enderDragonDefeated() { return enderDragonDefeated; }, set enderDragonDefeated(value: boolean) { enderDragonDefeated = value; },
   get spawnPoint() { return spawnPoint; }, set spawnPoint(value: typeof spawnPoint) { spawnPoint = value; },
