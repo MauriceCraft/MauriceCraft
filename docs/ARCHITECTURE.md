@@ -7,38 +7,40 @@ MauriceCraft is a plain TypeScript, Three.js and Vite game. You do **not** need 
 | Goal | Start here |
 | --- | --- |
 | New blocks, items, mining properties | `src/game/world/block-catalog.ts` |
-| Terrain, villages, structures, chunks | `src/game/world/` |
-| Mob appearances and species statistics | `src/game/entities/mob-models.ts` and `mob-catalog.ts` |
+| Terrain, villages, structures, chunks | `src/game/world/world-runtime.ts`, `chunk-generator.ts`, `chunk-lifecycle.ts`, `chunk-streamer.ts` and `structure-regions.ts` |
+| Creature definitions, combat, spawning, raids and projectiles | `src/game/entities/mob-catalog.ts`, `mob-runtime.ts`, `mob-spawning.ts`, `mob-simulation.ts`, `mob-world-cycle.ts`, `arrow-system.ts` |
 | Portal lighting and Nether travel | `src/game/portals/` |
-| Inventory, crafting, trading, health | `src/game/ui/` and `src/game/crafting/` |
-| Keyboard, mouse, phone controls | `src/game/input/game-controls.ts` |
+| Inventory, crafting, trading, health | `src/game/ui/game-ui-composition.ts`, `src/game/crafting/`, `src/game/items/tool-usage.ts`, `src/game/interactions/block-interactions.ts` |
+| Keyboard, mouse, phone controls and cooldowns | `src/game/input/game-controls.ts` and `action-controller.ts` |
 | Chat, autocomplete and commands | `src/game/commands/` |
-| Weather, sky, meshes, frame rendering | `src/game/rendering/` and `src/game/runtime/` |
+| Weather, sky, meshes, active simulation and frame scheduling | `src/game/rendering/`, `src/game/runtime/game-tick.ts`, `frame-loop.ts`, `game-session-controls.ts` |
 | Sounds and music | `src/game/audio/` |
-| World saving and loading | `src/game/session/world-session.ts` and `src/game/storage/world-storage.ts` |
+| World saving, restoration, storage and autosaves | `src/game/session/gameplay-world-session.ts`, `world-restore.ts`, `world-persistence.ts`, `world-session.ts`; `src/game/storage/world-storage.ts` |
 | Webpage and phone layout | `index.html`, `src/styles/global.css` |
 
-`src/main.ts` imports the CSS, monitors startup errors and launches the game module. `src/game/bootstrap.ts` remains a **temporary wiring adapter** for game systems and some unfinished gameplay extraction. It uses standard ES-module scope: the old immediately invoked function expression (IIFE) has been removed.
+`src/main.ts` imports the CSS, installs startup error monitoring, dynamically imports `src/game/bootstrap.ts`, and explicitly calls `startGameApplication()`. Importing the game no longer starts an IIFE or starts the animation loop by itself. `bootstrap.ts` is the integration/composition boundary, **not** the owner of new gameplay rules. Its state facade is shared with typed subsystems rather than copied into each component.
 
-New features belong in focused, **typed** modules with clear input/output interfaces, not new blocks of code in `bootstrap.ts`. Keep production TypeScript modules within the 500-line lint limit. The bootstrap's current `@ts-nocheck` exception must be removed once its remaining untyped gameplay is migrated; do not copy that exception into new files.
+New features belong in focused, strictly **typed** modules with clear input/output interfaces. The same 500-effective-line ESLint limit applies to every production TypeScript file, including the bootstrap. Avoid `@ts-nocheck`, `any`, module-import side effects, and storing runtime state in arbitrary global variables.
 
 ## System map
 
 ```mermaid
 flowchart TD
-    Main["main.ts: start and error handling"] --> Runtime["bootstrap.ts: temporary integration"]
-    Runtime --> World["world: terrain, chunks, structures, collisions"]
-    Runtime --> Entities["entities: models, definitions and spatial queries"]
-    Runtime --> Controls["input: keyboard, mouse and touch"]
-    Runtime --> HUD["ui: HUD, inventory, menu"]
-    Runtime --> Commands["commands: chat and parsing"]
-    Runtime --> Portals["portals: lighting, travel, persistence"]
-    Runtime --> Graphics["rendering: Three.js, meshes, sky"]
-    Runtime --> Loop["runtime: animation frame"]
-    Runtime --> Session["session: world lifecycle and save queue"]
-    Session --> Storage["storage: Dexie and IndexedDB"]
-    World --> Noise["seeded noise and structures"]
-    Controls --> HUD
+    Main["main.ts: startup monitor and explicit start"] --> Bootstrap["bootstrap.ts: typed wiring / shared state"]
+    Bootstrap --> World["world-runtime: blocks, terrain, structures, chunks"]
+    Bootstrap --> Entities["mob-runtime: creature systems, raids, arrows, effects"]
+    Bootstrap --> UI["game-ui-composition: HUD, inventory, crafting, touch"]
+    Bootstrap --> Action["action-controller: mining and attack intent"]
+    Bootstrap --> Tick["game-tick + frame-loop: simulation and rendering"]
+    Bootstrap --> Portal["portal-system: frames and dimension travel"]
+    Bootstrap --> Cmd["commands: parser and command registrations"]
+    Bootstrap --> Session["gameplay-world-session: restore and save batching"]
+    World --> WorldStorage["chunk-lifecycle and streaming"]
+    Entities --> World
+    Action --> Entities
+    Action --> World
+    Session --> IndexedDB["world-storage: Dexie / IndexedDB"]
+    UI --> Action
 ```
 
 ## Startup and loading
@@ -46,7 +48,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     Start["Load index.html"] --> Monitor["Install startup error monitor"]
-    Monitor --> Import["Import and start gameplay"]
+    Monitor --> Import["Import and explicitly start gameplay"]
     Import --> OpenDB["Open existing worlds in IndexedDB"]
     OpenDB --> World{"Saved world exists?"}
     World -- Yes --> Restore["Restore metadata and edited chunks"]

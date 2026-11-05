@@ -2,8 +2,8 @@
 
 1. Install Node.js 22 or newer (`.nvmrc` specifies 22) and npm.
 2. Run `npm ci` to install exactly the locked dependencies, then `npm run dev`.
-3. Run `npm run typecheck` and `npm run build` before merging any changes.
-4. Run the test suite once the testing stage is installed. New gameplay features should be accompanied by tests.
+3. Run `npm run check` before calling a change complete; this covers ESLint, strict TypeScript, unit coverage thresholds, and a production Vite build.
+4. Run `npx playwright install chromium` once, then `npm run test:e2e` for desktop/mobile startup, gameplay and persistence regressions. `npm run check:full` runs both stages.
 
 ## Design principles
 
@@ -13,4 +13,4 @@ Refactor in small steps, and confirm Creative, Survival, Adventure, Spectator, p
 
 ## Code quality
 
-Use TypeScript for new code, explicit types for exported functions, two-space indentation, single-purpose modules, no unexplained magic numbers, and clear ownership of persistent data. Do not extend the legacy `@ts-nocheck` exemption to new files. Make small meaningful commits. Treat changes to world generation, inventory IDs, saved worlds, and input handling as high risk.
+Use strict TypeScript, explicit dependency interfaces, two-space indentation, single-purpose modules, no unexplained magic numbers, and clear ownership of persistent data. The bootstrap only wires modules together. Do not use `@ts-nocheck` or bypass the 500-effective-line lint limit. Make small meaningful commits, and keep the architecture and testing docs current. Treat generation versions, inventory/block IDs, save data, and mobile input as high risk.

@@ -13,7 +13,7 @@ Open the [MauriceCraft website](https://maniator.github.io/MauriceCraft/). Try w
 Install Node.js 22 and npm (or ask a parent to help install them once). Open a terminal in the project folder:
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
@@ -54,4 +54,4 @@ When a check fails, paste the **first useful error message** into the agent chat
 4. Improve the instructions for a keyboard or touch control.
 5. Make a small visual improvement and check it on a phone-sized screen.
 
-For larger features like new mobs, dimensions, or save formats, start with a GitHub issue and a tiny working slice instead of a giant rewrite.
+For larger features like new mobs, dimensions, or save formats, start with a GitHub issue and a tiny working slice instead of a giant rewrite. The [architecture guide](ARCHITECTURE.md) shows which focused module to edit; avoid changing the main bootstrap file for ordinary game features.

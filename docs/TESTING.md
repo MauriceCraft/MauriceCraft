@@ -11,13 +11,13 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm run check` runs ESLint, TypeScript, Vitest with coverage, and a production Vite build. `npm run check:full` also runs Playwright. During development, `npm run test:watch` reruns Vitest automatically.
+`npm run check` runs ESLint (including `bootstrap.ts`), strict TypeScript, Vitest with coverage thresholds, and a production Vite build. `npm run check:full` also runs Playwright. During development, `npm run test:watch` reruns Vitest automatically.
 
 ## What each test protects
 
 | Type | Location | Catches |
 | --- | --- | --- |
-| Unit / regression | `tests/unit/` | Terrain math, block IDs, recipes, mob targeting, chunk budgets, portal dimensions, storage logic |
+| Unit / regression | `tests/unit/` | Terrain/seed versions, block IDs, recipes, mob spawning and raids, projectile collisions, chunk streaming and caches, player respawn, mining/placement cooldowns, portal travel, save-format compatibility and retry behavior |
 | Browser integration | `tests/e2e/` | Play becoming enabled, game controls, menus, mobile touch, portal commands, saved data after reload |
 | Type and style | `npm run typecheck`, `npm run lint` | Invalid interfaces, unsafe JavaScript, unnecessarily large TypeScript files |
 | Production build | `npm run build` | Broken imports, Pages base path, TypeScript/build errors |
