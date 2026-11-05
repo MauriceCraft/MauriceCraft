@@ -1,7 +1,8 @@
 import './styles/global.css';
 import { monitorStartup, showStartupFailure } from './startup/startup-health';
 
-// Dynamic loading lets us show an error even if WebGL setup or another
-// imported game module throws before the normal world initializer runs.
+// Preserve graceful WebGL/error handling and explicitly start only after import.
 monitorStartup();
-void import('./game/bootstrap').catch(error => showStartupFailure(error));
+void import('./game/bootstrap')
+  .then(({ startGameApplication }) => startGameApplication())
+  .catch(error => showStartupFailure(error));
