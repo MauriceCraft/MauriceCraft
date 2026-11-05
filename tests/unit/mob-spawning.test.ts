@@ -11,6 +11,7 @@ function fixture() {
   let canTakeDamage = true;
   let chunksLoaded = true;
   let block = 1;
+  let submerged = false;
   const showHint = vi.fn();
   const playSound = vi.fn();
   const giveItem = vi.fn();
@@ -30,7 +31,7 @@ function fixture() {
     regionSize: 80, grassBlock: 1, leavesBlock: 6, woodBlock: 5, torchBlock: 17, emeraldItem: 42,
     getSeed: () => 42,
     getChunk: () => chunksLoaded ? {} : null,
-    getBlock: () => block, topY: () => 14,
+    getBlock: (_x, y) => y === 14 ? block : (submerged && y === 15 ? 34 : 0), topY: () => 14,
     solid: id => id !== 0,
     collides: () => false,
     getStructure: () => village,
@@ -45,7 +46,8 @@ function fixture() {
     setDead: (value: boolean) => { dead = value; },
     setCanTakeDamage: (value: boolean) => { canTakeDamage = value; },
     setChunksLoaded: (value: boolean) => { chunksLoaded = value; },
-    setBlock: (value: number) => { block = value; } };
+    setBlock: (value: number) => { block = value; },
+    setSubmerged: (value: boolean) => { submerged = value; } };
 }
 
 describe('mob spawning and raids', () => {
@@ -56,6 +58,16 @@ describe('mob spawning and raids', () => {
     f.spawning.trySpawnAnimals();
     f.spawning.trySpawnPatrol();
     expect(f.addMob).not.toHaveBeenCalled();
+  });
+
+  it('does not spawn cows on submerged grass or in liquid', () => {
+    const f = fixture();
+    f.setSubmerged(true);
+    f.spawning.trySpawnAnimals();
+    expect(f.addMob).not.toHaveBeenCalled();
+    f.setSubmerged(false);
+    f.spawning.trySpawnAnimals();
+    expect(f.addMob).toHaveBeenCalled();
   });
 
   it('does not spawn natural monsters near a torch', () => {
