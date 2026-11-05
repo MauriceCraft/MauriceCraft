@@ -156,6 +156,9 @@ import { createAudioEngine } from './audio/sound-engine';
   let hp = MAXHP, sinceHurt = 99, regenT = 0, dead = false;
   const inv = {};
   let specSpeed = 1;
+  // Shared with the weather engine, time commands, sleeping and saved worlds.
+  // The legacy bootstrap still owns this state until the final typed extraction.
+  let tod = 0.22;
   let isNight = false, isDay = true;
 
   const player = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: false, fly: false, fallStart: null };
