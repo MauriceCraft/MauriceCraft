@@ -1,3 +1,4 @@
+import { liquidKind } from '../world/fluid-blocks';
 import * as THREE from 'three';
 import { SpatialIndex } from './spatial-index';
 import type { MovableEntity } from '../world/collision';
@@ -56,6 +57,7 @@ export interface MobCombatDependencies {
   isDaylight: () => boolean;
   isNight: () => boolean;
   isSunExposed?: (x: number, y: number, z: number) => boolean;
+  getBlock?: (x: number, y: number, z: number) => number;
   getRainLevel: () => number;
   canTakeDamage: () => boolean;
   removeMobAt: (index: number) => void;
@@ -225,6 +227,15 @@ export function createMobSimulation(deps: MobCombatDependencies) {
     if (m.kind === 'spider' && !m.onGround) { /* keep the pounce going */ }
     else { m.vx += (tx - m.vx) * k; m.vz += (tz - m.vz) * k; }
     m.vy = Math.max(-50, m.vy - 28 * dt);
+    // Passive animals that wander into water should swim, not sink indefinitely.
+    if (['cow', 'pig', 'sheep', 'chicken'].includes(m.kind) && deps.getBlock) {
+      const x = Math.floor(m.x), z = Math.floor(m.z);
+      const feet = Math.floor(m.y - 0.3);
+      if (liquidKind(deps.getBlock(x, feet, z)) === 'water' ||
+        liquidKind(deps.getBlock(x, feet + 1, z)) === 'water') {
+        m.vy = Math.max(m.vy, 1.9);
+      }
+    }
     m.onGround = false; m.hit = false;
     moveEnt(m, 0, m.vx * dt); moveEnt(m, 2, m.vz * dt); moveEnt(m, 1, m.vy * dt);
     if (m.hit && m.onGround && (!m.hostile || dist > 1)) m.vy = m.hostile ? 8.2 : 7.8;
