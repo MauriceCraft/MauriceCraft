@@ -141,3 +141,20 @@ test('game canvas remains sized to the viewport after resizing', async ({ page }
   })).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('a device without WebGL shows a safe retry rather than Loading forever', async ({ page }) => {
+  // A real mobile browser can fail WebGL setup even when desktop Chromium passes.
+  // Simulate that missing browser capability before the game module initializes.
+  await page.addInitScript(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      configurable: true,
+      value: () => null,
+    });
+  });
+  await page.goto('./');
+  const retry = page.getByRole('button', { name: 'Retry loading' });
+  await expect(retry).toBeEnabled({ timeout: 15_000 });
+  await expect(page.locator('#sub')).toContainText('saved worlds have not been deleted');
+  await expect(page.locator('#newworld')).toBeDisabled();
+  await expect(page.locator('#overlay')).toBeVisible();
+});

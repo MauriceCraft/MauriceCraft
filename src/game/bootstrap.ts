@@ -2,6 +2,7 @@
 // This legacy gameplay loop is being migrated to typed, focused modules.
 // Keep IndexedDB store names/keys and world serialization compatible.
 import * as THREE from 'three';
+import { showStartupFailure } from '../startup/startup-health';
 import { raycastActors } from './entities/actor-targeting';
 import { createRelicSystem } from './adventure/relics';
 import { createWeatherSystem } from './rendering/weather-system';
@@ -1876,5 +1877,5 @@ function frame(now) {
 }
 
 setMode('creative');
-setTimeout(init, 30);
+setTimeout(() => { void init().catch(error => showStartupFailure(error)); }, 30);
 requestAnimationFrame(frame);
