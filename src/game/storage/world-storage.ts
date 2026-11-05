@@ -21,6 +21,8 @@ export interface ChunkRecord {
   w: string;
   cx: number;
   cz: number;
+  /** Absent for legacy Overworld chunks. The IndexedDB key path stays unchanged. */
+  dimension?: 'overworld' | 'nether' | 'end';
   data: Uint8Array;
 }
 
