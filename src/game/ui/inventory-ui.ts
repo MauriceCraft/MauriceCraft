@@ -158,7 +158,7 @@ export function createInventoryUi(deps: InventoryUiDependencies) {
       const row = document.createElement('div'); row.className = 'recipe'; if (!have) row.style.opacity = '0.6';
       const left = document.createElement('span'); left.style.display = 'inline-flex'; left.style.alignItems = 'center'; left.style.gap = '6px'; left.style.flexWrap = 'wrap';
       const ic = iconCanvas(r.out, 24); ic.style.width = '24px'; ic.style.height = '24px'; ic.style.imageRendering = 'pixelated'; left.appendChild(ic);
-      left.appendChild(document.createTextNode(r.n + ' \u00d7 ' + NAMES[r.out] + ' \u2190 ' + Object.keys(counts).map(function (k) { return counts[k] + ' ' + NAMES[Number(k)].toLowerCase(); }).join(', ')));
+      left.appendChild(document.createTextNode(r.n + ' \u00d7 ' + NAMES[r.out] + ' \u2190 ' + Object.keys(counts).map(function (k) { return counts[Number(k)] + ' ' + NAMES[Number(k)].toLowerCase(); }).join(', ')));
       const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn small'; btn.textContent = 'Fill';
       btn.addEventListener('click', function () { fillRecipe(r); });
       row.appendChild(left); row.appendChild(btn); craftBook.appendChild(row);
