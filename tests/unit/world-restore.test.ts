@@ -25,7 +25,7 @@ function fixture() {
     state, player, portals, inventory, toolWear, hotbar,
     allBlocks: [2, 3, 4, 5, 6, 7, 8, 9, 10],
     savedChunks: new Map(), validDifficulties: { normal: {}, hard: {} },
-    weatherLabels: { clear: 'Clear', rain: 'Rain', storm: 'Storm' },
+    weatherLabels: { clear: 'Clear', cloudy: 'Cloudy', rain: 'Rain', storm: 'Storm' },
     kinds: { irongolem: {} }, mobs: [], relics, maximumHealth: 20,
     resetWorld, clearPortalVisuals: vi.fn(), showPortalVisual: vi.fn(),
     clearMobs, clearRelics, addRelic: vi.fn(), createRelics: vi.fn(),
@@ -66,6 +66,17 @@ describe('saved-world restoration', () => {
     expect(f.state.dead).toBe(false);
   });
 
+  it('restores v2 terrain version and cloudy weather from saved metadata', () => {
+    const f = fixture();
+    f.restore.applyWorld({
+      id: 'new', name: 'New World', seed: 311, generatorVersion: 2,
+      created: 1, lastPlayed: 1, weather: { w: 'cloudy', t: 37, r: 0.16 },
+    });
+    expect(f.resetWorld).toHaveBeenCalledWith(311, 0, 0, 2);
+    expect(f.state.weather).toBe('cloudy');
+    expect(f.state.rainTarget).toBe(0.16);
+  });
+
   it('restores saved golems without duplicating ordinary creatures', () => {
     const f = fixture();
     const world: WorldRecord = {
@@ -91,7 +102,7 @@ describe('saved-world restoration', () => {
     expect(f.resetWorld).toHaveBeenCalledWith(700, 0, 0, 1);
     expect(f.state.spawnPoint).toBeNull();
     expect(f.state.omen).toBe(false);
-    expect(f.state.weatherT).toBe(570);
+    expect(f.state.weatherT).toBe(360);
     expect(f.state.tod).toBe(0.22);
     expect(f.state.ready).toBe(true);
     expect(f.inventory).toEqual({});
