@@ -6,6 +6,7 @@ import { createFrameLoop, startFrameLoop } from './runtime/frame-loop';
 import { showStartupFailure } from '../startup/startup-health';
 import { raycastActors } from './entities/actor-targeting';
 import { createMobCatalog } from './entities/mob-catalog';
+import { createPlayerMovement } from './player/player-movement';
 import { createRelicSystem } from './adventure/relics';
 import { createWeatherSystem } from './rendering/weather-system';
 import { SpatialIndex } from './entities/spatial-index';
@@ -1057,7 +1058,29 @@ function handleActions(dt, tNow) {
 }
 
 /* ---------- Update loop ---------- */
-let gtime = 0, stepDist = 0, lavaDamageTimer = 0;
+let gtime = 0, lavaDamageTimer = 0;
+const { updateMovement: updatePlayerMovement } = createPlayerMovement({
+  player,
+  keys,
+  touchMovement: touchMove,
+  getMode: () => mode,
+  getHunger: () => hunger,
+  isJumpPressed: () => Boolean(keys.Space || touchJump),
+  isSleeping: () => sleepT > 0,
+  getSpectatorSpeed: () => specSpeed,
+  worldHeight: WORLD_HEIGHT,
+  moveEntity: (axis, distance) => moveEnt(player, axis, distance),
+  checkPortal: seconds => checkPortal(seconds),
+  respawn: () => respawn(),
+  exert: amount => exert(amount),
+  refreshHunger: () => {
+    if (mode === 'survival' && hunger !== shownHunger) renderFood();
+  },
+  getSurfaceBlock: get,
+  playStep: blockId => sfx('step', 0.8, 0, blockId),
+  playLanding: volume => sfx('land', volume),
+  applyFallDamage: amount => damagePlayer(amount),
+});
 function update(dt, tNow) {
   dt = Math.min(dt, 0.05);
   gtime += dt;
@@ -1071,76 +1094,7 @@ function update(dt, tNow) {
     fadeEl.style.opacity = sleepT <= 0 ? 0 : (el < 1 ? el : (sleepT > 1 ? 1 : sleepT));
     if (!slept && el >= 1.2) { slept = true; tod = 0.02; setWeather('clear'); showHint('Good morning!', 1800); sfx('pop'); }
   }
-  let mx = 0, mz = 0;
-  if (keys.KeyW) mz -= 1;
-  if (keys.KeyS) mz += 1;
-  if (keys.KeyA) mx -= 1;
-  if (keys.KeyD) mx += 1;
-  if (keys.ArrowLeft) player.yaw += 2.0 * dt;
-  if (keys.ArrowRight) player.yaw -= 2.0 * dt;
-  if (keys.ArrowUp) player.pitch = Math.min(1.55, player.pitch + 1.6 * dt);
-  if (keys.ArrowDown) player.pitch = Math.max(-1.55, player.pitch - 1.6 * dt);
-  mx += touchMove.x; mz += touchMove.z;
-  if (sleepT > 0) { mx = 0; mz = 0; }
-  const len = Math.hypot(mx, mz);
-  if (len > 1) { mx /= len; mz /= len; }
-  const shift = keys.ShiftLeft || keys.ShiftRight;
-  const jumpHeld = (keys.Space || touchJump) && sleepT <= 0;
-  const sn = Math.sin(player.yaw), cs = Math.cos(player.yaw);
-
-  if (mode === 'spectator') {
-    const speed = 12 * specSpeed, cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
-    const tvx = (mx * cs + mz * sn * cp) * speed;
-    const tvz = (-mx * sn + mz * cs * cp) * speed;
-    const tvy = (-mz * sp + ((jumpHeld ? 1 : 0) - (shift ? 1 : 0))) * speed;
-    const k = Math.min(1, 10 * dt);
-    player.vx += (tvx - player.vx) * k; player.vy += (tvy - player.vy) * k; player.vz += (tvz - player.vz) * k;
-    player.x += player.vx * dt;
-    player.y = Math.max(-5, Math.min(WORLD_HEIGHT + 40, player.y + player.vy * dt));
-    player.z += player.vz * dt;
-    player.onGround = false; player.fallStart = null;
-  } else {
-    const flying = player.fly && mode === 'creative';
-    const sprinting = shift && !flying && (mx !== 0 || mz !== 0) && !(mode === 'survival' && hunger <= 6);   // too hungry to sprint
-    const speed = flying ? (keys.ControlLeft ? 18 : 10) : (sprinting ? 6.6 : 4.4);
-    const tvx = (mx * cs + mz * sn) * speed;
-    const tvz = (-mx * sn + mz * cs) * speed;
-    const accel = (player.onGround || flying) ? 14 : 3.5;
-    const k = Math.min(1, accel * dt);
-    player.vx += (tvx - player.vx) * k;
-    player.vz += (tvz - player.vz) * k;
-    if (flying) {
-      const up = (jumpHeld ? 1 : 0) - (shift ? 1 : 0);
-      player.vy += (up * speed - player.vy) * Math.min(1, 10 * dt);
-    } else {
-      player.vy = Math.max(-50, player.vy - 28 * dt);
-      if (jumpHeld && player.onGround) { player.vy = 8.6; exert(sprinting ? 0.2 : 0.04); }
-    }
-    player.onGround = false;
-    moveEnt(player, 0, player.vx * dt);
-    moveEnt(player, 2, player.vz * dt);
-    moveEnt(player, 1, player.vy * dt);
-    checkPortal(dt);
-    if (player.y < -30) respawn();
-    const wspd = Math.hypot(player.vx, player.vz);
-    exert(dt * (0.015 + (wspd > 1.2 && player.onGround ? (sprinting ? 0.13 : 0.03) : 0)));
-    if (mode === 'survival' && hunger !== shownHunger) renderFood();
-    if (!flying && player.onGround && wspd > 1.2) {
-      stepDist += wspd * dt;
-      if (stepDist > 2.2) { stepDist = 0; sfx('step', 0.8, 0, get(Math.floor(player.x), Math.floor(player.y - 0.2), Math.floor(player.z))); }
-    }
-
-    if (flying) player.fallStart = null;
-    else if (player.onGround) {
-      if (player.fallStart !== null) {
-        const dist = player.fallStart - player.y;
-        if (dist > 3.5) damagePlayer(Math.floor(dist - 3)); else if (dist > 1.6) sfx('land', Math.min(1, dist / 5));
-        player.fallStart = null;
-      }
-    } else if (player.vy < 0) {
-      player.fallStart = (player.fallStart === null) ? player.y : Math.max(player.fallStart, player.y);
-    } else player.fallStart = null;
-  }
+  updatePlayerMovement(dt);
 
   camera.position.set(player.x, player.y + EYE_HEIGHT, player.z);
   camera.rotation.set(player.pitch, player.yaw, 0);
