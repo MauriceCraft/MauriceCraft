@@ -24,13 +24,16 @@ export function treeStyle(biome: Biome, roll: number): TreeStyle {
 
 export interface TreeDecoratorDependencies {
   getSeed: () => number;
+  getGeneratorVersion?: () => number;
   getBiome: (x: number, z: number) => Biome;
   groundHeight: (x: number, z: number) => number;
   canGrowAt: (x: number, z: number) => boolean;
   inStructureZone: (x: number, z: number) => boolean;
   seaLevel: number;
   maxHeight: number;
-  blocks: { wood: number; leaves: number; darkWood: number; pineLeaves: number };
+  blocks: { wood: number; leaves: number; darkWood: number; pineLeaves: number;
+    birchWood?: number; birchLeaves?: number; acaciaWood?: number; acaciaLeaves?: number;
+    willowWood?: number; willowLeaves?: number; autumnLeaves?: number };
 }
 
 /** Tree origins use global jittered cells, never the current chunk's RNG. */
@@ -57,8 +60,17 @@ export function createTreeDecorator(deps: TreeDecoratorDependencies) {
         style === 'pine' ? 6 + Math.floor(growth * 5) :
         style === 'birch' ? 5 + Math.floor(growth * 5) :
         style === 'oak' ? 4 + Math.floor(growth * 5) : 4 + Math.floor(growth * 3);
-      const timber = style === 'pine' || style === 'ancient' ? darkWood : wood;
-      const foliage = style === 'pine' ? pineLeaves : leaves;
+      const varied = (deps.getGeneratorVersion?.() ?? 2) >= 3;
+      const timber = varied && style === 'birch' ? deps.blocks.birchWood ?? wood :
+        varied && style === 'acacia' ? deps.blocks.acaciaWood ?? wood :
+        varied && style === 'willow' ? deps.blocks.willowWood ?? wood :
+        style === 'pine' || style === 'ancient' ? darkWood : wood;
+      const foliage = style === 'pine' ? pineLeaves :
+        !varied ? leaves : style === 'birch' ? deps.blocks.birchLeaves ?? leaves :
+        style === 'acacia' ? deps.blocks.acaciaLeaves ?? leaves :
+        style === 'willow' ? deps.blocks.willowLeaves ?? leaves :
+        style === 'oak' && hash2(gx, gz, seed + 1033) > 0.87 ?
+          deps.blocks.autumnLeaves ?? leaves : leaves;
       const trunkX = style === 'acacia' ? (hash2(gx, gz, seed + 1015) < 0.5 ? -2 : 2) : 0;
       for (let dy = 1; dy <= h; dy++) {
         const tx = style === 'acacia' && dy >= h - 1 ? x + trunkX : x;
@@ -90,8 +102,8 @@ export function createTreeDecorator(deps: TreeDecoratorDependencies) {
             put(originX + dx, top + dy, z + dz, foliage, true);
             if (style === 'willow' && Math.abs(dx) + Math.abs(dz) >= 3 &&
               hash2(originX + dx, z + dz, seed + 1016) > 0.43) {
-              put(originX + dx, top + dy - 1, z + dz, leaves, true);
-              put(originX + dx, top + dy - 2, z + dz, leaves, true);
+              put(originX + dx, top + dy - 1, z + dz, foliage, true);
+              put(originX + dx, top + dy - 2, z + dz, foliage, true);
             }
           }
         }
