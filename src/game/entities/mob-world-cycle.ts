@@ -4,7 +4,7 @@ import type { MobActor } from './mob-simulation';
 export interface MobWorldDifficulty {
   cap: number;
   every: number;
-  patrol: readonly [number, number];
+  patrol: readonly number[];
   raid: number;
 }
 
@@ -66,7 +66,7 @@ function updateMobs(dt: number): void {
   patrolT -= dt;
   if (deps.getDimension() !== 'end' && patrolT <= 0) {
     patrolT = D.patrol[0] + random() * (D.patrol[1] - D.patrol[0]);
-    if (hasHealth() && D.cap > 0 && mobs.filter(function (m) { return KINDS[m.kind].illager && !m.raid; }).length < 6) trySpawnPatrol();
+    if (deps.hasHealth() && D.cap > 0 && mobs.filter(function (m) { return KINDS[m.kind].illager && !m.raid; }).length < 6) trySpawnPatrol();
   }
   if (deps.getDimension() !== 'end') updateRaid(dt, D);
   // Index mobs once per frame instead of searching everyone for every AI actor.
@@ -78,8 +78,8 @@ function updateMobs(dt: number): void {
   }
   deps.setActiveIndexes({ hostiles: hostileActors, defenders });
   stepMobActors(dt);
-  while (pendingHits.length) { const ph = pendingHits.pop(); if (mobs.indexOf(ph.m) >= 0) deps.damageMob(ph.m, ph.d); }
-  while (pendingBlasts.length) { const pb = pendingBlasts.pop(); deps.explode(pb.x, pb.y, pb.z, pb.r, pb.p); }
+  while (pendingHits.length) { const ph = pendingHits.pop()!; if (mobs.indexOf(ph.m) >= 0) deps.damageMob(ph.m, ph.d); }
+  while (pendingBlasts.length) { const pb = pendingBlasts.pop()!; deps.explode(pb.x, pb.y, pb.z, pb.r, pb.p); }
   deps.setActiveIndexes(null);
 }
 
