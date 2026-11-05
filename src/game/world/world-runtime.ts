@@ -50,6 +50,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     getBlock: get, opq, isBed, tiles: TILES,
     height: WORLD_HEIGHT, chunkSize: CHUNK_SIZE,
     atlasTiles: ATLAS_N, bedHeight: BED_H, torchId: TORCH,
+    waterId: WATER, lavaId: LAVA,
   });
   const { disposeMesh, buildChunk } = mesher;
   const savedChunks = new Map<number, Uint8Array>();

@@ -27,6 +27,8 @@ export interface MesherDependencies<T extends MeshChunk> {
   atlasTiles: number;
   bedHeight: number;
   torchId: number;
+  waterId?: number;
+  lavaId?: number;
 }
 
 /** Create and dispose visible chunk meshes without owning world generation. */
@@ -35,6 +37,7 @@ export function createChunkMesher<T extends MeshChunk>(deps: MesherDependencies<
   const get = deps.getBlock;
   const TILES = deps.tiles, H = deps.height, CS = deps.chunkSize;
   const ATLAS_N = deps.atlasTiles, BED_H = deps.bedHeight, TORCH = deps.torchId;
+  const liquids = new Set([deps.waterId, deps.lavaId].filter((id): id is number => id !== undefined));
 
   /* ---------- Chunk meshing and lighting ---------- */
   const FACES = [
@@ -171,7 +174,10 @@ export function createChunkMesher<T extends MeshChunk>(deps: MesherDependencies<
           for (let fi = 0; fi < 6; fi++) {
             const f = FACES[fi];
             const nx = x + f.n[0], ny = y + f.n[1], nz = z + f.n[2];
-            if (opq(get(nx, ny, nz))) continue;
+            const neighbor = get(nx, ny, nz);
+            // Do not draw internal water/lava faces: they create visible square seams
+            // and cause large lakes to look like stacks of disconnected cubes.
+            if (opq(neighbor) || (liquids.has(b) && neighbor === b)) continue;
             const ax = f.n[0] ? 0 : (f.n[1] ? 1 : 2);
             const t1 = (ax + 1) % 3, t2 = (ax + 2) % 3;
             for (let i = 0; i < 4; i++) {

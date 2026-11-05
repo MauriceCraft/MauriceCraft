@@ -20,6 +20,7 @@ function fixture(blockId: number) {
     opq: b => b !== 0 && b !== 17, isBed: b => b >= 19 && b <= 26,
     tiles: { 3: [3, 3, 3] }, height: 48, chunkSize: 16,
     atlasTiles: 128, bedHeight: 0.5625, torchId: 17,
+    waterId: 34, lavaId: 35,
   });
   return { scene, chunk, mesher };
 }
@@ -34,6 +35,14 @@ describe('typed chunk meshing', () => {
     mesher.disposeMesh(chunk);
     expect(chunk.meshed).toBe(false);
     expect(scene.children).toHaveLength(0);
+  });
+  it('does not render the six faces between neighboring water blocks', () => {
+    const { chunk, mesher } = fixture(34);
+    chunk.data[(1 * 16 + 1) * 16 + 2] = 34;
+    // Fixture's visibility treats liquids as transparent.
+    mesher.buildChunk(0, 0);
+    expect(chunk.mesh).toBeInstanceOf(THREE.Mesh);
+    expect((chunk.mesh!.geometry as THREE.BufferGeometry).getIndex()!.count).toBeLessThan(72);
   });
   it('creates a separate, always-bright torch mesh and glow', () => {
     const { scene, chunk, mesher } = fixture(17);
