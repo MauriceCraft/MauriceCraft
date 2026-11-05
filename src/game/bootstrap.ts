@@ -3,6 +3,7 @@
 // Keep IndexedDB store names/keys and world serialization compatible.
 import * as THREE from 'three';
 import { createFrameLoop, startFrameLoop } from './runtime/frame-loop';
+import { createGameTick } from './runtime/game-tick';
 import { showStartupFailure } from '../startup/startup-health';
 import { raycastActors } from './entities/actor-targeting';
 import { createMobCatalog } from './entities/mob-catalog';
@@ -537,7 +538,6 @@ function handleActions(dt, tNow) {
 }
 
 /* ---------- Update loop ---------- */
-let gtime = 0, lavaDamageTimer = 0;
 const { updateMovement: updatePlayerMovement } = createPlayerMovement({
   player,
   keys,
@@ -560,49 +560,30 @@ const { updateMovement: updatePlayerMovement } = createPlayerMovement({
   playLanding: volume => sfx('land', volume),
   applyFallDamage: amount => damagePlayer(amount),
 });
-function update(dt, tNow) {
-  dt = Math.min(dt, 0.05);
-  gtime += dt;
-  lavaDamageTimer -= dt;
-  if (mode !== 'spectator' && lavaDamageTimer <= 0 && get(Math.floor(player.x), Math.floor(player.y + 0.2), Math.floor(player.z)) === LAVA) {
-    damagePlayer(2, false); lavaDamageTimer = 0.8; flashName('Ouch! Lava burns you!');
-  }
-  if (sleepT > 0) {
-    sleepT -= dt;
-    const el = 3.2 - sleepT;
-    fadeEl.style.opacity = sleepT <= 0 ? 0 : (el < 1 ? el : (sleepT > 1 ? 1 : sleepT));
-    if (!slept && el >= 1.2) { slept = true; tod = 0.02; setWeather('clear'); showHint('Good morning!', 1800); sfx('pop'); }
-  }
-  updatePlayerMovement(dt);
-
-  camera.position.set(player.x, player.y + EYE_HEIGHT, player.z);
-  camera.rotation.set(player.pitch, player.yaw, 0);
-
-  blockHit = mode === 'spectator' ? null : raycast(canInteract() ? (mode === 'creative' ? 6 : 5) : 4);
-  target = canInteract() ? blockHit : null;
-  if (target) { sel.visible = true; sel.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5); }
-  else sel.visible = false;
-
-  updateMobs(dt); updateBlasts(dt); updateArrows(dt); updateFx(dt); updateMusic(dt);
-  if (hasHealth()) {
-    sinceHurt += dt;
-    if (hp < MAX_HEALTH && sinceHurt > DIFF[difficulty].regenAfter && (mode !== 'survival' || difficulty === 'peaceful' || hunger >= 15)) {
-      regenT += dt;
-      if (regenT >= DIFF[difficulty].regenEvery) { regenT = 0; hp = Math.min(MAX_HEALTH, hp + 1); updateHearts(); exert(1.2); }
-    }
-    if (mode === 'survival' && difficulty !== 'peaceful' && hunger <= 0) {
-      starveT += dt;
-      if (starveT >= 4) { starveT = 0; if (hp > (difficulty === 'easy' ? 10 : (difficulty === 'normal' ? 1 : 0))) damagePlayer(1); }
-    } else starveT = 0;
-    if (mode === 'adventure') checkRelics();
-  }
-  if (!dead && sleepT <= 0) handleActions(dt, tNow);
-  if (shake > 0) {
-    camera.position.x += (Math.random() - 0.5) * shake * 0.35; camera.position.y += (Math.random() - 0.5) * shake * 0.35;
-    camera.rotation.z = (Math.random() - 0.5) * shake * 0.05;
-    shake = Math.max(0, shake - dt * 2.2);
-  } else camera.rotation.z = 0;
-}
+const update = createGameTick({
+  state: {
+    get mode() { return mode; },
+    get difficulty() { return difficulty; },
+    get hunger() { return hunger; },
+    get health() { return hp; }, set health(value) { hp = value; },
+    get dead() { return dead; },
+    get sleepTime() { return sleepT; }, set sleepTime(value) { sleepT = value; },
+    get slept() { return slept; }, set slept(value) { slept = value; },
+    get timeOfDay() { return tod; }, set timeOfDay(value) { tod = value; },
+    get sinceHurt() { return sinceHurt; }, set sinceHurt(value) { sinceHurt = value; },
+    get regenerationTimer() { return regenT; }, set regenerationTimer(value) { regenT = value; },
+    get starvationTimer() { return starveT; }, set starvationTimer(value) { starveT = value; },
+    get shake() { return shake; }, set shake(value) { shake = value; },
+  },
+  player, camera, selection: sel, fadeElement: fadeEl,
+  difficulty: DIFF, lavaBlock: LAVA, maximumHealth: MAX_HEALTH, eyeHeight: EYE_HEIGHT,
+  getBlock: get, canInteract, hasHealth,
+  raycast, setBlockHit: hit => { blockHit = hit; }, setTarget: hit => { target = hit; },
+  damagePlayer, setWeather: () => setWeather('clear'),
+  showHint, playSound: event => sfx(event), flashName,
+  updatePlayerMovement, updateMobs, updateBlasts, updateArrows, updateFx, updateMusic,
+  updateHearts, exert, checkRelics, handleActions,
+});
 
 /* ---------- Day / night ---------- */
 const boltEl = document.getElementById('bolt');
