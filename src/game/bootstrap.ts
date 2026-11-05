@@ -31,6 +31,7 @@ import { createGameMenu, MODE_LABELS } from './ui/game-menu';
 import { coord } from './commands/coordinates';
 import { createCommandConsole } from './commands/command-console';
 import { registerWorldCommands } from './commands/world-commands';
+import { registerPlayerCommands } from './commands/player-commands';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { createPortalSystem } from './portals/portal-system';
@@ -1259,9 +1260,6 @@ function rebuildRegion(x1, z1, x2, z2) {
   for (let cx = (Math.min(x1, x2) >> 4) - 1; cx <= (Math.max(x1, x2) >> 4) + 1; cx++) for (let cz = (Math.min(z1, z2) >> 4) - 1; cz <= (Math.max(z1, z2) >> 4) + 1; cz++) rebuildSet.add(cx + ',' + cz);
   flushRebuilds();
 }
-const MODE_ALIASES = { creative: 'creative', c: 'creative', '1': 'creative', survival: 'survival', s: 'survival', '0': 'survival', adventure: 'adventure', a: 'adventure', '2': 'adventure', spectator: 'spectator', sp: 'spectator', '3': 'spectator' };
-const DIFF_ALIASES = { peaceful: 'peaceful', p: 'peaceful', '0': 'peaceful', easy: 'easy', e: 'easy', '1': 'easy', normal: 'normal', n: 'normal', '2': 'normal', hard: 'hard', h: 'hard', '3': 'hard' };
-const TIME_NAMES = { day: 1000, noon: 6000, sunset: 12000, night: 13000, midnight: 18000, sunrise: 23000 };
 const mobNames = function () { return Object.keys(KINDS); };
 
 defCmd(['help', '?'], '/help [command]', 'List the commands, or explain one', function (a) {
@@ -1301,71 +1299,29 @@ defCmd(['dimension', 'dim'], '/dimension <overworld|nether|end>', 'Travel betwee
   changeDimension(target);
   return 'Entered the ' + target + '.';
 }, function () { return ['overworld', 'nether', 'end']; });
-defCmd(['time'], '/time set <day|noon|sunset|night|midnight|sunrise|ticks> | add <ticks> | query', 'Change or read the time of day (24000 ticks per day)', function (a) {
-  const sub = (a[0] || '').toLowerCase();
-  if (sub === 'query') return 'It is ' + Math.round(tod * 24000) + ' ticks into the day (' + (isNight ? 'night' : 'day') + ')';
-  if (sub === 'set' || sub === 'add') {
-    const v = (a[1] || '').toLowerCase();
-    const n = (sub === 'set' && TIME_NAMES[v] !== undefined) ? TIME_NAMES[v] : parseFloat(v);
-    if (!isFinite(n)) throw new Error('Usage: /time ' + sub + (sub === 'set' ? ' <day|noon|sunset|night|midnight|sunrise|ticks>' : ' <ticks>'));
-    tod = sub === 'set' ? ((((n % 24000) + 24000) % 24000) / 24000) : ((((tod + n / 24000) % 1) + 1) % 1);
-    return 'Time ' + (sub === 'set' ? 'set to ' : 'moved on to ') + Math.round(tod * 24000) + ' ticks';
-  }
-  throw new Error('Usage: /time set <day|noon|sunset|night|midnight|sunrise|ticks>, /time add <ticks>, /time query');
-}, function (i) { return i === 1 ? ['set', 'add', 'query'] : Object.keys(TIME_NAMES); });
-defCmd(['day'], '/day', 'Set the time to morning', function () { tod = TIME_NAMES.day / 24000; return 'Time set to day'; });
-defCmd(['night'], '/night', 'Set the time to night', function () { tod = TIME_NAMES.night / 24000; return 'Time set to night'; });
-defCmd(['weather'], '/weather <clear|rain|storm> [seconds]', 'Change the weather', function (a) {
-  const w = (a[0] || '').toLowerCase();
-  if (!WEATHER_LABEL[w]) throw new Error('Usage: /weather <clear|rain|storm> [seconds]');
-  setWeather(w);
-  if (a[1] !== undefined && +a[1] > 0) weatherT = +a[1];
-  saveWorld().then(refreshWorlds);
-  return 'Weather set to ' + WEATHER_LABEL[w].toLowerCase();
-}, function () { return ['clear', 'rain', 'storm']; });
-defCmd(['gamemode', 'gm'], '/gamemode <creative|survival|adventure|spectator>', 'Switch game mode', function (a) {
-  const m = MODE_ALIASES[(a[0] || '').toLowerCase()];
-  if (!m) throw new Error('Usage: /gamemode <creative|survival|adventure|spectator>');
-  setMode(m); saveWorld().then(refreshWorlds);
-  return 'Game mode is now ' + LABEL[m];
-}, function () { return ['creative', 'survival', 'adventure', 'spectator']; });
-defCmd(['difficulty'], '/difficulty <peaceful|easy|normal|hard>', 'Change the difficulty', function (a) {
-  const d = DIFF_ALIASES[(a[0] || '').toLowerCase()];
-  if (!d) throw new Error('Usage: /difficulty <peaceful|easy|normal|hard>');
-  setDifficulty(d);
-  return 'Difficulty is now ' + DIFF[d].label.toLowerCase();
-}, function () { return ['peaceful', 'easy', 'normal', 'hard']; });
-defCmd(['give'], '/give <item> [count]', 'Give yourself an item or block (Creative puts it in your hotbar)', function (a) {
-  if (!a[0]) throw new Error('Usage: /give <item> [count]');
-  const id = findItem(a[0], false);
-  let n = a[1] === undefined ? 1 : Math.floor(+a[1]);
-  if (!(n >= 1)) throw new Error('The count must be 1 or more');
-  n = Math.min(n, 9999);
-  if (hotbar.indexOf(id) < 0) hotbar[selected] = id;
-  if (mode === 'creative') { updateHotbar(true); return NAMES[id] + ' is in your hotbar (Creative items are unlimited)'; }
-  inv[id] = Math.min(9999, (inv[id] || 0) + n); updateHotbar(true);
-  return 'Gave you ' + n + ' ' + NAMES[id];
-}, function (i) { return i === 1 ? Object.keys(itemMap()) : []; });
-defCmd(['clear'], '/clear', 'Empty your backpack', function () { for (const k in inv) delete inv[k]; updateHotbar(false); return 'Backpack cleared'; });
-defCmd(['heal'], '/heal', 'Restore your health', function () { hp = MAX_HEALTH; sinceHurt = 99; updateHearts(); return 'You feel healthy again'; });
-defCmd(['feed'], '/feed', 'Fill your hunger bar', function () { hunger = 20; sat = 5; exhaust = 0; renderFood(); return 'You are no longer hungry'; });
-defCmd(['fly'], '/fly', 'Toggle flying (Creative)', function () {
-  if (mode !== 'creative') throw new Error('Flying is a Creative mode ability');
-  toggleFly(); return player.fly ? 'Flying on' : 'Flying off';
+registerPlayerCommands({
+  register: defCmd,
+  state: {
+    get tod() { return tod; }, set tod(value) { tod = value; },
+    get isNight() { return isNight; },
+    get weatherDuration() { return weatherT; },
+    set weatherDuration(value) { weatherT = value; },
+    get mode() { return mode; },
+    get selected() { return selected; },
+    get health() { return hp; }, set health(value) { hp = value; },
+    get sinceHurt() { return sinceHurt; }, set sinceHurt(value) { sinceHurt = value; },
+    get hunger() { return hunger; }, set hunger(value) { hunger = value; },
+    get satiety() { return sat; }, set satiety(value) { sat = value; },
+    get exhaustion() { return exhaust; }, set exhaustion(value) { exhaust = value; },
+  },
+  player, maxHeight: WORLD_HEIGHT, maxHealth: MAX_HEALTH,
+  inventory: inv, hotbar, names: NAMES, labels: LABEL, difficulties: DIFF,
+  weatherLabels: WEATHER_LABEL, findItem, itemMap,
+  setWeather, setMode, setDifficulty, refreshWorlds, saveWorld,
+  updateHotbar, updateHearts, renderFood, toggleFly, ensureAround,
+  topBlockY: topY, collides: (x, y, z) => collides(x, y, z),
+  getSeed: () => seed,
 });
-defCmd(['tp', 'teleport'], '/tp <x> <y> <z> | <x> <z> | spawn   (~ means relative)', 'Teleport', function (a) {
-  let x, y, z;
-  if ((a[0] || '').toLowerCase() === 'spawn') { x = 0.5; z = 0.5; ensureAround(x, z); y = topY(0, 0) + 1.01; }
-  else if (a.length >= 3) { x = coord(a[0], player.x); y = coord(a[1], player.y); z = coord(a[2], player.z); ensureAround(x, z); }
-  else if (a.length === 2) { x = coord(a[0], player.x); z = coord(a[1], player.z); ensureAround(x, z); y = topY(Math.floor(x), Math.floor(z)) + 1.01; }
-  else throw new Error('Usage: /tp <x> <y> <z>, /tp <x> <z>, or /tp spawn');
-  if (!(y > -20 && y < WORLD_HEIGHT + 200)) throw new Error('That height is out of range');
-  for (let k = 0; k < 80 && mode !== 'spectator' && collides(x, y, z); k++) y += 1;
-  player.x = x; player.y = y; player.z = z; player.vx = player.vy = player.vz = 0; player.fallStart = null;
-  return 'Teleported to ' + x.toFixed(1) + ' ' + y.toFixed(1) + ' ' + z.toFixed(1);
-}, function (i) { return i === 1 ? ['spawn'] : []; });
-defCmd(['pos'], '/pos', 'Show where you are', function () { return 'You are at ' + player.x.toFixed(1) + ' ' + player.y.toFixed(1) + ' ' + player.z.toFixed(1); });
-defCmd(['seed'], '/seed', 'Show the world seed', function () { return 'Seed: ' + seed; });
 defCmd(['spawn', 'summon'], '/spawn <creature> [count]', 'Spawn creatures in front of you', function (a) {
   if (!a[0]) throw new Error('Usage: /spawn <creature> [count]. Creatures: ' + mobNames().join(', '));
   const q = slug(a[0]).replace(/_/g, '');
