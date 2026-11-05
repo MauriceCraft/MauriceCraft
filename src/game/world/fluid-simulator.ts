@@ -21,7 +21,7 @@ export function createFluidSimulator(deps: FluidDependencies) {
   const pending: Position[] = [], enqueued = new Set<string>();
   let tickClock = 0;
   const key = (x: number, y: number, z: number) => x + ',' + y + ',' + z;
-  const enabled = () => deps.getDimension() === 'overworld' && deps.getGeneratorVersion() >= 2;
+  const enabled = () => deps.getDimension() === 'overworld' && deps.getGeneratorVersion() >= 3;
   const loaded = (x: number, z: number) => deps.isLoaded(x, z);
   function schedule(x: number, y: number, z: number): void {
     if (y <= 0 || y >= deps.height - 1 || !loaded(x, z) || pending.length >= 24000) return;

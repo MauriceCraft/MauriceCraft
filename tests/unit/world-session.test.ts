@@ -15,7 +15,7 @@ describe('saved world session naming and history', () => {
   });
 
   it('creates full-range deterministic testable seeds without reusing saved seeds', () => {
-    expect(CURRENT_WORLD_GENERATOR_VERSION).toBe(2);
+    expect(CURRENT_WORLD_GENERATOR_VERSION).toBe(3);
     expect(nextWorldSeed([], () => 0.75)).toBe(3221225472);
     expect(nextWorldSeed([world('a')], () => 0)).toBe(0);
     const existing = [{ ...world('a'), seed: 3221225472 }];

@@ -3,7 +3,7 @@ import { createFluidSimulator } from '../../src/game/world/fluid-simulator';
 
 function fixture() {
   const blocks = new Map<string, number>();
-  let version = 2, dimension = 'overworld';
+  let version = 3, dimension = 'overworld';
   const get = (x: number, y: number, z: number) => blocks.get(`${x},${y},${z}`) ?? (y === 0 ? 3 : 0);
   const set = (x: number, y: number, z: number, b: number) => {
     if (b === 0) blocks.delete(`${x},${y},${z}`);
@@ -52,7 +52,7 @@ describe('bounded liquid updates', () => {
     const f = fixture();
     f.setVersion(1); f.set(0, 5, 0, 34); f.fluid.notify(0, 5, 0); f.advance();
     expect(f.get(0, 4, 0)).toBe(0);
-    f.setVersion(2); f.setDimension('nether'); f.fluid.notify(0, 5, 0); f.advance();
+    f.setVersion(3); f.setDimension('nether'); f.fluid.notify(0, 5, 0); f.advance();
     expect(f.get(0, 4, 0)).toBe(0);
   });
   it('reaches fewer blocks and cools when lava meets water', () => {
