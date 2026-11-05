@@ -7,7 +7,8 @@ type MapXZ = (u: number, v: number) => [number, number];
 export type StructureBlockIds = Record<'BRICK' | 'COBBLE' | 'CTABLE' | 'DIRT' | 'GOLD' | 'GRAVEL' | 'HAY' | 'LEAVES' | 'MOSSY' | 'PLANKS' | 'SANDSTONE' | 'STONEBRICK' | 'TORCH' | 'WOOD', number>;
 
 /** Stable seeded geometry for villages, temples, towers, dungeons and cabins. */
-export function createStructureBuilders(getSeed: () => number, blocks: StructureBlockIds) {
+export function createStructureBuilders(getSeed: () => number, blocks: StructureBlockIds,
+  getGeneratorVersion: () => number = () => 1) {
   const { BRICK, COBBLE, CTABLE, DIRT, GOLD, GRAVEL, HAY, LEAVES, MOSSY, PLANKS, SANDSTONE, STONEBRICK, TORCH, WOOD } = blocks;
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   function eachXZ(x0: number, z0: number, a1: number, b1: number, a2: number, b2: number, fn: (x: number, z: number) => void): void {
@@ -82,6 +83,57 @@ export function createStructureBuilders(getSeed: () => number, blocks: Structure
     }
     const c = map(2, 2); P(c[0], gy + 11, c[1], GOLD);
   }
+  /** V2 settlements have variable street lengths, orientations, and plot counts. */
+  function buildVariedVillage(P: PlaceBlock, st: GeneratedStructure, x0: number, z0: number): void {
+    const { cx, cz, gy } = st;
+    clearAbove(P, st, x0, z0, st.pad, 14);
+    for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+      P(cx + dx, gy, cz + dz, Math.abs(dx) <= 1 && Math.abs(dz) <= 1 ? COBBLE : GRAVEL);
+    }
+    // Central market well and beacon are stable, but streets and plots are not.
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      const border = Math.abs(dx) === 1 || Math.abs(dz) === 1;
+      if (border) P(cx + dx, gy + 1, cz + dz, COBBLE);
+      else for (let y = gy - 3; y <= gy + 1; y++) P(cx, y, cz, 0);
+    }
+    for (const [dx, dz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+      for (let y = gy + 2; y <= gy + 3; y++) P(cx + dx, y, cz + dz, WOOD);
+      P(cx + dx, gy + 4, cz + dz, PLANKS);
+    }
+    P(cx, gy + 5, cz, TORCH);
+    const seed = getSeed();
+    for (let a = 0; a < 4; a++) {
+      const roll = hash2(st.rx * 5 + a, st.rz, seed + 1610);
+      if (roll < 0.20) continue; // Some villages have only two or three streets.
+      const [dx, dz] = DIRS[a], px = -dz, pz = dx;
+      const reach = 10 + Math.floor(hash2(st.rx * 5 + a, st.rz, seed + 1611) * 9);
+      const shift = Math.floor(hash2(st.rx * 5 + a, st.rz, seed + 1612) * 3) - 1;
+      for (let step = 3; step <= reach; step++) {
+        for (let side = -1; side <= 1; side++)
+          P(cx + dx * step + px * (side + shift), gy, cz + dz * step + pz * (side + shift), GRAVEL);
+      }
+      for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
+        const side = sideIndex ? 1 : -1;
+        const k = st.rx * 91 + st.rz * 37 + a * 2 + sideIndex;
+        if (hash2(k, a, seed + 1613) < 0.30) continue;
+        const along = 6 + Math.floor(hash2(k, a, seed + 1614) * 4);
+        const width = hash2(k, a, seed + 1615) > 0.63 ? 7 : 5;
+        const style = Math.floor(hash2(k, a, seed + 1616) * 3);
+        const building = hash2(k, a, seed + 1617);
+        const map: MapXZ = (u, v) => [
+          cx + dx * (along + u) + px * (shift + side * (3 + v)),
+          cz + dz * (along + u) + pz * (shift + side * (3 + v)),
+        ];
+        if (building < 0.58) buildHouse(P, map, gy, width, 5, style);
+        else if (building < 0.89) buildFarm(P, map, gy, 7, 6);
+        else buildBellTower(P, map, gy);
+      }
+      const endX = cx + dx * reach + px * shift, endZ = cz + dz * reach + pz * shift;
+      P(endX, gy + 1, endZ, WOOD);
+      P(endX, gy + 2, endZ, TORCH);
+    }
+  }
+
   function buildVillage(P: PlaceBlock, st: GeneratedStructure, x0: number, z0: number): void {
     const cx = st.cx, cz = st.cz, gy = st.gy;
     clearAbove(P, st, x0, z0, st.pad, 14);
@@ -203,7 +255,10 @@ export function createStructureBuilders(getSeed: () => number, blocks: Structure
   function buildStructure(st: GeneratedStructure, put: WriteBlock, x0: number, z0: number): void {
     const P: PlaceBlock = function (x: number, y: number, z: number, b: number) { put(x, y, z, b, false); };
     switch (st.type) {
-      case 'village': buildVillage(P, st, x0, z0); break;
+      case 'village':
+        if (getGeneratorVersion() >= 2) buildVariedVillage(P, st, x0, z0);
+        else buildVillage(P, st, x0, z0);
+        break;
       case 'temple': buildTemple(P, st, x0, z0); break;
       case 'tower': buildRuinTower(P, st, x0, z0); break;
       case 'dungeon': buildDungeon(P, st); break;

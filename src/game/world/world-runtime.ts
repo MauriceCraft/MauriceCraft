@@ -75,7 +75,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
   const { buildStructure } = createStructureBuilders(deps.getSeed, {
     BRICK, COBBLE, CTABLE, DIRT, GOLD, GRAVEL, HAY,
     LEAVES, MOSSY, PLANKS, SANDSTONE, STONEBRICK, TORCH, WOOD,
-  });
+  }, deps.getGeneratorVersion);
   const generateChunkData = createChunkGenerator({
     getSeed: deps.getSeed, getDimension: deps.getDimension,
     getGeneratorVersion: deps.getGeneratorVersion,

@@ -10,9 +10,9 @@ const blocks: StructureBlockIds = {
 const structure = (type: GeneratedStructure['type']): GeneratedStructure => ({
   type, cx: 48, cz: 48, gy: 20, pad: 20, blend: 8, reach: 22, zone: 30, rx: 1, rz: 1,
 });
-function geometry(type: GeneratedStructure['type'], seed = 123): string[] {
+function geometry(type: GeneratedStructure['type'], seed = 123, version = 1): string[] {
   const placed: string[] = [];
-  createStructureBuilders(() => seed, blocks)
+  createStructureBuilders(() => seed, blocks, () => version)
     .buildStructure(structure(type), (x, y, z, block, onlyAir) => {
       expect(onlyAir).toBe(false);
       if (x >= 48 && x < 64 && z >= 48 && z < 64 && y >= 0 && y < 48) {
@@ -28,6 +28,13 @@ describe('saved-world structure geometry', () => {
       expect(geometry(type, 99).length).toBeGreaterThan(0);
     },
   );
+  it('builds varied new village street and building layouts without changing legacy villages', () => {
+    const original = geometry('village', 500, 1);
+    const modern = geometry('village', 500, 2);
+    expect(modern).not.toEqual(original);
+    expect(geometry('village', 500, 2)).toEqual(modern);
+    expect(geometry('village', 501, 2)).not.toEqual(modern);
+  });
   it('varies ruined tower details with the seeded world', () => {
     expect(geometry('tower', 500)).not.toEqual(geometry('tower', 501));
   });
