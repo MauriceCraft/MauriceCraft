@@ -8,6 +8,8 @@ import { raycastActors } from './actor-targeting';
 import { SpatialIndex } from './spatial-index';
 import { createExplosionSystem, type ExplosionDependencies } from '../effects/explosions';
 import { createRelicSystem } from '../adventure/relics';
+import { JOBS } from './mob-models';
+import type { MovableEntity } from '../world/collision';
 
 type MobBlueprint = {
   hostile?: boolean; golem?: boolean; r: number; h: number; hp: number;
@@ -20,6 +22,7 @@ export interface MobRuntimeDependencies {
   player: MobCombatDependencies['player'];
   mobDropIds: MobDropIds;
   diamondItem: number;
+  names: Readonly<Record<number, string>>;
   getSeed: () => number;
   getDimension: () => string;
   isDragonDefeated: () => boolean;
@@ -54,7 +57,7 @@ export interface MobRuntimeDependencies {
   collides: MobSpawnDependencies['collides'];
   getStructure: MobSpawnDependencies['getStructure'];
   buildChunk: ExplosionDependencies['buildChunk'];
-  moveEntity: (mob: SpawnMob, axis: number, distance: number) => void;
+  moveEntity: (actor: MovableEntity, axis: number, distance: number) => void;
   getOrGenerateChunk: (cx: number, cz: number) => unknown;
   inStructureZone: (x: number, z: number) => boolean;
   damagePlayer: (damage: number, scaled: boolean) => void;
@@ -74,7 +77,7 @@ export function createMobRuntime(deps: MobRuntimeDependencies) {
   const { scene, player, camera } = deps;
   const get = deps.getBlock, topY = deps.topY, collides = deps.collides;
   const chunkAt = deps.getChunk, solid = deps.solid;
-  const structureFor = deps.getStructure, JOBS = ['farmer', 'butcher', 'mason', 'blacksmith', 'cleric'];
+  const structureFor = deps.getStructure;
   const { grassBlock: GRASS, leavesBlock: LEAVES, woodBlock: WOOD,
     torchBlock: TORCH, emeraldItem: EMERALD, regionSize: STRUCTURE_REGION_SIZE } = deps;
 
@@ -128,12 +131,13 @@ const { raid, endRaid, trySpawnMob, trySpawnAnimals, manageVillagers,
   playSound: deps.playSound,
   raidElement: deps.raidElement,
 });
-const pendingBlasts = [], pendingHits = [];
+const pendingBlasts: MobCombatDependencies['pendingBlasts'] = [];
+const pendingHits: MobCombatDependencies['pendingHits'] = [];
 const { arrows, hasLOS, shootArrow, updateArrows } = createArrowSystem({
   scene, player, mobs, getBlock: get, solid, collides,
   hasHealth: deps.hasHealth,
   damagePlayer: deps.damagePlayer, damageMob,
-  playSound: event => sfx(event),
+  playSound: deps.playSound,
   playSoundAt: deps.playSoundAt,
 });
 const stepMobActors = createMobSimulation({
@@ -170,14 +174,15 @@ function killMob(m: SpawnMob): void {
     deps.setDragonDefeated(true);
     deps.showHint('THE ENDER DRAGON IS DEFEATED! You conquered the End!', 8000);
     deps.playSoundAt('explode', m.x, m.y, m.z);
-    if (deps.getMode() === 'survival') deps.giveItem(DIAMOND, 5);
+    if (deps.getMode() === 'survival') deps.giveItem(deps.diamondItem, 5);
     return;
   }
   deps.playSoundAt('die', m.x, m.y + 0.5, m.z);
   if (m.leader && deps.hasHealth() && !deps.getOmen() && deps.getDifficulty().cap > 0) { deps.setOmen(true); deps.showHint('You feel an ominous presence... Enter a village and a raid will follow.', 5500); }
   if (deps.getMode() === 'survival') {
-    const got = [];
-    KINDS[m.kind].drops().forEach(function (d) { if (d[1] > 0) { deps.giveItem(d[0], d[1]); got.push('+' + d[1] + ' ' + NAMES[d[0]]); } });
+    const got: string[] = [];
+    const blueprint = KINDS[m.kind as MobKind] as unknown as MobBlueprint;
+    blueprint.drops().forEach(d => { if (d[1] > 0) { deps.giveItem(d[0], d[1]); got.push('+' + d[1] + ' ' + deps.names[d[0]]); } });
     if (got.length) deps.flashName(got.join('   '));
   }
 }
@@ -188,7 +193,7 @@ function damageMob(m: SpawnMob, dmg: number): boolean {
   return false;
 }
 function attackMob(m: SpawnMob): void {
-  if (m.golem) { flashName('That golem is on your side'); return; }
+  if (m.golem) { deps.flashName('That golem is on your side'); return; }
   const dx = m.x - player.x, dz = m.z - player.z, d = Math.hypot(dx, dz) || 1;
   m.vx += dx / d * 9; m.vz += dz / d * 9; m.vy = 5;
   deps.playSoundAt('hit', m.x, m.y + 0.8, m.z);
@@ -202,7 +207,7 @@ const { blasts, fx, rebuildSet, spawnTnt, addDynamite, removeBlastAt, removeFxAt
   breakTimes: deps.breakTimes, blockGeometry: deps.blockGeometry,
   getBlock: get, setBlock: deps.setBlock, hasChunk: (x, z) => !!chunkAt(x, z), buildChunk: deps.buildChunk,
   getMobs: () => mobs, getPlayer: () => player,
-  damageMob: (mob, damage) => { damageMob(mob, damage); },
+  damageMob: (mob, damage) => { damageMob(mob as SpawnMob, damage); },
   damagePlayer: damage => deps.damagePlayer(damage, false),
   moveEntity: deps.moveEntity, collides,
   playSound: deps.playSoundAt,
