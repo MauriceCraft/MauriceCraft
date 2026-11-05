@@ -23,7 +23,14 @@ describe('seeded cave networks', () => {
     expect(cavities).toBeGreaterThan(500);
   });
   it('generates different networks for different world seeds', () => {
-    const a = generated(3, 1, -1), b = generated(4, 1, -1);
-    expect(a).not.toEqual(b);
+    const signature = (seed: number) => {
+      const chunks: number[] = [];
+      for (let cx = -4; cx <= 4; cx++) for (let cz = -4; cz <= 4; cz++) {
+        const data = generated(seed, cx, cz);
+        chunks.push(data.slice(5 * 256, 24 * 256).filter(block => block === 0).length);
+      }
+      return chunks;
+    };
+    expect(signature(3)).not.toEqual(signature(4));
   });
 });
