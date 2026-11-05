@@ -56,7 +56,7 @@ function updateMobs(dt: number): void {
   spawnT -= dt; animalT -= dt; villT -= dt;
   if (deps.getDimension() !== 'end' && deps.hasHealth() && spawnT <= 0) {
     spawnT = D.every;
-    if (D.cap > 0 && (deps.isNight() || deps.getWeather() === 'storm') && mobs.filter(function (m) { return m.hostile && !KINDS[m.kind].illager; }).length < D.cap) trySpawnMob();
+    if (D.cap > 0 && deps.getDimension() === 'overworld' && mobs.filter(function (m) { return m.hostile && !KINDS[m.kind].illager; }).length < D.cap) trySpawnMob();
   }
   if (deps.getDimension() !== 'end' && animalT <= 0) {
     animalT = 2.5;
