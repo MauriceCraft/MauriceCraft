@@ -38,6 +38,7 @@ import { coord } from './commands/coordinates';
 import { createCommandConsole } from './commands/command-console';
 import { registerWorldCommands } from './commands/world-commands';
 import { registerPlayerCommands } from './commands/player-commands';
+import { registerGeneralCommands } from './commands/general-commands';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { createPortalSystem } from './portals/portal-system';
@@ -735,17 +736,7 @@ function rebuildRegion(x1, z1, x2, z2) {
   for (let cx = (Math.min(x1, x2) >> 4) - 1; cx <= (Math.max(x1, x2) >> 4) + 1; cx++) for (let cz = (Math.min(z1, z2) >> 4) - 1; cz <= (Math.max(z1, z2) >> 4) + 1; cz++) rebuildSet.add(cx + ',' + cz);
   flushRebuilds();
 }
-const mobNames = function () { return Object.keys(KINDS); };
 
-defCmd(['help', '?'], '/help [command]', 'List the commands, or explain one', function (a) {
-  if (a[0]) {
-    const c = CMDS[a[0].toLowerCase().replace(/^\//, '')];
-    if (!c) throw new Error('No command called "' + a[0] + '"');
-    return c.usage + '  -  ' + c.desc;
-  }
-  const names = []; Object.keys(CMDS).forEach(function (k) { if (CMDS[k].name === k) names.push(k); });
-  return 'Commands: ' + names.sort().map(function (n) { return '/' + n; }).join('  ') + '   (try /help <command>)';
-}, function () { return Object.keys(CMDS); });
 const { clearPortalVisuals, showPortalVisual, buildPortalFrame,
   changeDimension, checkPortal } = createPortalSystem({
   scene, portals, chunks, savedChunks, obsidian: OBSIDIAN, worldHeight: WORLD_HEIGHT,
@@ -757,23 +748,6 @@ const { clearPortalVisuals, showPortalVisual, buildPortalFrame,
   rebuildRegion, disposeMesh, resetChunkCache, clearStructures: () => structCache.clear(),
   clearMobs, collides, saveWorld, showHint,
 });
-defCmd(['portal'], '/portal [build]', 'Build an obsidian Nether portal frame in front of you; walk through it to travel', function (a) {
-  if (dimension === 'end') throw new Error('Nether portals do not work in the End. Return to the Overworld first.');
-  if (a.length && a[0].toLowerCase() !== 'build') throw new Error('Usage: /portal [build]');
-  const cx = Math.round(player.x - Math.sin(player.yaw) * 3);
-  const cz = Math.round(player.z - Math.cos(player.yaw) * 3);
-  const by = Math.max(1, Math.min(WORLD_HEIGHT - 6, Math.floor(player.y) - 1));
-  const made = buildPortalFrame(dimension, cx, by, cz);
-  saveWorld();
-  return 'Built an obsidian Nether portal frame at ' + made.x + ' ' + made.y + ' ' + made.z + '. Walk through the doorway to travel.';
-}, function () { return ['build']; });
-defCmd(['dimension', 'dim'], '/dimension <overworld|nether|end>', 'Travel between the Overworld, Nether, and End', function (a) {
-  const target = (a[0] || '').toLowerCase();
-  if (['overworld', 'nether', 'end'].indexOf(target) < 0) throw new Error('Usage: /dimension <overworld|nether|end>');
-  if (target === dimension) return 'You are already in the ' + target + '.';
-  changeDimension(target);
-  return 'Entered the ' + target + '.';
-}, function () { return ['overworld', 'nether', 'end']; });
 registerPlayerCommands({
   register: defCmd,
   state: {
@@ -797,39 +771,6 @@ registerPlayerCommands({
   topBlockY: topY, collides: (x, y, z) => collides(x, y, z),
   getSeed: () => seed,
 });
-defCmd(['spawn', 'summon'], '/spawn <creature> [count]', 'Spawn creatures in front of you', function (a) {
-  if (!a[0]) throw new Error('Usage: /spawn <creature> [count]. Creatures: ' + mobNames().join(', '));
-  const q = slug(a[0]).replace(/_/g, '');
-  let kind = mobNames().filter(function (k) { return k === q; })[0] || (q === 'golem' ? 'irongolem' : null);
-  if (!kind) { const c = mobNames().filter(function (k) { return k.indexOf(q) === 0; }); if (c.length === 1) kind = c[0]; }
-  if (!kind) throw new Error('Unknown creature "' + a[0] + '". Creatures: ' + mobNames().join(', '));
-  const K = KINDS[kind];
-  if (K.hostile && hasHealth() && DIFF[difficulty].cap === 0) throw new Error('Monsters cannot spawn on Peaceful');
-  const n = Math.max(1, Math.min(20, Math.floor(+(a[1] || 1)) || 1)), sp = spawnSpot();
-  let made = 0;
-  for (let i = 0; i < n; i++) {
-    const x = sp[0] + (Math.random() - 0.5) * (n > 1 ? 4 : 0), z = sp[2] + (Math.random() - 0.5) * (n > 1 ? 4 : 0);
-    getOrGen(Math.floor(x) >> 4, Math.floor(z) >> 4);
-    let y = topY(Math.floor(x), Math.floor(z)) + 1.01;
-    for (let k = 0; k < 3 && collides(x, y, z, K.r, K.h); k++) y += 1;
-    if (collides(x, y, z, K.r, K.h)) continue;
-    const m = addMob(kind, x, y, z, kind === 'villager' ? { job: JOBS[Math.floor(Math.random() * JOBS.length)] } : null);
-    m.persist = true; m.hx = x; m.hz = z; made++;
-  }
-  return made ? 'Spawned ' + made + ' ' + kind + (made === 1 ? '' : 's') : 'There was no room to spawn that here';
-}, function (i) { return i === 1 ? mobNames() : []; });
-defCmd(['kill'], '/kill [hostile|passive|villagers|golems|all|me]', 'Remove creatures (or yourself)', function (a) {
-  const what = (a[0] || 'hostile').toLowerCase();
-  if (what === 'me' || what === 'self') {
-    if (!hasHealth()) throw new Error('You can only do that in Survival or Adventure');
-    hp = 1; damagePlayer(1); return 'Ouch.';
-  }
-  const sel = { hostile: function (m) { return m.hostile; }, passive: function (m) { return !m.hostile && !m.golem && m.kind !== 'villager'; }, villagers: function (m) { return m.kind === 'villager'; }, golems: function (m) { return m.golem; }, all: function () { return true; } }[what];
-  if (!sel) throw new Error('Usage: /kill [hostile|passive|villagers|golems|all|me]');
-  let n = 0;
-  for (let i = mobs.length - 1; i >= 0; i--) if (sel(mobs[i])) { removeMobAt(i); n++; }
-  return 'Removed ' + n + ' creature' + (n === 1 ? '' : 's');
-}, function () { return ['hostile', 'passive', 'villagers', 'golems', 'all', 'me']; });
 registerWorldCommands({
   register: defCmd,
   player,
@@ -852,8 +793,23 @@ registerWorldCommands({
   ensureAround,
   topBlockY: topY,
 });
-defCmd(['save'], '/save', 'Save the world now', function () { saveWorld().then(refreshWorlds); return worldSession.isStorageAvailable() ? 'Saving the world...' : 'Saving is not available in this browser'; });
-defCmd(['say'], '/say <message>', 'Write a message in the chat', function (a) { return '[You] ' + a.join(' '); });
+registerGeneralCommands({
+  register: defCmd, commands: CMDS,
+  player, maxHeight: WORLD_HEIGHT,
+  getDimension: () => dimension,
+  buildPortalFrame: (where, x, y, z) => buildPortalFrame(where, x, y, z),
+  changeDimension: where => changeDimension(where),
+  saveWorld: () => saveWorld(),
+  refreshWorlds: () => { void refreshWorlds(); },
+  isStorageAvailable: () => worldSession.isStorageAvailable(),
+  slug, mobs, kinds: KINDS, jobs: JOBS,
+  getDifficultyCap: () => DIFF[difficulty].cap,
+  hasHealth: () => hasHealth(),
+  setHealth: value => { hp = value; },
+  damagePlayer: amount => damagePlayer(amount),
+  spawnSpot, getOrGenerateChunk: getOrGen, topY, collides,
+  addMob, removeMobAt,
+});
 
 /* ---------- Saved worlds: game state adapters ---------- */
 function snapshotWorld(world) {
