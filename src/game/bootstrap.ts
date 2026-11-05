@@ -16,6 +16,7 @@ import { createMobSpawning } from './entities/mob-spawning';
 import { part, JOBS, JOB_NAMES } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
 import { createBlockAccess } from './world/block-access';
+import { createChunkLifecycle } from './world/chunk-lifecycle';
 import { createChunkStreamer } from './world/chunk-streamer';
 import { primeWorldChunks } from './world/prime-chunks';
 import { createStructureRegions } from './world/structure-regions';
@@ -106,28 +107,14 @@ const generateChunkData = createChunkGenerator({
   groundH, heightAt, forceSand, inStructZone, structureFor, buildStructure,
   blocks: { BRICK, COAL_ORE, COPPER_ORE, DIAMOND_ORE, DIRT, GOLD, GRASS, IRON_ORE, LAVA, LEAVES, SAND, SANDSTONE, STONE, STONEBRICK, TORCH, WATER, WOOD },
 });
-function genChunk(cx, cz) {
-  const sv = dimension === 'overworld' ? savedChunks.get(ckey(cx, cz)) : null;
-  if (sv) {
-    const sc = { cx: cx, cz: cz, data: new Uint8Array(sv), mesh: null, meshed: false, edited: true, dirty: false };
-    chunks.set(ckey(cx, cz), sc); resetChunkCache();
-    return sc;
-  }
-  const data = generateChunkData(cx, cz);
-  const generated = { cx, cz, data, mesh: null, meshed: false, edited: false, dirty: false };
-  chunks.set(ckey(cx, cz), generated);
-  resetChunkCache();
-  return generated;
-}
-function getOrGen(cx, cz) { return chunkAt(cx, cz) || genChunk(cx, cz); }
-function topY(x, z) { for (let y = WORLD_HEIGHT - 1; y >= 0; y--) if (solid(get(x, y, z))) return y; return 0; }
-
-function resetWorld(newSeed, ox, oz) {
-  chunks.forEach(function (c) { disposeMesh(c); });
-  chunks.clear(); resetChunkCache();
-  seed = newSeed; structCache.clear();
-  primeWorldChunks(ox, oz, genChunk, buildChunk);
-}
+const { genChunk, getOrGen, topY, resetWorld } = createChunkLifecycle({
+  chunks, savedChunks, height: WORLD_HEIGHT,
+  getDimension: () => dimension,
+  setSeed: value => { seed = value; },
+  clearStructures: () => structCache.clear(),
+  chunkAt, resetChunkCache, generateChunkData, buildChunk, disposeMesh,
+  solid, getBlock: get,
+});
 
 const streamChunks = createChunkStreamer({
   chunks, viewDistance: VIEW_DISTANCE,
