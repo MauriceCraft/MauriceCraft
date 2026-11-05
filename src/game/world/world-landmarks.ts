@@ -12,7 +12,7 @@ interface Deps {
 /** The same deterministic feature regions are queried for generation and HUD labels. */
 export function createLandmarkFinder(deps: Deps) {
   const natural = createNaturalFeatures({
-    getSeed: deps.getSeed,
+    getSeed: deps.getSeed, getGeneratorVersion: deps.getVersion,
     biomeAt: (x, z) => biomeAt(x, z, deps.getSeed()),
     heightAt: deps.heightAt, inStructureZone: deps.inStructureZone,
     seaLevel: deps.seaLevel, maxHeight: deps.worldHeight,
