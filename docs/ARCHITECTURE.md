@@ -62,7 +62,7 @@ The renderer and initialization can fail on some mobile devices. An error must s
 
 ## Versioned world generation
 
-Worlds created before the biome upgrade have no `generatorVersion` and use generator v1. Newly created worlds explicitly store `generatorVersion: 2` and use full-range 32-bit seeds. Loading and portal travel preserve the selected version, so edits and unexplored terrain in older worlds do not unexpectedly change. Do not modify v1 terrain/structures in place; new algorithms belong behind version 2.
+Worlds created before the biome upgrade have no `generatorVersion` and use generator v1. Newly created worlds explicitly store `generatorVersion: 2` and use full-range 32-bit seeds. The v2 biome maps, modern chunk generator, sparse tree decorator and lake/cascade planner live in `src/game/world/biomes.ts`, `chunk-generator-v2.ts`, `tree-decorator.ts`, and `natural-features.ts`. All features are coordinate- and seed-driven to prevent chunk-order seams. Legacy structure layouts and old 7-block tree-grid generation remain on v1. Loading and portal travel preserve the selected version, so edits and unexplored terrain in older worlds do not unexpectedly change. Do not modify v1 terrain/structures in place; new algorithms belong behind version 2.
 
 ## Never break world saves
 

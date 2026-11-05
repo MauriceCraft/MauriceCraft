@@ -19,6 +19,47 @@ test('production build loads the game menu without startup exceptions', async ({
   expect(pageErrors).toEqual([]);
 });
 
+test('new worlds use versioned biomes and weather settings persist across reloads', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('./');
+  await expect(page.locator('#play')).toBeEnabled({ timeout: 15_000 });
+  await page.locator('#newworld').click();
+  await expect(page.locator('#play')).toBeEnabled({ timeout: 15_000 });
+  await expect(page.locator('.world')).toHaveCount(2);
+  const cloudy = page.locator('.wmode[data-weather="cloudy"]');
+  await cloudy.click();
+  await expect(cloudy).toHaveClass(/on/);
+  const readWorlds = () => page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('blockcraft-worlds');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<Array<{ seed: number; generatorVersion?: number; weather?: { w: string } }>>((resolve, reject) => {
+        const request = database.transaction('worlds', 'readonly').objectStore('worlds').getAll();
+        request.onsuccess = () => resolve(request.result as Array<{ seed: number; generatorVersion?: number; weather?: { w: string } }>);
+        request.onerror = () => reject(request.error);
+      });
+    } finally { database.close(); }
+  });
+  await expect.poll(async () => (await readWorlds()).filter(w => w.weather?.w === 'cloudy').length, {
+    timeout: 15_000,
+  }).toBe(1);
+  const before = await readWorlds();
+  expect(before).toHaveLength(2);
+  for (const world of before) {
+    expect(world.generatorVersion).toBe(2);
+    expect(world.seed).toBeGreaterThanOrEqual(0);
+    expect(world.seed).toBeLessThan(0x100000000);
+  }
+  await page.reload();
+  await expect(page.locator('#play')).toBeEnabled({ timeout: 15_000 });
+  expect(await readWorlds()).toHaveLength(2);
+  expect(errors).toEqual([]);
+});
+
 test('desktop and mobile can start playing', async ({ page, isMobile }) => {
   await page.goto('./');
   const play = page.locator('#play');

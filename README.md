@@ -19,6 +19,12 @@ Desktop: **WASD** to move, **Space** to jump, mouse to look, left/right click to
 
 Mobile: use the on-screen movement area, drag to look, and tap the on-screen Jump/Place/Bag/Cmd controls. Inventory, crafting, and the pause menu are touch-friendly.
 
+## Exploring generated worlds
+
+New worlds use generator v2: 11 climate-driven biomes (plains, forest, flower meadow, savanna, desert, badlands, marsh, snowy taiga, tundra, highlands and volcanic highlands), distinct tree silhouettes and densities, lakes and lava pools, cliffside cascades, and less repetitive villages. Weather can now shift between clear, cloudy, rain, and thunderstorms. Worlds use 32-bit seeded generation; the same seed and generator version reproduce the same starting terrain.
+
+**Existing saves are preserved:** worlds created before this change stay on generator v1, including in unexplored chunks. Create a **New World** to see the new biomes and natural features. Do not rewrite an old world's generator version unless you deliberately accept terrain discontinuities.
+
 ## Saved worlds
 
 Saves live **only in your current browser** in IndexedDB. They are not stored in this GitHub repository or synchronized across devices. Clearing site storage, switching browser profiles/devices, or changing the website origin can make saves inaccessible. The database name and saved data format are intentionally unchanged in this refactor.
