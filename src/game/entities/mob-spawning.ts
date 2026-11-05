@@ -25,7 +25,7 @@ export interface MobSpawnDependencies {
   solid: (block: number) => boolean;
   collides: (x: number, y: number, z: number, radius?: number, height?: number) => boolean;
   getStructure: (rx: number, rz: number) => SpawnStructure | null;
-  addMob: (kind: string, x: number, y: number, z: number, options: { job?: string; leader?: boolean } | null) => SpawnMob;
+  addMob: (kind: string, x: number, y: number, z: number, options?: { job?: string; leader?: boolean } | null) => SpawnMob;
   getOmen: () => boolean;
   setOmen: (value: boolean) => void;
   isDead: () => boolean;
