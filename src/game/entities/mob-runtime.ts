@@ -84,7 +84,7 @@ export function createMobRuntime(deps: MobRuntimeDependencies) {
 
 const mobs: SpawnMob[] = [];
 const hostileActors = new SpatialIndex<SpawnMob>(16);
-const defenders = new SpatialIndex(16);
+const defenders = new SpatialIndex<SpawnMob>(16);
 let activeMobIndexes: { hostiles: SpatialIndex<SpawnMob>; defenders: SpatialIndex<SpawnMob> } | null = null;
 const { KINDS, ANIMALS } = createMobCatalog(deps.mobDropIds);
 function addMob(kind: string, x: number, y: number, z: number, opts?: { job?: string; leader?: boolean; boss?: boolean } | null): SpawnMob {
