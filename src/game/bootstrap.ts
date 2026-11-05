@@ -3,6 +3,7 @@
 // Keep IndexedDB store names/keys and world serialization compatible.
 import * as THREE from 'three';
 import { raycastActors } from './entities/actor-targeting';
+import { SpatialIndex } from './entities/spatial-index';
 import { bg, bm, part, JOBS, JOB_NAMES, makeZombie, makeCow, makePig, makeSheep, makeChicken, makeCreeper, makeSkeleton, makeSpider, makePillager, makeVindicator, makeIronGolem, makeCopperGolem, makeDiamondGolem, makeVillager, makeEnderDragon } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
 import { createChunkStreamer } from './world/chunk-streamer';
@@ -234,6 +235,7 @@ import { createAudioEngine } from './audio/sound-engine';
   /* ---------- Mobs: hostile monsters, villagers and farm animals ---------- */
   let enderDragonDefeated = false;
   const mobs = [];
+  let activeMobIndexes = null;
   const rnd3 = n => 1 + Math.floor(Math.random() * n);
   const KINDS = {
     zombie: { hostile: true, r: 0.3, h: 1.8, hp: 20, speed: 2.7, melee: { d: 1.15, dmg: 3, cd: 1.1 }, make: makeZombie, drops: function () { return [[GUNPOWDER, Math.random() < 0.5 ? 1 : 0]]; } },
@@ -263,7 +265,13 @@ import { createAudioEngine } from './audio/sound-engine';
     scene.add(m.group); mobs.push(m);
     return m;
   }
-  function removeMobAt(i) { scene.remove(mobs[i].group); mobs.splice(i, 1); }
+  function removeMobAt(index) {
+    const mob = mobs[index];
+    activeMobIndexes?.hostiles.delete(mob);
+    activeMobIndexes?.defenders.delete(mob);
+    scene.remove(mob.group);
+    mobs.splice(index, 1);
+  }
   function clearMobs() {
     mobs.forEach(function (m) { if (m.village) m.village.vSpawned = false; });   // villages repopulate afterwards
     while (mobs.length) removeMobAt(mobs.length - 1);
@@ -502,6 +510,14 @@ import { createAudioEngine } from './audio/sound-engine';
       if (hasHealth() && D.cap > 0 && mobs.filter(function (m) { return KINDS[m.kind].illager && !m.raid; }).length < 6) trySpawnPatrol();
     }
     if (dimension !== 'end') updateRaid(dt, D);
+    // Index mobs once per frame instead of searching everyone for every AI actor.
+    const hostileActors = new SpatialIndex(16);
+    const defenders = new SpatialIndex(16);
+    for (const mob of mobs) {
+      if (mob.hostile) hostileActors.upsert(mob);
+      if (mob.kind === 'villager' || mob.golem) defenders.upsert(mob);
+    }
+    activeMobIndexes = { hostiles: hostileActors, defenders };
     for (let i = mobs.length - 1; i >= 0; i--) {
       const m = mobs[i], K = KINDS[m.kind];
       const dx = player.x - m.x, dz = player.z - m.z;
@@ -518,6 +534,7 @@ import { createAudioEngine } from './audio/sound-engine';
         m.y += Math.max(-1, Math.min(1, ey)) * dt * 2.2;
         m.group.position.set(m.x, m.y + Math.sin(m.phase * 2) * 0.35, m.z);
         m.group.rotation.y = Math.atan2(ex, ez);
+        hostileActors.upsert(m);
         if (m.group.userData.wings) m.group.userData.wings.forEach(function (w) { w.rotation.z = Math.sin(m.phase * 5) * 0.55 * w.userData.flapSide; });
         m.atk -= dt;
         if (dist < 5.5 && Math.abs(player.y - m.y) < 7 && m.atk <= 0) {
@@ -542,9 +559,7 @@ import { createAudioEngine } from './audio/sound-engine';
         else m.burn = -1;
         const ill = !!K.illager;
         if (m.kind === 'zombie' || ill) {   // zombies and illagers go for the nearest villager when it is closer than you
-          for (let q = 0; q < mobs.length; q++) {
-            const o = mobs[q];
-            if (o.kind !== 'villager' && !o.golem) continue;
+          for (const o of defenders.near(m.x, m.z, 40)) {
             const vd = Math.hypot(o.x - m.x, o.z - m.z);
             if (vd < ad && vd < 40) { ad = vd; ax = o.x - m.x; az = o.z - m.z; huntV = o; }
           }
@@ -583,9 +598,7 @@ import { createAudioEngine } from './audio/sound-engine';
       } else if (K.golem) {
         // Golems fight any monster nearby. Copper and diamond golems tag along with you; iron golems guard their post.
         let tgt = null, td = K.range;
-        for (let q = 0; q < mobs.length; q++) {
-          const o = mobs[q];
-          if (!o.hostile) continue;
+        for (const o of hostileActors.near(m.x, m.z, K.range)) {
           const d2 = Math.hypot(o.x - m.x, o.z - m.z);
           if (d2 < td) { td = d2; tgt = o; }
         }
@@ -615,9 +628,7 @@ import { createAudioEngine } from './audio/sound-engine';
       } else if (m.kind === 'villager') {
         m.panic -= dt; m.ai -= dt;
         let fx = 0, fz = 0, scared = false;
-        for (let q = 0; q < mobs.length; q++) {
-          const o = mobs[q];
-          if (!o.hostile) continue;
+        for (const o of hostileActors.near(m.x, m.z, 9)) {
           const ox = m.x - o.x, oz = m.z - o.z, od = Math.hypot(ox, oz);
           if (od < 9 && od > 0.01) { fx += ox / od; fz += oz / od; scared = true; }
         }
@@ -662,6 +673,8 @@ import { createAudioEngine } from './audio/sound-engine';
       else if (m.kind === 'villager' && dist < 4) m.face = Math.atan2(dx, dz);
       m.group.position.set(m.x, m.y, m.z);
       m.group.rotation.y = m.face;
+      if (m.hostile) hostileActors.upsert(m);
+      if (m.kind === 'villager' || m.golem) defenders.upsert(m);
       const sp = Math.hypot(m.vx, m.vz);
       m.phase += dt * sp * 3.2;
       const sw = Math.sin(m.phase) * Math.min(0.8, sp * 0.5 + 0.05), legs = m.group.userData.legs;
@@ -669,6 +682,7 @@ import { createAudioEngine } from './audio/sound-engine';
     }
     while (pendingHits.length) { const ph = pendingHits.pop(); if (mobs.indexOf(ph.m) >= 0) damageMob(ph.m, ph.d); }
     while (pendingBlasts.length) { const pb = pendingBlasts.pop(); explode(pb.x, pb.y, pb.z, pb.r, pb.p); }
+    activeMobIndexes = null;
   }
 
   const rayDir = new THREE.Vector3();
