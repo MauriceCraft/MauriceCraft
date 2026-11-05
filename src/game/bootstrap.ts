@@ -22,6 +22,7 @@ import { createRecipeCatalog } from './crafting/recipe-catalog';
 import { createInventoryUi } from './ui/inventory-ui';
 import { createInputControls } from './input/game-controls';
 import { createHud } from './ui/hud';
+import { createGameMenu, MODE_LABELS } from './ui/game-menu';
 import { coord } from './commands/coordinates';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
@@ -1212,56 +1213,24 @@ import { createAudioEngine } from './audio/sound-engine';
     });
 
   /* ---------- UI / state ---------- */
-  const overlay = document.getElementById('overlay');
-  const playBtn = document.getElementById('play');
-  const newBtn = document.getElementById('newworld');
-  const subEl = document.getElementById('sub');
-  const infoEl = document.getElementById('info');
-  const hintEl = document.getElementById('hint');
-  const objEl = document.getElementById('objective');
-  const modeDescEl = document.getElementById('modeDesc');
-  const modeBtns = Array.prototype.slice.call(document.querySelectorAll('.mode'));
-  const diffBtns = Array.prototype.slice.call(document.querySelectorAll('.dmode'));
-  const diffDescEl = document.getElementById('diffDesc');
-  const DIFF_DESC = {
-    peaceful: 'No monsters, no hunger, and health comes back quickly. Falls and explosions still hurt.',
-    easy: 'Fewer, slower monsters that hit softly, with slow-firing skeletons and longer creeper fuses.',
-    normal: 'The standard challenge.',
-    hard: 'Lots of fast monsters that spot you from far away and hit hard. Skeletons shoot quickly, creepers blow sooner, and health returns slowly.'
-  };
-  const DESC = {
-    creative: 'Unlimited blocks, instant building and flying. Nothing can hurt you.',
-    survival: 'Mine blocks to collect them, then build with what you gather. Stone needs a pickaxe, and better tools mine faster. Keep an eye on your hunger and eat meat. Dig for coal, copper, iron and diamonds. Zombies, skeletons, creepers and spiders come out at night, and falls hurt. Torches light up the dark and keep them from spawning nearby. Craft a table from planks for bigger recipes.',
-    adventure: 'The world is protected, so you can\u2019t break or place blocks. Find all ' + RELIC_COUNT + ' glowing relics and stay alive.',
-    spectator: 'Fly through anything and look around. You can\u2019t touch the world. Scroll to change speed.'
-  };
-  const LABEL = { creative: 'Creative', survival: 'Survival', adventure: 'Adventure', spectator: 'Spectator' };
+  const LABEL = MODE_LABELS;
+  const { overlay, playBtn, newBtn, subEl, infoEl, objEl,
+    updateModeUI, updateDiffUI, updateWeatherUI, showHint } = createGameMenu({
+    getMode: () => mode, getDifficulty: () => difficulty, getWeather: () => weather,
+    canInteract, hasHealth, isTouch, relicCount: RELIC_COUNT,
+    touchUi: touchUI, hotbar: hotbarEl, hearts: heartsEl, food: foodEl,
+    placeButton: bPlace, flyButton: bFly, inventoryButton: bInv, jumpButton: bJump,
+    hideSelection: () => { sel.visible = false; resetMine(); },
+    syncRelics: syncRelicVisibility,
+    updateHotbar: () => updateHotbar(false), updateHearts, updateFood: renderFood,
+    setMode: value => setMode(value), setDifficulty: value => setDifficulty(value),
+    setWeather: value => setWeather(value), sound: Snd,
+    initializeAudio: audioInit, applySound, saveSound, playClick: () => sfx('click'),
+    isPlaying: () => playing,
+    saveAndRefreshWorlds: () => { void saveWorld().then(refreshWorlds); },
+    onPlay: () => startGame(),
+  });
 
-  if (isTouch) {
-    touchUI.style.display = 'block';
-    document.getElementById('controls').innerHTML =
-      '<dt>Left side</dt><dd>Drag to move</dd><dt>Right side</dt><dd>Drag to look, tap to break or hit, hold to mine</dd>' +
-      '<dt>Place</dt><dd>Puts down the selected block</dd><dt>Hotbar</dt><dd>Tap to choose a block</dd><dt>Bag</dt><dd>Open the inventory</dd>';
-  }
-
-  function updateModeUI() {
-    const inter = canInteract(), health = hasHealth();
-    hotbarEl.style.display = inter ? 'flex' : 'none';
-    heartsEl.style.display = health ? 'flex' : 'none';
-    heartsEl.classList.toggle('raised', inter);
-    foodEl.style.display = mode === 'survival' ? 'flex' : 'none'; foodEl.classList.toggle('raised', inter);
-    objEl.style.display = mode === 'adventure' ? 'block' : 'none';
-    sel.visible = false; resetMine();
-    bPlace.style.display = inter ? 'block' : 'none';
-    bFly.style.display = mode === 'creative' ? 'block' : 'none';
-    bInv.style.display = inter ? 'block' : 'none';
-    bJump.textContent = mode === 'spectator' ? 'Up' : 'Jump';
-    syncRelicVisibility();
-    modeBtns.forEach(function (b) { const on = b.dataset.mode === mode; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
-    modeDescEl.textContent = DESC[mode];
-    updateDiffUI();
-    updateHotbar(false); updateHearts(); renderFood();
-  }
   function setMode(m) {
     mode = m;
     mining = placing = pulseMine = pulsePlace = false;
@@ -1272,31 +1241,6 @@ import { createAudioEngine } from './audio/sound-engine';
     if (ready && m !== 'spectator' && collides(player.x, player.y, player.z)) player.y = topY(Math.floor(player.x), Math.floor(player.z)) + 1.01;
     updateModeUI();
   }
-  const wBtns = Array.prototype.slice.call(document.querySelectorAll('.wmode'));
-  function updateWeatherUI() {
-    wBtns.forEach(function (b) { const on = b.dataset.weather === weather; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
-  }
-  wBtns.forEach(function (b) { b.addEventListener('click', function () { setWeather(b.dataset.weather); sfx('click'); saveWorld().then(refreshWorlds); }); });
-  updateWeatherUI();
-  const sfxBtn = document.getElementById('sfxBtn'), musicBtn = document.getElementById('musicBtn');
-  function syncSoundBtns() {
-    sfxBtn.textContent = 'Sound: ' + (Snd.sfx ? 'On' : 'Off'); musicBtn.textContent = 'Music: ' + (Snd.music ? 'On' : 'Off');
-    sfxBtn.setAttribute('aria-pressed', Snd.sfx ? 'true' : 'false'); musicBtn.setAttribute('aria-pressed', Snd.music ? 'true' : 'false');
-  }
-  sfxBtn.addEventListener('click', function () { audioInit(); Snd.sfx = !Snd.sfx; applySound(); saveSound(); syncSoundBtns(); sfx('click'); });
-  musicBtn.addEventListener('click', function () { audioInit(); Snd.music = !Snd.music; applySound(); saveSound(); syncSoundBtns(); if (Snd.music) Snd.nextMusic = 0.2; });
-  window.addEventListener('keydown', function (e) {
-    if (e.code !== 'KeyM' || e.repeat) return;
-    audioInit();
-    const on = !(Snd.sfx || Snd.music);
-    Snd.sfx = Snd.music = on; applySound(); saveSound(); syncSoundBtns();
-    if (playing) showHint('Sound ' + (on ? 'on' : 'off'), 1200);
-  });
-  syncSoundBtns();
-  function updateDiffUI() {
-    diffBtns.forEach(function (b) { const on = b.dataset.diff === difficulty; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
-    diffDescEl.textContent = DIFF_DESC[difficulty] + (hasHealth() ? '' : ' (Applies in Survival and Adventure.)');
-  }
   function setDifficulty(d) {
     if (!DIFF[d]) return;
     difficulty = d;
@@ -1304,14 +1248,6 @@ import { createAudioEngine } from './audio/sound-engine';
     updateDiffUI();
     sfx('click');
     saveWorld().then(refreshWorlds);
-  }
-  diffBtns.forEach(function (b) { b.addEventListener('click', function () { setDifficulty(b.dataset.diff); }); });
-  modeBtns.forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); saveWorld().then(refreshWorlds); }); });
-
-  let hintTimer = 0;
-  function showHint(msg, ms) {
-    hintEl.textContent = msg; hintEl.style.display = 'block';
-    clearTimeout(hintTimer); hintTimer = setTimeout(function () { hintEl.style.display = 'none'; }, ms || 6000);
   }
   function enterFallback() {
     if (fallback || isTouch) return;
@@ -1358,7 +1294,7 @@ import { createAudioEngine } from './audio/sound-engine';
     subEl.textContent = 'You died. Respawn to try again.';
     playBtn.textContent = 'Respawn';
   }
-  playBtn.addEventListener('click', startGame);
+
   /* ---------- Commands (press T or /) ---------- */
   const chatEl = document.getElementById('chatlog'), cmdBar = document.getElementById('cmdbar'), cmdInput = document.getElementById('cmdinput');
   const cmdHist = []; let cmdHistI = 0;
