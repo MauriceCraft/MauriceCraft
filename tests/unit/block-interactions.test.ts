@@ -40,7 +40,7 @@ function fixture() {
     getSatiety: () => satiety, setSatiety: value => { satiety = value; },
     isNight: () => false, getWeather: () => 'clear', hasHealth: () => true,
     setSpawnPoint: vi.fn(), startSleeping: vi.fn(),
-    getBlock, setBlock, inBounds: (_x, y) => y >= 0 && y < 48,
+    getBlock, setBlock, inBounds: (x, y, z) => Number.isFinite(x) && y >= 0 && y < 48 && Number.isFinite(z),
     hasChunk: () => true, solid: id => id !== 0, isBed: id => id >= 19 && id <= 26,
     collides: () => false, heldTool: () => null, canCollect: () => true,
     wearTool: vi.fn(), spendItem: id => { if (!(inventory[id] > 0)) return false; inventory[id]--; return true; },
