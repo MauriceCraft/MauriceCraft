@@ -42,7 +42,15 @@ export function createMobWorldCycle<T extends MobActor>(deps: MobWorldCycleDeps<
     pendingHits, pendingBlasts, addMob, trySpawnMob, trySpawnAnimals,
     manageVillagers, trySpawnPatrol, updateRaid, stepMobActors } = deps;
   const random = deps.random ?? Math.random;
-  let spawnT = 2, animalT = 0.5, villT = 0.2, patrolT = 70;
+  // Ten active minutes of grace stop dangerous patrols overwhelming new players.
+  const INITIAL_PATROL_GRACE_SECONDS = 600;
+  let spawnT = 2, animalT = 0.5, villT = 0.2, patrolT = INITIAL_PATROL_GRACE_SECONDS;
+  function resetSpawnTimers(): void {
+    spawnT = 2;
+    animalT = 0.5;
+    villT = 0.2;
+    patrolT = INITIAL_PATROL_GRACE_SECONDS;
+  }
 
 function updateMobs(dt: number): void {
   const D = deps.getDifficulty();
@@ -63,10 +71,13 @@ function updateMobs(dt: number): void {
     if (!deps.isNight() && mobs.filter(function (m) { return !m.hostile && m.kind !== 'villager'; }).length < 12) trySpawnAnimals();
   }
   if (deps.getDimension() !== 'end' && villT <= 0) { villT = 1.5; manageVillagers(); }
-  patrolT -= dt;
-  if (deps.getDimension() !== 'end' && patrolT <= 0) {
-    patrolT = D.patrol[0] + random() * (D.patrol[1] - D.patrol[0]);
-    if (deps.hasHealth() && D.cap > 0 && mobs.filter(function (m) { return KINDS[m.kind].illager && !m.raid; }).length < 6) trySpawnPatrol();
+  // Patrol timing pauses outside the Overworld (including the Nether).
+  if (deps.getDimension() === 'overworld') {
+    patrolT -= dt;
+    if (patrolT <= 0) {
+      patrolT = D.patrol[0] + random() * (D.patrol[1] - D.patrol[0]);
+      if (deps.hasHealth() && D.cap > 0 && mobs.filter(function (m) { return KINDS[m.kind].illager && !m.raid; }).length < 6) trySpawnPatrol();
+    }
   }
   if (deps.getDimension() !== 'end') updateRaid(dt, D);
   // Index mobs once per frame instead of searching everyone for every AI actor.
@@ -84,5 +95,5 @@ function updateMobs(dt: number): void {
 }
 
 
-  return { updateMobs };
+  return { updateMobs, resetSpawnTimers };
 }

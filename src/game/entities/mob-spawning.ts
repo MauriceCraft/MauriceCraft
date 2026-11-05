@@ -145,7 +145,8 @@ function trySpawnPatrol(): void {
       if (!chunkAt(x >> 4, z >> 4)) continue;
       const y = topY(x, z), b = get(x, y, z);
       if (b === LEAVES || b === WOOD || b === 0) continue;
-      const kind = (i > 0 && Math.random() < 0.25) ? 'vindicator' : 'pillager', K = KINDS[kind];
+      // Natural patrols are Pillagers only; Vindicators are reserved for raids.
+      const kind = 'pillager', K = KINDS.pillager;
       if (collides(x + 0.5, y + 1.01, z + 0.5, K.r, K.h)) continue;
       const lead = made === 0 && kind === 'pillager';
       const m = addMob(kind, x + 0.5, y + 1.01, z + 0.5, { leader: lead });

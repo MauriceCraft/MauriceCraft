@@ -13,23 +13,24 @@ function fixture() {
   const trySpawnPatrol = vi.fn(), updateRaid = vi.fn(), stepMobActors = vi.fn();
   const setActiveIndexes = vi.fn();
   const damageMob = vi.fn(), explode = vi.fn(), showHint = vi.fn(), addMob = vi.fn();
-  let dimension = 'overworld', night = false, health = true, dragonDefeated = false;
+  let dimension = 'overworld', night = false, health = true, dragonDefeated = false, mobCap = 8;
   const deps: MobWorldCycleDeps<MobActor> = {
     mobs, player: { x: 0, y: 15, z: 0 }, kinds: { zombie: {}, villager: {}, pillager: { illager: true } },
     hostileActors, defenders, pendingHits, pendingBlasts,
-    getDifficulty: () => ({ cap: 8, every: 2, patrol: [90, 160], raid: 1 }),
+    getDifficulty: () => ({ cap: mobCap, every: 2, patrol: [90, 160], raid: 1 }),
     getDimension: () => dimension, isDragonDefeated: () => dragonDefeated,
     hasHealth: () => health, isNight: () => night, getWeather: () => 'clear',
     addMob, trySpawnMob, trySpawnAnimals, manageVillagers, trySpawnPatrol, updateRaid,
     stepMobActors, setActiveIndexes, damageMob, explode, showHint,
     random: () => 0,
   };
-  const { updateMobs } = createMobWorldCycle(deps);
+  const { updateMobs, resetSpawnTimers } = createMobWorldCycle(deps);
   return { mobs, hostileActors, defenders, pendingHits, pendingBlasts,
-    updateMobs, trySpawnMob, trySpawnAnimals, manageVillagers,
+    updateMobs, resetSpawnTimers, trySpawnMob, trySpawnAnimals, manageVillagers,
     trySpawnPatrol, updateRaid, stepMobActors, setActiveIndexes, damageMob, explode, addMob,
     setDimension: (v: string) => { dimension = v; }, setNight: (v: boolean) => { night = v; },
-    setHealth: (v: boolean) => { health = v; }, setDragonDefeated: (v: boolean) => { dragonDefeated = v; } };
+    setHealth: (v: boolean) => { health = v; }, setMobCap: (v: number) => { mobCap = v; },
+    setDragonDefeated: (v: boolean) => { dragonDefeated = v; } };
 }
 
 describe('mob world population cycle', () => {
@@ -62,6 +63,48 @@ describe('mob world population cycle', () => {
     expect(f.trySpawnMob).not.toHaveBeenCalled();
     expect(f.trySpawnAnimals).not.toHaveBeenCalled();
     expect(f.updateRaid).not.toHaveBeenCalled();
+  });
+
+  it('waits ten active minutes before a patrol and then uses the difficulty interval', () => {
+    const f = fixture();
+    f.updateMobs(599);
+    expect(f.trySpawnPatrol).not.toHaveBeenCalled();
+    f.updateMobs(1);
+    expect(f.trySpawnPatrol).toHaveBeenCalledTimes(1);
+    f.updateMobs(89);
+    expect(f.trySpawnPatrol).toHaveBeenCalledTimes(1);
+    f.updateMobs(1);
+    expect(f.trySpawnPatrol).toHaveBeenCalledTimes(2);
+  });
+
+  it('restarts the patrol grace period after switching worlds', () => {
+    const f = fixture();
+    f.updateMobs(600);
+    expect(f.trySpawnPatrol).toHaveBeenCalledTimes(1);
+    f.resetSpawnTimers();
+    f.updateMobs(599);
+    expect(f.trySpawnPatrol).toHaveBeenCalledTimes(1);
+    f.updateMobs(1);
+    expect(f.trySpawnPatrol).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not count time spent in the Nether towards Overworld patrols', () => {
+    const f = fixture();
+    f.setDimension('nether');
+    f.updateMobs(1200);
+    expect(f.trySpawnPatrol).not.toHaveBeenCalled();
+    f.setDimension('overworld');
+    f.updateMobs(599);
+    expect(f.trySpawnPatrol).not.toHaveBeenCalled();
+    f.updateMobs(1);
+    expect(f.trySpawnPatrol).toHaveBeenCalledTimes(1);
+  });
+
+  it('prevents patrols on Peaceful difficulty', () => {
+    const f = fixture();
+    f.setMobCap(0);
+    f.updateMobs(600);
+    expect(f.trySpawnPatrol).not.toHaveBeenCalled();
   });
 
   it('rebuilds indexes and drains hits before explosions, clearing active indexes', () => {

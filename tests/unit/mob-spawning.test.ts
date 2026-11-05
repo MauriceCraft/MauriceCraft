@@ -94,6 +94,36 @@ describe('mob spawning and raids', () => {
     expect(f.addMob).toHaveBeenCalledTimes(count);
   });
 
+  it('spawns Pillager-only patrols even when the random roll would have chosen Vindicators', () => {
+    const f = fixture();
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+    try {
+      f.spawning.trySpawnPatrol();
+      expect(f.mobs).toHaveLength(2);
+      expect(f.mobs.every(m => m.kind === 'pillager')).toBe(true);
+      expect(f.mobs.filter(m => m.leader)).toHaveLength(1);
+      expect(f.showHint).toHaveBeenCalledWith('A pillager patrol is nearby!', 3500);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it('continues spawning Vindicators in actual raid waves', () => {
+    const f = fixture();
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+    try {
+      f.spawning.raid.active = true;
+      f.spawning.raid.st = f.village;
+      f.spawning.raid.wave = 1;
+      f.spawning.raid.cd = 0;
+      f.spawning.updateRaid(0.1, { cap: 8, raid: 1 });
+      expect(f.mobs.filter(m => m.kind === 'pillager')).toHaveLength(4);
+      expect(f.mobs.filter(m => m.kind === 'vindicator')).toHaveLength(1);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
   it('uses an ominous presence to start a raid and resets it when ended', () => {
     const f = fixture();
     f.setOmen(true);

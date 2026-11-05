@@ -106,6 +106,8 @@ function removeMobAt(index: number): void {
   mobs.splice(index, 1);
 }
 function clearMobs(): void {
+  // A newly created or loaded world starts with its own patrol grace period.
+  resetSpawnTimers();
   mobs.forEach(function (m) { if (m.village) m.village.vSpawned = false; });   // villages repopulate afterwards
   while (mobs.length) removeMobAt(mobs.length - 1);
   while (blasts.length) removeBlastAt(blasts.length - 1);
@@ -155,7 +157,7 @@ const stepMobActors = createMobSimulation({
   hasLineOfSight: hasLOS, shootArrow,
   moveEntity: deps.moveEntity, pendingHits, pendingBlasts,
 });
-const { updateMobs } = createMobWorldCycle({
+const { updateMobs, resetSpawnTimers } = createMobWorldCycle({
   mobs, player, kinds: KINDS, hostileActors, defenders, pendingHits, pendingBlasts,
   getDifficulty: deps.getDifficulty, getDimension: deps.getDimension,
   isDragonDefeated: deps.isDragonDefeated,
