@@ -620,7 +620,9 @@ const { applyWorld, prepareNewWorld } = createWorldRestore({
   savedChunks, validDifficulties: DIFF, weatherLabels: WEATHER_LABEL,
   kinds: KINDS, mobs, relics, maximumHealth: MAX_HEALTH,
   resetWorld, clearPortalVisuals, showPortalVisual, clearMobs, clearRelics,
-  addRelic, createRelics, setMode, updateHearts, renderFood, updateWeatherUI,
+  addRelic, createRelics,
+  setMode: value => setMode(value in MODE_LABELS ? value as GameMode : 'creative'),
+  updateHearts, renderFood, updateWeatherUI,
   addMob, hasChunk: (cx, cz) => !!chunkAt(cx, cz), respawn,
 });
 
