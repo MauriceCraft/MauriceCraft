@@ -214,5 +214,27 @@ export function makeAtlas(getToolTile: (tier: number, kind: number) => number): 
       const stripe = x % 5 === 0 ? -20 : 0;
       put(103, x, y, 94 + d + stripe, 65 + d + stripe, 42 + d + stripe);
     }
+    // Species palettes are generated deterministically in unused atlas slots.
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const n = (hash2(x, y, 405) - 0.5) * 22;
+      const bark = (x % 5 === 0 || x % 7 === 0) ? -21 : 0;
+      put(104, x, y, 220 + n, 208 + n, 185 + n);
+      put(105, x, y, 218 + n + bark, 215 + n + bark, 205 + n + bark);
+      put(106, x, y, 143 + n, 179 + n, 69 + n * 0.4);
+      put(107, x, y, 166 + n, 102 + n, 61 + n);
+      put(108, x, y, 116 + n + bark, 87 + n, 68 + n);
+      put(109, x, y, 91 + n * 0.6, 132 + n, 77 + n * 0.7);
+      put(110, x, y, 111 + n, 90 + n, 65 + n);
+      put(111, x, y, 104 + n + bark, 86 + n, 70 + n);
+      put(112, x, y, 43 + n * 0.6, 126 + n, 62 + n * 0.5);
+      put(113, x, y, 206 + n, 138 + n * 1.2, 43 + n * 0.4);
+      put(114, x, y, 85 + n, 67 + n * 0.7, 51 + n * 0.5);
+      const f = hash2(x >> 1, y >> 1, 406);
+      if (f < 0.08) put(115, x, y, 236, 203, 81);
+      else if (f < 0.16) put(115, x, y, 244, 154, 190);
+      else put(115, x, y, 91 + n, 158 + n, 65 + n * 0.5);
+      if (y < 4) put(116, x, y, 91 + n, 158 + n, 65 + n * 0.5);
+      else put(116, x, y, 130 + n, 97 + n * 0.7, 68 + n * 0.6);
+    }
     return c;
   }
