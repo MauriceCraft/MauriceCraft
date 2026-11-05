@@ -13,6 +13,7 @@ import { SpatialIndex } from './entities/spatial-index';
 import { createMobSimulation } from './entities/mob-simulation';
 import { part, JOBS, JOB_NAMES } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
+import { createBlockAccess } from './world/block-access';
 import { createChunkStreamer } from './world/chunk-streamer';
 import { primeWorldChunks } from './world/prime-chunks';
 import { createStructureRegions } from './world/structure-regions';
@@ -48,24 +49,8 @@ import { createAudioEngine } from './audio/sound-engine';
 /* ---------- World constants ---------- */
 const WORLD_HEIGHT = 48, CHUNK_SIZE = 16, SEA_LEVEL = 14, VIEW_DISTANCE = 5;   // VIEW_DISTANCE = view distance in chunks
 const chunks = new Map();
-let _ck = null, _cc = null;
-function chunkAt(cx, cz) { const k = ckey(cx, cz); if (k === _ck) return _cc; _ck = k; _cc = chunks.get(k) || null; return _cc; }
-function resetChunkCache() { _ck = null; _cc = null; }
-// Unloaded space counts as solid, so nothing can walk into it
-function get(x, y, z) {
-  if (y < 0) return 3;
-  if (y >= WORLD_HEIGHT) return 0;
-  const c = chunkAt(x >> 4, z >> 4);
-  if (!c) return 3;
-  return c.data[(y * 16 + (z & 15)) * 16 + (x & 15)];
-}
-function setBlock(x, y, z, b) {
-  if (y < 0 || y >= WORLD_HEIGHT) return;
-  const c = chunkAt(x >> 4, z >> 4);
-  if (!c) return;
-  c.data[(y * 16 + (z & 15)) * 16 + (x & 15)] = b; c.edited = true; c.dirty = true; c.torches = null;
-}
-function inBounds(x, y, z) { return y >= 0 && y < WORLD_HEIGHT; }
+const { chunkAt, resetChunkCache, getBlock: get, setBlock, inBounds } =
+  createBlockAccess(chunks, WORLD_HEIGHT);
 
 // Persistent items, blocks, and mining rules live in a typed catalog.
 const {
