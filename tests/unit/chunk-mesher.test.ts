@@ -45,4 +45,12 @@ describe('typed chunk meshing', () => {
     mesher.disposeMesh(chunk);
     expect(scene.children).toHaveLength(0);
   });
+  it('shares canonical six-face geometry with explosive block entities', () => {
+    const { mesher } = fixture(3);
+    const geometry = mesher.blockGeo(3);
+    expect(geometry.getIndex()?.count).toBe(36);
+    expect(geometry.getAttribute('position').count).toBe(24);
+    geometry.dispose();
+    expect(() => mesher.blockGeo(999)).toThrow('unknown block ID');
+  });
 });

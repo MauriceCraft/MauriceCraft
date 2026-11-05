@@ -233,5 +233,31 @@ export function createChunkMesher<T extends MeshChunk>(deps: MesherDependencies<
       buildChunk(cx + dx, cz + dz);
     }
   }
-  return { disposeMesh, buildChunk, refreshAround };
+  /** Shared block cube geometry for TNT and other loose block entities. */
+  function blockGeo(blockId: number): THREE.BufferGeometry {
+    const positions: number[] = [], uvs: number[] = [], colors: number[] = [], indices: number[] = [];
+    const blockTiles = TILES[blockId];
+    if (!blockTiles) throw new Error('Cannot render unknown block ID ' + blockId);
+    FACES.forEach(face => {
+      const vertexIndex = positions.length / 3;
+      const tile = blockTiles[face.t];
+      const minU = tile / ATLAS_N + EPS, maxU = (tile + 1) / ATLAS_N - EPS;
+      const faceUvs = [[minU, EPS], [maxU, EPS], [maxU, 1 - EPS], [minU, 1 - EPS]];
+      for (let corner = 0; corner < 4; corner++) {
+        const [x, y, z] = face.c[corner];
+        positions.push(x - 0.5, y - 0.5, z - 0.5);
+        uvs.push(faceUvs[corner][0], faceUvs[corner][1]);
+        colors.push(face.s, face.s, face.s);
+      }
+      indices.push(vertexIndex, vertexIndex + 1, vertexIndex + 2, vertexIndex,
+        vertexIndex + 2, vertexIndex + 3);
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.setIndex(indices);
+    return geometry;
+  }
+  return { disposeMesh, buildChunk, refreshAround, blockGeo };
 }

@@ -72,7 +72,7 @@ import { createAudioEngine } from './audio/sound-engine';
   const { canvas, renderer, scene, camera, atlasCanvas, tex, mat, torchMat,
     dayUniform, glowMat, sun, moon, sel } = createGameRenderer(toolTile);
 
-  const { disposeMesh, buildChunk, refreshAround } = createChunkMesher({
+  const { disposeMesh, buildChunk, refreshAround, blockGeo } = createChunkMesher({
     scene, mat, torchMat, glowMat, chunks, chunkAt,
     getBlock: get, opq, isBed, tiles: TILES, height: H, chunkSize: CS,
     atlasTiles: ATLAS_N, bedHeight: BED_H, torchId: TORCH,
@@ -676,22 +676,6 @@ import { createAudioEngine } from './audio/sound-engine';
   /* ---------- TNT, dynamite and explosions ---------- */
   const blasts = [], fx = [];
   let shake = 0;
-  function blockGeo(b) {
-    const pos = [], uv = [], col = [], ind = [], tl = TILES[b];
-    FACES.forEach(function (f) {
-      const vi = pos.length / 3, tile = tl[f.t];
-      const u0 = tile / ATLAS_N + EPS, u1 = (tile + 1) / ATLAS_N - EPS;
-      const uvs = [[u0, EPS], [u1, EPS], [u1, 1 - EPS], [u0, 1 - EPS]];
-      for (let i = 0; i < 4; i++) { const c = f.c[i]; pos.push(c[0] - 0.5, c[1] - 0.5, c[2] - 0.5); uv.push(uvs[i][0], uvs[i][1]); col.push(f.s, f.s, f.s); }
-      ind.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
-    });
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    geo.setIndex(ind);
-    return geo;
-  }
   let tntGeo = null;
   function spawnTnt(x, y, z, fuse, vx, vy, vz) {   // x,z = centre, y = bottom
     if (!tntGeo) tntGeo = blockGeo(TNT);
