@@ -11,7 +11,7 @@ export interface MobWorldDifficulty {
 export interface MobWorldCycleDeps<T extends MobActor> {
   mobs: T[];
   player: { x: number; y: number; z: number };
-  kinds: Readonly<Record<string, { illager?: boolean }>>;
+  kinds: Readonly<Record<string, { hostile?: boolean; illager?: boolean }>>;
   hostileActors: SpatialIndex<T>;
   defenders: SpatialIndex<T>;
   pendingHits: Array<{ m: T; d: number }>;
