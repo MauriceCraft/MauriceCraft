@@ -3,6 +3,7 @@
 // Keep IndexedDB store names/keys and world serialization compatible.
 import * as THREE from 'three';
 import { raycastActors } from './entities/actor-targeting';
+import { createRelicSystem } from './adventure/relics';
 import { SpatialIndex } from './entities/spatial-index';
 import { bg, bm, part, JOBS, JOB_NAMES, makeZombie, makeCow, makePig, makeSheep, makeChicken, makeCreeper, makeSkeleton, makeSpider, makePillager, makeVindicator, makeIronGolem, makeCopperGolem, makeDiamondGolem, makeVillager, makeEnderDragon } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
@@ -896,64 +897,13 @@ import { createAudioEngine } from './audio/sound-engine';
     }
   }
 
-  /* ---------- Relics (Adventure goal) ---------- */
-  const RELIC_COUNT = 5;
-  const relics = [];
-  let collected = 0;
-  const relicGeo = new THREE.OctahedronGeometry(0.38);
-  const relicMat = new THREE.MeshBasicMaterial({ color: 0xffd34d });
-  const beamGeo = new THREE.CylinderGeometry(0.07, 0.07, 40, 8);
-  const beamMat = new THREE.MeshBasicMaterial({ color: 0xffe28a, transparent: true, opacity: 0.4, fog: false, depthWrite: false });
-  function clearRelics() { while (relics.length) { scene.remove(relics.pop().group); } collected = 0; }
-  function addRelic(x, y, z, got) {
-    const g = new THREE.Group();
-    const gem = new THREE.Mesh(relicGeo, relicMat); g.add(gem);
-    const beam = new THREE.Mesh(beamGeo, beamMat); beam.position.y = 20; g.add(beam);
-    const r = { x: x, y: y, z: z, group: g, gem: gem, got: !!got };
-    g.position.set(x, y, z);
-    g.visible = (mode === 'adventure') && !r.got;
-    scene.add(g); relics.push(r);
-    if (r.got) collected++;
-  }
-  function createRelics() {
-    clearRelics();
-    let minGap = 30;
-    for (let attempt = 0; attempt < 600 && relics.length < RELIC_COUNT; attempt++) {
-      if (attempt === 300) minGap = 14;
-      const ang = Math.random() * Math.PI * 2, dist = 28 + Math.random() * 75;
-      const x = Math.floor(Math.cos(ang) * dist), z = Math.floor(Math.sin(ang) * dist);
-      getOrGen(x >> 4, z >> 4);
-      const y = topY(x, z), b = get(x, y, z);
-      if (b !== GRASS && b !== SAND) continue;
-      if (inStructZone(x, z)) continue;
-      if (relics.some(function (r) { return Math.hypot(r.x - x, r.z - z) < minGap; })) continue;
-      addRelic(x + 0.5, y + 2.0, z + 0.5, false);
-    }
-  }
-  function updateRelics(dt, t) {
-    for (const r of relics) {
-      if (r.got) continue;
-      r.gem.rotation.y += dt * 1.6;
-      r.gem.position.y = Math.sin(t * 2 + r.x) * 0.15;
-    }
-  }
-  function checkRelics() {
-    for (const r of relics) {
-      if (r.got) continue;
-      const dx = player.x - r.x, dy = player.y + 0.9 - r.y, dz = player.z - r.z;
-      if (dx * dx + dy * dy + dz * dz < 2.6 * 2.6) {
-        r.got = true; r.group.visible = false; collected++;
-        if (collected >= RELIC_COUNT) showHint('All ' + RELIC_COUNT + ' relics found. Adventure complete!', 10000);
-        else showHint('Relic found: ' + collected + ' of ' + RELIC_COUNT, 3000);
-      }
-    }
-  }
-  function objectiveText() {
-    if (collected >= RELIC_COUNT) return 'All relics found!';
-    let best = Infinity;
-    for (const r of relics) if (!r.got) best = Math.min(best, Math.hypot(r.x - player.x, r.z - player.z));
-    return 'Relics ' + collected + '/' + RELIC_COUNT + (isFinite(best) ? '\nNearest: ' + Math.round(best) + ' m' : '');
-  }
+  const { RELIC_COUNT, relics, addRelic, clearRelics, createRelics,
+    updateRelics, checkRelics, objectiveText, setMode: syncRelicVisibility } = createRelicSystem({
+    scene, getMode: () => mode, getPlayer: () => player,
+    getOrGenerateChunk: getOrGen, topBlockY: topY, getBlock: get,
+    inStructureZone: inStructZone, grassBlock: GRASS, sandBlock: SAND,
+    showHint: (message, milliseconds) => showHint(message, milliseconds),
+  });
 
   /* ---------- Input state ---------- */
   const keys = {};
@@ -2013,7 +1963,7 @@ import { createAudioEngine } from './audio/sound-engine';
     bFly.style.display = mode === 'creative' ? 'block' : 'none';
     bInv.style.display = inter ? 'block' : 'none';
     bJump.textContent = mode === 'spectator' ? 'Up' : 'Jump';
-    for (const r of relics) r.group.visible = (mode === 'adventure') && !r.got;
+    syncRelicVisibility();
     modeBtns.forEach(function (b) { const on = b.dataset.mode === mode; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     modeDescEl.textContent = DESC[mode];
     updateDiffUI();
