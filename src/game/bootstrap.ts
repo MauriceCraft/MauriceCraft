@@ -29,6 +29,7 @@ import { createGameMenu, MODE_LABELS } from './ui/game-menu';
 import { coord } from './commands/coordinates';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
+import { createPortalSystem } from './portals/portal-system';
 import { restorePortals, snapshotPortals } from './portals/persistence';
 import { createGameRenderer } from './rendering/game-renderer';
 import { createExplosionSystem } from './effects/explosions';
@@ -88,8 +89,6 @@ const { disposeMesh, buildChunk, refreshAround, blockGeo } = createChunkMesher({
 let seed = 1;
 let dimension = 'overworld'; // overworld, nether, or end
 const portals = []; // portal frames are saved with the world and paired between Overworld and Nether
-const portalVisuals = [];
-let portalCooldown = 0;
 const savedChunks = new Map();   // edited chunks loaded from a saved world, keyed like chunks
 function heightAt(x, z) {
   const n = fbm(x / 40, z / 40, seed), n2 = fbm(x / 170, z / 170, seed + 300), m = fbm(x / 12, z / 12, seed + 50);
@@ -1318,74 +1317,17 @@ defCmd(['help', '?'], '/help [command]', 'List the commands, or explain one', fu
   const names = []; Object.keys(CMDS).forEach(function (k) { if (CMDS[k].name === k) names.push(k); });
   return 'Commands: ' + names.sort().map(function (n) { return '/' + n; }).join('  ') + '   (try /help <command>)';
 }, function () { return Object.keys(CMDS); });
-function clearPortalVisuals() { while (portalVisuals.length) { const m = portalVisuals.pop(); scene.remove(m); m.geometry.dispose(); m.material.dispose(); } }
-function showPortalVisual(portal) {
-  if (portal.dimension !== dimension) return;
-  const geo = new THREE.PlaneGeometry(portal.width + 0.85, portal.height - 0.15);
-  const mat = new THREE.MeshBasicMaterial({ color: 0x9a42ff, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(portal.x + 0.5, portal.y + 1 + portal.height / 2, portal.z + 0.5);
-  if (portal.axis === 'z') mesh.rotation.y = Math.PI / 2;
-  scene.add(mesh); portalVisuals.push(mesh);
-}
-function buildPortalFrame(dim, centerX, baseY, centerZ) {
-  // Build a classic obsidian portal frame (5 blocks wide, 5 blocks tall).
-  const cx = Math.round(centerX), cz = Math.round(centerZ), by = Math.max(1, Math.min(H - 6, Math.floor(baseY)));
-  // Load all nearby chunks before placing the frame, including Z-side chunks.
-  ensureAround(cx, cz);
-  // Standard 4-by-5 frame (two blocks wide and three blocks tall inside).
-  const portal = { dimension: dim, x: cx - 0.5, y: by, z: cz, width: 2, height: 3, axis: 'x' };
-  for (let dx = -2; dx <= 1; dx++) {
-    for (let dy = 0; dy <= 4; dy++) {
-      const edge = dx === -2 || dx === 1 || dy === 0 || dy === 4;
-      setBlock(cx + dx, by + dy, cz, edge ? OBSIDIAN : 0);
-    }
-  }
-  portals.push(portal);
-  showPortalVisual(portal);
-  rebuildRegion(cx - 2, cz, cx + 2, cz);
-  saveWorld();
-  showHint('Portal activated! Walk through the purple opening.', 3000);
-  return portal;
-}
-function changeDimension(target, x, z, y) {
-  clearPortalVisuals();
-  if (dimension === 'overworld') chunks.forEach(function (c) { if (c.edited) savedChunks.set(ckey(c.cx, c.cz), c.data.slice()); });
-  chunks.forEach(function (c) { disposeMesh(c); });
-  chunks.clear(); resetChunkCache(); structCache.clear(); clearMobs();
-  dimension = target;
-  portals.forEach(showPortalVisual);
-  const tx = x === undefined ? 0.5 : x, tz = z === undefined ? 0.5 : z;
-  ensureAround(tx, tz);
-  player.x = tx; player.z = tz;
-  player.y = y === undefined ? (target === 'nether' ? 15 : (target === 'end' ? 22 : topY(Math.floor(tx), Math.floor(tz)) + 1.01)) : y;
-  for (let tries = 0; tries < 12 && collides(player.x, player.y, player.z); tries++) player.y += 1;
-  player.vx = player.vy = player.vz = 0; player.fallStart = null;
-  saveWorld();
-  showHint(target === 'nether' ? 'Welcome to the Nether! Watch your step in the red-hot caverns.' : target === 'end' ? 'Welcome to the End! Stay on the floating islands.' : 'Back to the Overworld.', 5000);
-}
-function checkPortal(dt) {
-  portalCooldown = Math.max(0, portalCooldown - dt);
-  if (portalCooldown > 0 || !playing || dimension === 'end') return;
-  const p = portals.find(q => portalContains(q, dimension, player));
-  if (!p) return;
-  const target = dimension === 'overworld' ? 'nether' : 'overworld';
-  const scale = dimension === 'overworld' ? 1 / 8 : 8;
-  const tx = Math.round(p.x * scale), tz = Math.round(p.z * scale);
-  let destination = portals.find(function (q) { return q.dimension === target && Math.abs(q.x - tx) < 3 && Math.abs(q.z - tz) < 3; });
-  // Load the destination dimension before building a paired frame there.
-  changeDimension(target, tx, tz, target === 'nether' ? 15 : undefined);
-  if (!destination) {
-    getOrGen(tx >> 4, tz >> 4);
-    const floorY = target === 'nether' ? 13 : topY(tx, tz) + 1;
-    destination = buildPortalFrame(target, tx, floorY, tz);
-  }
-  // Move just in front of the matching doorway so the player won't bounce straight back.
-  player.x = destination.x + (destination.axis === 'z' ? 2.1 : 0); player.z = destination.z + (destination.axis === 'z' ? 0 : 2.1); player.y = destination.y + 1.05;
-  for (let tries = 0; tries < 12 && collides(player.x, player.y, player.z); tries++) player.y += 1;
-  portalCooldown = 2.5;
-  showHint('Portal travel: ' + (target === 'nether' ? 'Overworld → Nether' : 'Nether → Overworld'), 3000);
-}
+const { clearPortalVisuals, showPortalVisual, buildPortalFrame,
+  changeDimension, checkPortal } = createPortalSystem({
+  scene, portals, chunks, savedChunks, obsidian: OBSIDIAN, worldHeight: H,
+  getDimension: () => dimension,
+  setDimension: nextDimension => { dimension = nextDimension; },
+  getPlayer: () => player,
+  isPlaying: () => playing,
+  ensureAround, getOrGenerate: getOrGen, setBlock, topBlockY: topY,
+  rebuildRegion, disposeMesh, resetChunkCache, clearStructures: () => structCache.clear(),
+  clearMobs, collides, saveWorld, showHint,
+});
 defCmd(['portal'], '/portal [build]', 'Build an obsidian Nether portal frame in front of you; walk through it to travel', function (a) {
   if (dimension === 'end') throw new Error('Nether portals do not work in the End. Return to the Overworld first.');
   if (a.length && a[0].toLowerCase() !== 'build') throw new Error('Usage: /portal [build]');
