@@ -28,7 +28,7 @@ function fixture() {
       irongolem: { r: 0.45, h: 2.7 }, pillager: { r: 0.3, h: 1.95, hostile: true },
       vindicator: { r: 0.3, h: 1.95, hostile: true } },
     animals: ['cow', 'pig', 'sheep', 'chicken'], jobs: ['farmer', 'librarian'],
-    regionSize: 80, grassBlock: 1, leavesBlock: 6, woodBlock: 5, torchBlock: 17, emeraldItem: 42,
+    regionSize: 80, grassBlock: 1, floweringGrassBlock: 49, leavesBlock: 6, woodBlock: 5, torchBlock: 17, emeraldItem: 42,
     getSeed: () => 42,
     getChunk: () => chunksLoaded ? {} : null,
     getBlock: (_x, y) => y === 14 ? block : (submerged && y === 15 ? 34 : 0), topY: () => 14,
@@ -66,6 +66,13 @@ describe('mob spawning and raids', () => {
     f.spawning.trySpawnAnimals();
     expect(f.addMob).not.toHaveBeenCalled();
     f.setSubmerged(false);
+    f.spawning.trySpawnAnimals();
+    expect(f.addMob).toHaveBeenCalled();
+  });
+
+  it('allows grazing animals on dry flower-meadow terrain', () => {
+    const f = fixture();
+    f.setBlock(49);
     f.spawning.trySpawnAnimals();
     expect(f.addMob).toHaveBeenCalled();
   });

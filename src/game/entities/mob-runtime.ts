@@ -39,6 +39,7 @@ export interface MobRuntimeDependencies {
   getMode: () => string;
   regionSize: number;
   grassBlock: number;
+  floweringGrassBlock?: number;
   leavesBlock: number;
   woodBlock: number;
   torchBlock: number;
@@ -118,7 +119,8 @@ const { raid, endRaid, trySpawnMob, trySpawnAnimals, manageVillagers,
   trySpawnPatrol, updateRaid } = createMobSpawning({
   mobs, player, kinds: KINDS, animals: ANIMALS, jobs: JOBS,
   regionSize: STRUCTURE_REGION_SIZE,
-  grassBlock: GRASS, leavesBlock: LEAVES, woodBlock: WOOD,
+  grassBlock: GRASS, floweringGrassBlock: deps.floweringGrassBlock,
+  leavesBlock: LEAVES, woodBlock: WOOD,
   torchBlock: TORCH, emeraldItem: EMERALD,
   getSeed: deps.getSeed,
   getChunk: chunkAt,

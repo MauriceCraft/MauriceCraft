@@ -14,6 +14,7 @@ export interface MobSpawnDependencies {
   jobs: readonly string[];
   regionSize: number;
   grassBlock: number;
+  floweringGrassBlock?: number;
   leavesBlock: number;
   woodBlock: number;
   torchBlock: number;
@@ -87,7 +88,8 @@ function trySpawnAnimals(): void {
     if (!chunkAt(x >> 4, z >> 4)) continue;
     const y = topY(x, z);
     // topY ignores liquid, so dry air above grass must be checked explicitly.
-    if (get(x, y, z) !== GRASS || get(x, y + 1, z) !== 0 ||
+    if ((get(x, y, z) !== GRASS && get(x, y, z) !== deps.floweringGrassBlock) ||
+      get(x, y + 1, z) !== 0 ||
       get(x, y + 2, z) !== 0) continue;
     if (collides(x + 0.5, y + 1.01, z + 0.5, K.r, K.h)) continue;
     addMob(kind, x + 0.5, y + 1.01, z + 0.5);
