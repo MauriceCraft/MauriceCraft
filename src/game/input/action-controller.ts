@@ -75,8 +75,8 @@ export function createActionController(deps: ActionDependencies) {
           const block = get(target.x, target.y, target.z);
           const total = (deps.breakTimes[block] || 1) / deps.toolSpeed(block);
           mineBar.style.display = 'block';
-          const progressBar = mineBar.firstElementChild;
-          if (progressBar instanceof HTMLElement) progressBar.style.width = Math.min(100, mine.t / total * 100) + '%';
+          const progressBar = mineBar.firstElementChild as HTMLElement | null;
+          if (progressBar) progressBar.style.width = Math.min(100, mine.t / total * 100) + '%';
           if (mine.t >= total) { deps.doBreak(target); resetMine(); }
         } else resetMine();
       }
