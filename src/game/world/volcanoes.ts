@@ -3,18 +3,27 @@ import { biomeAt, biomeHeightAt } from './biomes';
 
 export interface Volcano { x: number; z: number; base: number; radius: number; lavaLevel: number }
 const CELL = 176;
+const cache = new Map<string, Volcano | null>();
 /** Seeded cone catalog: only entries here may be labeled a volcano in the HUD. */
 export function volcanoFor(rx: number, rz: number, seed: number, worldHeight = 48): Volcano | null {
+  const key = seed + ':' + worldHeight + ':' + rx + ':' + rz;
+  if (cache.has(key)) return cache.get(key) ?? null;
   const x = rx * CELL + 63 + Math.floor(hash2(rx, rz, seed + 4011) * 50);
   const z = rz * CELL + 63 + Math.floor(hash2(rx, rz, seed + 4012) * 50);
   const biome = biomeAt(x, z, seed), roll = hash2(rx, rz, seed + 4010);
   if (!((biome === 'volcanic' && roll < 0.85) ||
     (biome === 'highlands' && roll < 0.30) ||
-    (biome === 'badlands' && roll < 0.07))) return null;
+    (biome === 'badlands' && roll < 0.07))) {
+    cache.set(key, null);
+    return null;
+  }
   const base = biomeHeightAt(x, z, seed, worldHeight);
-  return base >= 12 && base <= worldHeight - 20
+  const result = base >= 12 && base <= worldHeight - 20
     ? { x, z, base, radius: 22 + Math.floor(hash2(rx, rz, seed + 4013) * 7), lavaLevel: base + 8 }
     : null;
+  if (cache.size > 512) cache.clear();
+  cache.set(key, result);
+  return result;
 }
 export function volcanoNear(x: number, z: number, seed: number, h = 48): Volcano | null {
   return volcanoFor(Math.floor(x / CELL), Math.floor(z / CELL), seed, h);
