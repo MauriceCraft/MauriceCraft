@@ -32,7 +32,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     BRICK, COBBLE, CTABLE, DIRT, GOLD, GRAVEL, HAY, LEAVES,
     MOSSY, PLANKS, SANDSTONE, STONEBRICK, TORCH, WOOD,
     COAL_ORE, COPPER_ORE, DIAMOND_ORE, GRASS, IRON_ORE, LAVA,
-    SAND, STONE, WATER, tileOf, toolTile, ALL_BLOCKS, TILES,
+    SAND, STONE, WATER, toolTile, ALL_BLOCKS, TILES,
     ATLAS_N, BED_H, isBed, opq, solid,
   } = catalog;
   const hotbar = ALL_BLOCKS.slice(0, 9);
