@@ -22,7 +22,7 @@ import { createChunkGenerator } from './world/chunk-generator';
 import { raycastBlocks } from './world/raycast';
 import { createCollisionEngine } from './world/collision';
 import { mulberry32, hash2, fbm, smooth } from './world/noise';
-import { blockKind } from './world/block-kind';
+import { createToolUsage } from './items/tool-usage';
 import { createBlockCatalog } from './world/block-catalog';
 import { createRecipeMatcher } from './crafting/recipes';
 import { createRecipeCatalog } from './crafting/recipe-catalog';
@@ -656,47 +656,17 @@ function doBreak(t) {
   refreshAround(t.x, t.z, torchGone);
 }
 // The tool in the selected hotbar slot (in Survival you must own it)
-function heldTool() {
-  const it = hotbar[selected], T = TOOLS[it];
-  if (!T || mode === 'adventure' || mode === 'spectator') return null;
-  if (mode === 'survival' && !(inv[it] > 0)) return null;
-  return { id: it, kind: T.kind, tier: T.tier };
-}
-function toolSpeed(b) {
-  const t = heldTool();
-  if (!t) return 1;
-  if (t.kind === blockKind(b)) return TOOL_SPD[t.tier];
-  if (t.kind === 'sword' && (b === 6 || b === 13)) return 2;
-  return 1;
-}
-function canCollect(b) {
-  if (!(b in NEEDS_PICK)) return true;
-  const t = heldTool();
-  return !!t && t.kind === 'pickaxe' && TOOL_LVL[t.tier] >= NEEDS_PICK[b];
-}
-function wearTool(id, n) {
-  if (mode !== 'survival') return;
-  toolWear[id] = (toolWear[id] || 0) + n;
-  if (toolWear[id] >= TOOL_MAX[TOOLS[id].tier]) {
-    toolWear[id] = 0; inv[id] = Math.max(0, (inv[id] || 0) - 1);
-    flashName('Your ' + NAMES[id].toLowerCase() + ' broke!'); sfx('die');
-  }
-  updateHotbar(false);
-}
-function attackDamage() {
-  if (mode === 'creative') return 20;
-  exert(0.08);
-  const t = heldTool();
-  if (!t) return 3;
-  wearTool(t.id, 1);
-  return TOOL_DMG[t.kind][t.tier];
-}
-function spendItem(id) {
-  if (mode !== 'survival') return true;
-  if (!(inv[id] > 0)) { showHint('You have no ' + NAMES[id].toLowerCase() + '.', 1500); return false; }
-  inv[id]--; updateHotbar(false);
-  return true;
-}
+const { heldTool, toolSpeed, canCollect, wearTool, attackDamage, spendItem } = createToolUsage({
+  getMode: () => mode,
+  getSelectedItem: () => hotbar[selected],
+  inventory: inv, wear: toolWear,
+  tools: TOOLS, names: NAMES,
+  maxWear: TOOL_MAX, toolLevels: TOOL_LVL, toolSpeeds: TOOL_SPD,
+  toolDamages: TOOL_DMG, requiresPick: NEEDS_PICK,
+  updateHotbar: () => updateHotbar(false),
+  flashName, showHint: (message, ms) => showHint(message, ms),
+  playSound: event => sfx(event), exert,
+});
 function eatItem(id) {
   if (mode !== 'survival') { flashName('Food only matters in Survival'); return 0.4; }
   if (hunger >= 20) { showHint('You are not hungry.', 1200); return 0.4; }
