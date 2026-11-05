@@ -55,8 +55,7 @@ export class SpatialIndex<Actor extends SpatialPosition & object> {
   }
 
   /**
-   * Visits actors in nearby grid cells. The caller performs the final
-   * circular distance test, preserving each interaction's own radius.
+   * Visits only actors within the requested circular distance.
    * Complexity: O(cells overlapped + candidates), not O(all actors).
    */
   *near(x: number, z: number, radius: number): IterableIterator<Actor> {
@@ -65,13 +64,18 @@ export class SpatialIndex<Actor extends SpatialPosition & object> {
     const maxCellX = Math.floor((x + radius) / this.cellSize);
     const minCellZ = Math.floor((z - radius) / this.cellSize);
     const maxCellZ = Math.floor((z + radius) / this.cellSize);
+    const radiusSquared = radius * radius;
     for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
       const column = this.rows.get(cellX);
       if (!column) continue;
       for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
         const occupants = column.get(cellZ);
         if (!occupants) continue;
-        yield* occupants;
+        for (const actor of occupants) {
+          const deltaX = actor.x - x;
+          const deltaZ = actor.z - z;
+          if (deltaX * deltaX + deltaZ * deltaZ <= radiusSquared) yield actor;
+        }
       }
     }
   }
