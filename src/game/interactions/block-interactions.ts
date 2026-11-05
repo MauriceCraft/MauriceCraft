@@ -56,7 +56,7 @@ export interface BlockInteractionDependencies {
   spendItem: (id: number) => boolean;
   exert: (amount: number) => void;
   giveItem: (id: number, amount: number) => void;
-  updateHotbar: () => void;
+  updateHotbar: (withSound?: boolean) => void;
   renderFood: () => void;
   showHint: (message: string, ms: number) => void;
   flashName: (message: string) => void;
