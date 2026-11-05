@@ -26,6 +26,7 @@ import { raycastBlocks } from './world/raycast';
 import { createCollisionEngine } from './world/collision';
 import { mulberry32, hash2, fbm, smooth } from './world/noise';
 import { createToolUsage } from './items/tool-usage';
+import { createBlockInteractions } from './interactions/block-interactions';
 import { createBlockCatalog } from './world/block-catalog';
 import { createRecipeMatcher } from './crafting/recipes';
 import { createRecipeCatalog } from './crafting/recipe-catalog';
@@ -446,27 +447,6 @@ function raycast(maxD) {
   return raycastBlocks(camera.position, dirV, maxD, get, solid, WORLD_HEIGHT);
 }
 function resetMine() { mine.t = 0; mine.x = mine.y = mine.z = -1; mineBar.style.display = 'none'; }
-function doBreak(t) {
-  const b = get(t.x, t.y, t.z);
-  if (mode === 'survival') {
-    exert(0.02);
-    if (canCollect(b)) { const drop = isBed(b) ? BED : (DROPS[b] || b); inv[drop] = (inv[drop] || 0) + 1; updateHotbar(false); }
-    else flashName('You need a ' + (NEEDS_PICK[b] > 0 ? 'stronger ' : '') + 'pickaxe to collect this');
-    const ht = heldTool();
-    if (ht) wearTool(ht.id, ht.kind === 'sword' ? 2 : 1);
-  }
-  if (mode === 'survival' && b === GRAVEL && Math.random() < 0.3) { giveItem(GUNPOWDER, 1); flashName('+1 Gunpowder'); }
-  setBlock(t.x, t.y, t.z, 0);
-  if (isBed(b)) {   // take the other half of the bed with it
-    const k = b - 19, dv = BED_DIR[k >> 1], head = k & 1, sg = head ? -1 : 1;
-    const px = t.x + dv[0] * sg, pz = t.z + dv[1] * sg, pid = 19 + (k >> 1) * 2 + (1 - head);
-    if (get(px, t.y, pz) === pid) { setBlock(px, t.y, pz, 0); refreshAround(px, pz); }
-  }
-  sfx('break', 1, 0, b);
-  let torchGone = b === TORCH;
-  if (get(t.x, t.y + 1, t.z) === TORCH) { setBlock(t.x, t.y + 1, t.z, 0); torchGone = true; if (mode === 'survival') giveItem(TORCH, 1); }
-  refreshAround(t.x, t.z, torchGone);
-}
 // The tool in the selected hotbar slot (in Survival you must own it)
 const { heldTool, toolSpeed, canCollect, wearTool, attackDamage, spendItem } = createToolUsage({
   getMode: () => mode,
@@ -479,163 +459,41 @@ const { heldTool, toolSpeed, canCollect, wearTool, attackDamage, spendItem } = c
   flashName, showHint: (message, ms) => showHint(message, ms),
   playSound: event => sfx(event), exert,
 });
-function eatItem(id) {
-  if (mode !== 'survival') { flashName('Food only matters in Survival'); return 0.4; }
-  if (hunger >= 20) { showHint('You are not hungry.', 1200); return 0.4; }
-  if (!spendItem(id)) return 0.4;
-  hunger = Math.min(20, hunger + FOOD[id]); sat = Math.min(hunger, sat + FOOD[id] * 0.6); renderFood(); sfx('eat');
-  return 0.8;
-}
-function throwDynamite() {
-  if (!spendItem(DYNAMITE)) return 0.4;
-  sfx('throw');
-  const d = new THREE.Vector3(); camera.getWorldDirection(d);
-  addDynamite(camera.position.x + d.x * 0.6, camera.position.y + d.y * 0.6 - 0.1, camera.position.z + d.z * 0.6,
-    d.x * 14 + player.vx * 0.3, d.y * 14 + 2.5, d.z * 14 + player.vz * 0.3);
-  return 0.5;
-}
-function lightPortalAt(px, py, pz) {
-  if (dimension === 'end') return false;
-  // Both the final obsidian placement and flint-and-steel use this one
-  // validator, so the two controls cannot disagree about valid frames.
-  ensureAround(px, pz);
-  const portal = findPortalFrame(get, { x: px, y: py, z: pz }, dimension, OBSIDIAN, WORLD_HEIGHT);
-  if (!portal) return false;
-  const already = portals.some(p => p.dimension === portal.dimension && p.axis === portal.axis &&
-    p.x === portal.x && p.y === portal.y && p.z === portal.z);
-  if (!already) {
-    portals.push(portal);
-    showPortalVisual(portal);
-    rebuildRegion(Math.floor(portal.x - 4), Math.floor(portal.z - 4), Math.ceil(portal.x + 4), Math.ceil(portal.z + 4));
-    saveWorld();
-  }
-  showHint('Nether portal activated! Walk through the purple opening.', 3500);
-  sfx('click');
-  return true;
-}
-function activatePortalAtTarget() {
-  return !!target && get(target.x, target.y, target.z) === OBSIDIAN &&
-    lightPortalAt(target.x, target.y, target.z);
-}
-function lightTnt() {
-  if (mode === 'survival' && !(inv[FLINT] > 0)) { showHint('You have no flint & steel.', 1500); return 0.3; }
-  if (activatePortalAtTarget()) return 0.3;
-  if (!target || get(target.x, target.y, target.z) !== TNT) {
-    flashName('Aim flint & steel at a complete obsidian frame or TNT'); return 0.3;
-  }
-  setBlock(target.x, target.y, target.z, 0); queueRebuild(target.x, target.z); flushRebuilds();
-  spawnTnt(target.x + 0.5, target.y, target.z + 0.5, 3, 0, 0, 0);
-  return 0.4;
-}
-function useEgg(id) {
-  const kind = EGG_KINDS[id], K = KINDS[kind];
-  if (K.hostile && hasHealth() && DIFF[difficulty].cap === 0) { flashName('Monsters cannot spawn on Peaceful'); return 0.4; }
-  if (!target) { flashName('Aim at a block to spawn a ' + kind); return 0.3; }
-  const x = target.x + target.nx + 0.5, z = target.z + target.nz + 0.5;
-  let y = target.y + target.ny + 0.01, ok = false;
-  for (let k = 0; k < 3 && !ok; k++) { if (!collides(x, y + k, z, K.r, K.h)) { y += k; ok = true; } }
-  if (!ok) { flashName('Not enough room there'); return 0.3; }
-  if (!spendItem(id)) return 0.4;
-  const m = addMob(kind, x, y, z, kind === 'villager' ? { job: JOBS[Math.floor(Math.random() * JOBS.length)] } : null);
-  m.persist = true; m.hx = x; m.hz = z;   // egg creatures stay put (no daylight burn-off, villagers adopt this spot as home)
-  sfx('pop'); sfxAt(kind, x, y + 1, z);
-  return 0.4;
-}
 const fadeEl = document.getElementById('fade');
-function useBed(t) {
-  spawnPoint = { x: t.x, y: t.y, z: t.z };
-  if (!isNight && weather !== 'storm') { showHint('Respawn point set. You can only sleep at night or in a storm.', 2800); sfx('click'); return; }
-  if (hasHealth()) for (let i = 0; i < mobs.length; i++) if (mobs[i].hostile && Math.hypot(mobs[i].x - t.x, mobs[i].z - t.z) < 14) { showHint('You cannot sleep with monsters nearby.', 2600); sfx('no'); return; }
-  sleepT = 3.2; slept = false;
-  showHint('Respawn point set. Sleeping\u2026', 2000);
-}
-// Right click / E: place a block, or use the item in the selected slot. Returns the cooldown to wait.
-function useSelected() {
-  const it = hotbar[selected];
-  if (it < 100) { doPlace(); return 0.22; }
-  if (FOOD[it] !== undefined) return eatItem(it);
-  if (it === DYNAMITE) return throwDynamite();
-  if (it === FLINT) return lightTnt();
-  if (TOOLS[it]) { flashName(NAMES[it] + ' (left click to use)'); return 0.3; }
-  if (EGG_KINDS[it]) return useEgg(it);
-  flashName(NAMES[it] + ' is a crafting item');
-  return 0.4;
-}
-// Build a golem: four blocks of iron, copper or diamond in a T (three across, one below the middle) with a hay bale on top.
-const GOLEM_OF = { 31: 'irongolem', 32: 'coppergolem', 33: 'diamondgolem' };
-const GOLEM_INGOT = { irongolem: IRON_INGOT, coppergolem: COPPER_INGOT, diamondgolem: DIAMOND };
-function spawnGolem(kind, x, y, z) {
-  const m = addMob(kind, x, y, z, null);
-  m.persist = true; m.hx = x; m.hz = z;
-  sfx('pop'); sfxAt('hit', x, y + 1, z);
-  return m;
-}
-function tryBuildGolem(px, py, pz) {
-  for (let dx = -2; dx <= 2; dx++) for (let dy = -1; dy <= 3; dy++) for (let dz = -2; dz <= 2; dz++) {
-    const hx = px + dx, hy = py + dy, hz = pz + dz;
-    if (get(hx, hy, hz) !== HAY) continue;
-    const m = get(hx, hy - 1, hz), kind = GOLEM_OF[m];
-    if (!kind || get(hx, hy - 2, hz) !== m) continue;
-    const axes = [[1, 0], [0, 1]];
-    for (let a = 0; a < 2; a++) {
-      const ax = axes[a];
-      if (get(hx + ax[0], hy - 1, hz + ax[1]) === m && get(hx - ax[0], hy - 1, hz - ax[1]) === m) {
-        [[hx, hy, hz], [hx, hy - 1, hz], [hx, hy - 2, hz], [hx + ax[0], hy - 1, hz + ax[1]], [hx - ax[0], hy - 1, hz - ax[1]]].forEach(function (c) {
-          setBlock(c[0], c[1], c[2], 0); queueRebuild(c[0], c[2]);
-        });
-        flushRebuilds();
-        spawnGolem(kind, hx + 0.5, hy - 2 + 0.01, hz + 0.5);
-        flashName('You built a golem!');
-        return true;
-      }
-    }
-  }
-  return false;
-}
-function healGolem(m) {
-  const ing = GOLEM_INGOT[m.kind], K = KINDS[m.kind];
-  if (hotbar[selected] !== ing || m.hp >= K.hp) return false;
-  if (!spendItem(ing)) return false;
-  m.hp = Math.min(K.hp, m.hp + K.hp * 0.25); sfx('pop'); flashName('Golem repaired');
-  return true;
-}
-function placeBed(x, y, z) {
-  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
-  const dir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 2) : (fz > 0 ? 1 : 3);
-  const dv = BED_DIR[dir], hx = x + dv[0], hz = z + dv[1];
-  if (!chunkAt(hx >> 4, hz >> 4) || get(hx, y, hz) || !solid(get(x, y - 1, z)) || !solid(get(hx, y - 1, hz))) { flashName('A bed needs two free spots on solid ground'); return; }
-  const cells = [[x, z], [hx, hz]];
-  for (let i = 0; i < 2; i++) { const c = cells[i]; if (c[0] + 1 > player.x - PLAYER_RADIUS && c[0] < player.x + PLAYER_RADIUS && y + BED_H > player.y && y < player.y + PLAYER_HEIGHT && c[1] + 1 > player.z - PLAYER_RADIUS && c[1] < player.z + PLAYER_RADIUS) return; }
-  if (mode === 'survival') {
-    if (!(inv[BED] > 0)) { showHint('You have no bed.', 1500); return; }
-    inv[BED]--; updateHotbar(false);
-  }
-  setBlock(x, y, z, 19 + dir * 2); setBlock(hx, y, hz, 19 + dir * 2 + 1);
-  sfx('place', 1, 0, BED); refreshAround(x, z); refreshAround(hx, hz);
-}
-function detectObsidianPortal(px, py, pz) {
-  return lightPortalAt(px, py, pz);
-}
-
-function doPlace() {
-  if (!target) return;
-  const x = target.x + target.nx, y = target.y + target.ny, z = target.z + target.nz;
-  if (!inBounds(x, y, z) || get(x, y, z)) return;
-  if (hotbar[selected] === BED) { placeBed(x, y, z); return; }
-  if (hotbar[selected] !== TORCH && x + 1 > player.x - PLAYER_RADIUS && x < player.x + PLAYER_RADIUS && y + 1 > player.y && y < player.y + PLAYER_HEIGHT && z + 1 > player.z - PLAYER_RADIUS && z < player.z + PLAYER_RADIUS) return;
-  const b = hotbar[selected];
-  if (b === TORCH && !solid(get(x, y - 1, z))) { flashName('Torches need something to stand on'); return; }
-  if (mode === 'survival') {
-    if (!(inv[b] > 0)) { showHint('You have no ' + NAMES[b].toLowerCase() + '. Mine some first.', 1800); return; }
-    inv[b]--; updateHotbar(false);
-  }
-  setBlock(x, y, z, b);
-  if (b === OBSIDIAN) detectObsidianPortal(x, y, z);
-  sfx('place', 1, 0, b);
-  refreshAround(x, z, b === TORCH);
-  if (b === HAY || GOLEM_OF[b]) tryBuildGolem(x, y, z);
-}
-
+const { doBreak, useBed, useSelected, healGolem } = createBlockInteractions({
+  camera, player, mobs, portals, hotbar, inventory: inv,
+  names: NAMES, tools: TOOLS, kinds: KINDS, jobs: JOBS,
+  food: FOOD, drops: DROPS, requiresPick: NEEDS_PICK,
+  eggKinds: EGG_KINDS, bedDirections: BED_DIR,
+  worldHeight: WORLD_HEIGHT, playerRadius: PLAYER_RADIUS,
+  playerHeight: PLAYER_HEIGHT, bedHeight: BED_H,
+  blockIds: { BED, GRAVEL, GUNPOWDER, TORCH, TNT, FLINT, DYNAMITE,
+    OBSIDIAN, HAY, IRON_INGOT, COPPER_INGOT, DIAMOND },
+  getSelected: () => selected, getTarget: () => target,
+  getMode: () => mode, getDimension: () => dimension,
+  getDifficultyCap: () => DIFF[difficulty].cap,
+  getHunger: () => hunger, setHunger: value => { hunger = value; },
+  getSatiety: () => sat, setSatiety: value => { sat = value; },
+  isNight: () => isNight, getWeather: () => weather,
+  hasHealth: () => hasHealth(),
+  setSpawnPoint: point => { spawnPoint = point; },
+  startSleeping: () => { sleepT = 3.2; slept = false; },
+  getBlock: get, setBlock, inBounds,
+  hasChunk: (cx, cz) => !!chunkAt(cx, cz),
+  solid, isBed, collides, heldTool, canCollect, wearTool, spendItem,
+  exert, giveItem,
+  updateHotbar: withSound => updateHotbar(withSound ?? false),
+  renderFood, flashName,
+  showHint: (message, ms) => showHint(message, ms),
+  playSound: (event, volume, pitch, blockId) => sfx(event, volume, pitch, blockId),
+  playSoundAt: (event, x, y, z) => sfxAt(event, x, y, z),
+  refreshAround, queueRebuild, flushRebuilds,
+  rebuildRegion: (x1, z1, x2, z2) => rebuildRegion(x1, z1, x2, z2),
+  ensureAround: (x, z) => ensureAround(x, z),
+  showPortalVisual: portal => showPortalVisual(portal),
+  saveWorld: () => { void saveWorld(); },
+  spawnTnt, addDynamite, addMob,
+});
 function handleActions(dt, tNow) {
   mineCd -= dt; placeCd -= dt; attackCd -= dt;
   const holdOK = !drag || (tNow - drag.t0 > 160 && drag.moved < 6);
