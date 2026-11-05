@@ -37,7 +37,7 @@ export interface ExplosionDependencies {
   hasChunk: (chunkX: number, chunkZ: number) => boolean;
   buildChunk: (chunkX: number, chunkZ: number) => void;
   getMobs: () => BlastMob[];
-  getPlayer: () => BlastMob;
+  getPlayer: () => Pick<BlastMob, 'x' | 'y' | 'z' | 'vx' | 'vy' | 'vz'>;
   damageMob: (mob: BlastMob, damage: number) => void;
   damagePlayer: (damage: number) => void;
   moveEntity: (actor: TntBlast, axis: number, delta: number) => void;
