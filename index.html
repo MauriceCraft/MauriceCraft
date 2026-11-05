@@ -321,7 +321,7 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script>
 (function () {
   'use strict';
@@ -4360,13 +4360,26 @@
   }
   newBtn.addEventListener('click', function () { if (!busy) newWorld(); });
   async function init() {
-    try { db = await openDB(); storageOK = true; } catch (e) { storageOK = false; }
-    if (storageOK) {
-      try { worldList = (await dbListWorlds()).sort(function (a, b) { return (b.lastPlayed || 0) - (a.lastPlayed || 0); }); }
-      catch (e) { storageOK = false; worldList = []; }
+    setBusy(true, 'Starting MauriceCraft…');
+    try {
+      try { db = await openDB(); storageOK = true; }
+      catch (e) { storageOK = false; db = null; }
+      if (storageOK) {
+        try { worldList = (await dbListWorlds()).sort(function (a, b) { return (b.lastPlayed || 0) - (a.lastPlayed || 0); }); }
+        catch (e) { storageOK = false; worldList = []; db = null; }
+      }
+      renderWorlds();
+      if (storageOK && worldList.length) await loadWorld(worldList[0].id);
+      else await newWorld();
+    } catch (err) {
+      console.error('MauriceCraft could not finish loading:', err);
+      ready = false;
+      setBusy(false);
+      playBtn.disabled = true;
+      newBtn.disabled = false;
+      newBtn.textContent = 'Try again';
+      subEl.textContent = 'The world did not finish loading. Choose “Try again” to start a fresh world.';
     }
-    renderWorlds();
-    if (storageOK && worldList.length) await loadWorld(worldList[0].id); else await newWorld();
   }
   setInterval(function () { if (ready && playing) saveWorld(); }, 15000);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') saveWorld(); });
@@ -4388,8 +4401,7 @@
         if (fpsT >= 1) { fps = frames; frames = 0; fpsT = 0; }
         if (infoT > 0.2) {
           infoT = 0;
-          const state = mode === 'creative' ? (player.fly ? 'Flying' : 'Walking') : (isNight && hasHealth() ? 'Night' : (mode === 'spectator' ? 'x' + specSpeed.toFixed(2) : 'Day'));
-          infoEl.textContent = LABEL[mode] + (hasHealth() ? ' \u00b7 ' + DIFF[difficulty].label : '') + '  ' + state + '\nX ' + player.x.toFixed(1) + '  Y ' + player.y.toFixed(1) + '  Z ' + player.z.toFixed(1) + '\n' + fps + ' fps' + (weather === 'clear' ? '' : ' \u00b7 ' + WEATHER_LABEL[weather]) + '\nNearby: ' + nearestStructure();
+          // Keep developer diagnostics out of the player-facing game screen.
           if (mode === 'adventure') objEl.textContent = objectiveText();
         }
       }
