@@ -22,6 +22,8 @@ describe('game texture atlas regression', () => {
     expect(canvas.height).toBe(16);
     expect(pixels.get(`${98 * 16 + 5},5`)).toMatch(/^rgb\(/);
     expect(pixels.get(`${97 * 16 + 3},3`)).toMatch(/^rgb\(/);
+    for (const tile of [99, 100, 101, 102, 103])
+      expect(pixels.get(`${tile * 16 + 3},3`)).toMatch(/^rgb\(/);
     expect(pixels.get(`${80 * 16 + 8},8`)).toBeDefined();
     expect(createElement).toHaveBeenCalledWith('canvas');
   });

@@ -5,6 +5,7 @@ describe('persisted item and block catalog', () => {
   it('preserves the historical block IDs and tool identifiers', () => {
     const catalog = createBlockCatalog();
     expect(catalog.OBSIDIAN).toBe(36);
+    expect([catalog.SNOW, catalog.PINE_LEAVES, catalog.RED_SAND, catalog.DARK_WOOD]).toEqual([37, 38, 39, 40]);
     expect(catalog.FLINT).toBe(111);
     expect(catalog.BED).toBe(19);
     expect(catalog.toolId(0, 0)).toBe(130);
@@ -15,6 +16,8 @@ describe('persisted item and block catalog', () => {
   it('keeps rendering and collision rules stable', () => {
     const catalog = createBlockCatalog();
     expect(catalog.tileOf(catalog.OBSIDIAN)).toBe(98);
+    expect(catalog.tileOf(catalog.SNOW)).toBe(99);
+    expect(catalog.tileOf(catalog.PINE_LEAVES)).toBe(100);
     expect(catalog.solid(catalog.WATER)).toBe(false);
     expect(catalog.solid(catalog.STONE)).toBe(true);
     expect(catalog.opq(catalog.BED)).toBe(false);

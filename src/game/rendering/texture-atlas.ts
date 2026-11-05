@@ -200,5 +200,19 @@ export function makeAtlas(getToolTile: (tier: number, kind: number) => number): 
       const hot = ((x * 3 + y * 5) % 7 < 2) ? 55 : 0;
       put(97, x, y, 255, 76 + hot, 8 + Math.floor(hot * 0.15));
     }
+    // New biome materials use unused atlas cells; existing pixel IDs stay intact.
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const a = (hash2(x, y, 99) - 0.5) * 24;
+      put(99, x, y, 226 + a, 236 + a, 249 + a * 0.3); // snow
+      const p = (hash2(x, y, 100) - 0.5) * 36;
+      put(100, x, y, 28 + p * 0.3, 90 + p, 52 + p * 0.5); // pine foliage
+      const r = (hash2(x, y, 101) - 0.5) * 42;
+      put(101, x, y, 185 + r, 91 + r * 0.7, 58 + r * 0.4); // red sand
+      const ring = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
+      const d = (hash2(x, y, 102) - 0.5) * 20;
+      put(102, x, y, 98 + d + (Math.floor(ring) % 2 ? 12 : 0), 67 + d, 42 + d * 0.7);
+      const stripe = x % 5 === 0 ? -20 : 0;
+      put(103, x, y, 94 + d + stripe, 65 + d + stripe, 42 + d + stripe);
+    }
     return c;
   }
