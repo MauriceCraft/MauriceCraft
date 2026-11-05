@@ -5,6 +5,7 @@ import { createGameTick } from './runtime/game-tick';
 import { createGameSessionControls } from './runtime/game-session-controls';
 import { showStartupFailure } from '../startup/startup-health';
 import { createPlayerMovement } from './player/player-movement';
+import { createRespawn } from './player/player-respawn';
 import { createWeatherSystem } from './rendering/weather-system';
 import { JOBS, JOB_NAMES } from './entities/mob-models';
 import { createMobRuntime } from './entities/mob-runtime';
@@ -99,22 +100,12 @@ let tod = 0.22;
 let isNight = false, isDay = true;
 
 const player = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: false, fly: false, fallStart: null as number | null };
-function respawn(): void {
-  if (spawnPoint) {
-    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) getOrGen((spawnPoint.x >> 4) + dx, (spawnPoint.z >> 4) + dz);
-    if (isBed(get(spawnPoint.x, spawnPoint.y, spawnPoint.z))) {
-      let by = spawnPoint.y + 0.57;
-      for (let k = 0; k < 4 && collides(spawnPoint.x + 0.5, by, spawnPoint.z + 0.5); k++) by += 1;
-      player.x = spawnPoint.x + 0.5; player.z = spawnPoint.z + 0.5; player.y = by;
-      player.vx = player.vy = player.vz = 0; player.yaw = 0; player.pitch = -0.1; player.fallStart = null;
-      return;
-    }
-    spawnPoint = null;   // the bed is gone
-  }
-  const x = 0, z = 0;
-  player.x = x + 0.5; player.z = z + 0.5; player.y = topY(x, z) + 1.01;
-  player.vx = player.vy = player.vz = 0; player.yaw = 0; player.pitch = -0.1; player.fallStart = null;
-}
+const respawn = createRespawn({
+  player, getSpawnPoint: () => spawnPoint,
+  clearSpawnPoint: () => { spawnPoint = null; },
+  getOrGenerateChunk: getOrGen, getBlock: get, isBed, collides: (...coords) => collides(...coords),
+  topBlockY: topY,
+});
 const PLAYER_RADIUS = 0.3, PLAYER_HEIGHT = 1.8, EYE_HEIGHT = 1.62;
 const { collides, moveEnt } = createCollisionEngine({
   getBlock: get, solid, defaultRadius: PLAYER_RADIUS, defaultHeight: PLAYER_HEIGHT, bedHeight: BED_H,
