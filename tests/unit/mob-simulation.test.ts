@@ -13,7 +13,7 @@ function makeActor(kind: string, hostile: boolean, x: number): MobActor {
     fuse: -1, shoot: 4, snd: 4, hx: 0, hz: 0, group, village: null,
   };
 }
-function fixture(actors: MobActor[]) {
+function fixture(actors: MobActor[], options: { daylight?: boolean; water?: boolean; sheltered?: boolean } = {}) {
   const mobs = actors;
   const hostileActors = new SpatialIndex<MobActor>();
   const defenders = new SpatialIndex<MobActor>();
@@ -30,11 +30,12 @@ function fixture(actors: MobActor[]) {
     kinds: {
       zombie: { speed: 2, melee: { d: 1.15, dmg: 3, cd: 1.1 } },
       villager: { speed: 1 },
-      creeper: { speed: 2 },
+      creeper: { speed: 2 }, cow: { speed: 0.8 }, skeleton: { speed: 2 },
     },
     raid: { st: null }, hostileActors, defenders,
     getDifficulty: () => ({ cap: 8, dmg: 1, fuse: 1.5, speed: 1, aggro: 32, shoot: 1 }),
-    isDaylight: () => false, isNight: () => true, getRainLevel: () => 0,
+    isDaylight: () => Boolean(options.daylight), isNight: () => !options.daylight, getRainLevel: () => 0,
+    isSunExposed: () => !options.sheltered, getBlock: () => options.water ? 34 : 0,
     canTakeDamage: () => true,
     removeMobAt: index => { mobs.splice(index, 1); },
     damagePlayer, showHint: () => undefined, playSoundAt: () => undefined,
@@ -49,6 +50,20 @@ function fixture(actors: MobActor[]) {
   return { tick, mobs, player, damagePlayer, pendingHits, pendingBlasts };
 }
 describe('mob simulation', () => {
+  it('keeps animals afloat when swimming', () => {
+    const cow = makeActor('cow', false, 2);
+    const { tick } = fixture([cow], { water: true });
+    tick(0.1);
+    expect(cow.vy).toBeGreaterThan(0);
+  });
+  it('does not burn sheltered zombies or daylight creepers', () => {
+    const zombie = makeActor('zombie', true, 5);
+    const creeper = makeActor('creeper', true, 7);
+    const { tick } = fixture([zombie, creeper], { daylight: true, sheltered: true });
+    tick(0.1);
+    expect(zombie.burn).toBe(-1);
+    expect(creeper.burn).toBe(-1);
+  });
   it('moves a nearby zombie toward the player without full-crowd scans', () => {
     const actor = makeActor('zombie', true, 8);
     const { tick } = fixture([actor]);
