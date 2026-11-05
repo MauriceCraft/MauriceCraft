@@ -94,6 +94,7 @@ export function createModernChunkGenerator(
       const i = (y * 16 + z - z0) * 16 + x - x0;
       if (!onlyAir || !data[i]) data[i] = block;
     };
+    if ((deps.getGeneratorVersion?.() ?? 2) >= 3) deps.carveCaves?.(cx, cz, data);
     trees(cx, cz, put);
     natural.decorateFalls(cx, cz, put);
     const st = structureFor(Math.floor(x0 / REG), Math.floor(z0 / REG));

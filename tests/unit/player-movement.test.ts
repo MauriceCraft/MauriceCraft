@@ -66,6 +66,12 @@ describe('player movement and physics', () => {
     expect(game.getCollisions()).toBe(0);
     expect(game.player.onGround).toBe(false);
     expect(game.player.fallStart).toBeNull();
+    game.player.y = 1.1;
+    game.keys.KeyW = false;
+    game.keys.Space = false;
+    game.keys.ShiftLeft = true;
+    game.movement.updateMovement(1);
+    expect(game.player.y).toBeGreaterThanOrEqual(1);
   });
 
   it('prevents a hungry survival player from sprinting', () => {

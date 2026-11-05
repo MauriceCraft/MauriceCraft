@@ -70,7 +70,7 @@ export function createPlayerMovement(deps: PlayerMovementDependencies) {
       player.vy += (targetVelocityY - player.vy) * smoothFactor;
       player.vz += (targetVelocityZ - player.vz) * smoothFactor;
       player.x += player.vx * seconds;
-      player.y = Math.max(-5, Math.min(deps.worldHeight + 40, player.y + player.vy * seconds));
+      player.y = Math.max(1, Math.min(deps.worldHeight + 40, player.y + player.vy * seconds));
       player.z += player.vz * seconds;
       player.onGround = false;
       player.fallStart = null;

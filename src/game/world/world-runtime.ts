@@ -7,6 +7,7 @@ import { createStructureRegions } from './structure-regions';
 import { createStructureBuilders } from './structure-builders';
 import { fbm } from './noise';
 import { createFluidSimulator } from './fluid-simulator';
+import { createCaveCarver } from './cave-carver';
 import { biomeAt, biomeHeightAt } from './biomes';
 import { createGameRenderer } from '../rendering/game-renderer';
 import { createChunkMesher } from '../rendering/chunk-mesher';
@@ -90,6 +91,10 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     BRICK, COBBLE, CTABLE, DIRT, GOLD, GRAVEL, HAY,
     LEAVES, MOSSY, PLANKS, SANDSTONE, STONEBRICK, TORCH, WOOD,
   }, deps.getGeneratorVersion);
+  const caveCarver = createCaveCarver({
+    getSeed: deps.getSeed, heightAt: groundH, inStructureZone: inStructZone,
+    worldHeight: WORLD_HEIGHT,
+  });
   const generateChunkData = createChunkGenerator({
     getSeed: deps.getSeed, getDimension: deps.getDimension,
     getGeneratorVersion: deps.getGeneratorVersion,
@@ -97,6 +102,7 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     maxHeight: WORLD_HEIGHT, seaLevel: SEA_LEVEL,
     regionSize: STRUCTURE_REGION_SIZE, groundH, heightAt,
     forceSand, inStructZone, structureFor, buildStructure,
+    carveCaves: caveCarver.carve,
     blocks: { BRICK, COAL_ORE, COPPER_ORE, DIAMOND_ORE, DIRT,
       GOLD, GRASS, IRON_ORE, LAVA, LEAVES, SAND, SANDSTONE,
       STONE, STONEBRICK, TORCH, WATER, WOOD, SNOW, PINE_LEAVES, RED_SAND, DARK_WOOD,

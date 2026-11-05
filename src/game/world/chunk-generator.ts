@@ -11,6 +11,7 @@ export interface ChunkGeneratorDependencies {
   getDimension: () => WorldDimension;
   getGeneratorVersion?: () => number;
   getBiome?: (x: number, z: number) => Biome;
+  carveCaves?: (cx: number, cz: number, data: Uint8Array) => void;
   maxHeight: number;
   seaLevel: number;
   regionSize: number;
