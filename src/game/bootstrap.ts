@@ -30,6 +30,7 @@ import { createHud } from './ui/hud';
 import { createGameMenu, MODE_LABELS } from './ui/game-menu';
 import { coord } from './commands/coordinates';
 import { createCommandConsole } from './commands/command-console';
+import { registerWorldCommands } from './commands/world-commands';
 import { createItemResolver } from './commands/item-resolver';
 import { findPortalFrame, portalContains } from './portals/frame';
 import { createPortalSystem } from './portals/portal-system';
@@ -1398,53 +1399,28 @@ defCmd(['kill'], '/kill [hostile|passive|villagers|golems|all|me]', 'Remove crea
   for (let i = mobs.length - 1; i >= 0; i--) if (sel(mobs[i])) { removeMobAt(i); n++; }
   return 'Removed ' + n + ' creature' + (n === 1 ? '' : 's');
 }, function () { return ['hostile', 'passive', 'villagers', 'golems', 'all', 'me']; });
-defCmd(['setblock'], '/setblock <x> <y> <z> <block|air>', 'Place a single block', function (a) {
-  if (a.length < 4) throw new Error('Usage: /setblock <x> <y> <z> <block|air>');
-  const x = Math.floor(coord(a[0], player.x)), y = Math.floor(coord(a[1], player.y)), z = Math.floor(coord(a[2], player.z));
-  if (y < 0 || y >= WORLD_HEIGHT) throw new Error('Height must be between 0 and ' + (WORLD_HEIGHT - 1));
-  const id = a[3].toLowerCase() === 'air' ? 0 : findItem(a[3], true);
-  getOrGen(x >> 4, z >> 4);
-  const old = get(x, y, z);
-  setBlock(x, y, z, id); queueRebuild(x, z, id === TORCH || old === TORCH); flushRebuilds();
-  return 'Set ' + x + ' ' + y + ' ' + z + ' to ' + (id ? NAMES[id] : 'air');
-}, function (i) { return i === 4 ? ['air'].concat(Object.keys(itemMap()).filter(function (k) { return itemMap()[k] < 100; })) : []; });
-defCmd(['fill'], '/fill <x1> <y1> <z1> <x2> <y2> <z2> <block|air>', 'Fill a box with a block (up to 32768 blocks)', function (a) {
-  if (a.length < 7) throw new Error('Usage: /fill <x1> <y1> <z1> <x2> <y2> <z2> <block|air>');
-  const x1 = Math.floor(coord(a[0], player.x)), y1 = Math.floor(coord(a[1], player.y)), z1 = Math.floor(coord(a[2], player.z));
-  const x2 = Math.floor(coord(a[3], player.x)), y2 = Math.floor(coord(a[4], player.y)), z2 = Math.floor(coord(a[5], player.z));
-  const lx = Math.min(x1, x2), hx = Math.max(x1, x2), lz = Math.min(z1, z2), hz = Math.max(z1, z2), ly = Math.max(0, Math.min(y1, y2)), hy = Math.min(WORLD_HEIGHT - 1, Math.max(y1, y2));
-  const vol = (hx - lx + 1) * (hz - lz + 1) * (hy - ly + 1);
-  if (vol > 32768) throw new Error('That is ' + vol + ' blocks. The limit is 32768');
-  const id = a[6].toLowerCase() === 'air' ? 0 : findItem(a[6], true);
-  for (let cx = lx >> 4; cx <= hx >> 4; cx++) for (let cz = lz >> 4; cz <= hz >> 4; cz++) getOrGen(cx, cz);
-  for (let x = lx; x <= hx; x++) for (let z = lz; z <= hz; z++) for (let y = ly; y <= hy; y++) setBlock(x, y, z, id);
-  rebuildRegion(lx, lz, hx, hz);
-  return 'Filled ' + vol + ' block' + (vol === 1 ? '' : 's') + ' with ' + (id ? NAMES[id] : 'air');
-}, function (i) { return i === 7 ? ['air'].concat(Object.keys(itemMap()).filter(function (k) { return itemMap()[k] < 100; })) : []; });
-defCmd(['explode'], '/explode [radius]', 'Blow up the ground in front of you', function (a) {
-  const r = Math.max(1, Math.min(12, +(a[0] || 4) || 4)), sp = spawnSpot();
-  explode(sp[0], sp[1], sp[2], r, 30 * r / 4.2);
-  return 'Boom (radius ' + r + ')';
+registerWorldCommands({
+  register: defCmd,
+  player,
+  maxHeight: WORLD_HEIGHT,
+  torchBlock: TORCH,
+  names: NAMES,
+  findItem,
+  itemMap,
+  getBlock: get,
+  setBlock,
+  getOrGenerateChunk: getOrGen,
+  queueRebuild,
+  flushRebuilds,
+  rebuildRegion,
+  spawnSpot,
+  explode,
+  structureRegionSize: STRUCTURE_REGION_SIZE,
+  structureNames: STRUCT_NAMES,
+  structureFor,
+  ensureAround,
+  topBlockY: topY,
 });
-defCmd(['locate'], '/locate <village|temple|tower|dungeon|cabin|circle> [tp]', 'Find the nearest structure', function (a) {
-  const type = (a[0] || '').toLowerCase();
-  if (!STRUCT_NAMES[type]) throw new Error('Usage: /locate <' + Object.keys(STRUCT_NAMES).join('|') + '> [tp]');
-  const prx = Math.floor(player.x / STRUCTURE_REGION_SIZE), prz = Math.floor(player.z / STRUCTURE_REGION_SIZE);
-  let best = null, bd = 1e9;
-  for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) {
-    const st = structureFor(prx + dx, prz + dz);
-    if (!st || st.type !== type) continue;
-    const d = Math.hypot(st.cx - player.x, st.cz - player.z);
-    if (d < bd) { bd = d; best = st; }
-  }
-  if (!best) throw new Error('No ' + STRUCT_NAMES[type].toLowerCase() + ' within about 600 blocks');
-  if ((a[1] || '').toLowerCase() === 'tp') {
-    const x = best.cx + 0.5, z = best.cz + 4.5; ensureAround(x, z);
-    player.x = x; player.z = z; player.y = topY(Math.floor(x), Math.floor(z)) + 1.01; player.vx = player.vy = player.vz = 0; player.fallStart = null;
-    return 'Teleported to the ' + STRUCT_NAMES[type].toLowerCase() + ' at ' + best.cx + ' ' + best.cz;
-  }
-  return 'Nearest ' + STRUCT_NAMES[type].toLowerCase() + ': x ' + best.cx + ', z ' + best.cz + ' (' + Math.round(bd) + ' blocks away)';
-}, function (i) { return i === 1 ? Object.keys(STRUCT_NAMES) : (i === 2 ? ['tp'] : []); });
 defCmd(['save'], '/save', 'Save the world now', function () { saveWorld().then(refreshWorlds); return worldSession.isStorageAvailable() ? 'Saving the world...' : 'Saving is not available in this browser'; });
 defCmd(['say'], '/say <message>', 'Write a message in the chat', function (a) { return '[You] ' + a.join(' '); });
 
