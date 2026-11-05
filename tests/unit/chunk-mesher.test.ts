@@ -17,8 +17,8 @@ function fixture(blockId: number) {
     chunks, chunkAt: (cx, cz) => chunks.get(ckey(cx, cz)) ?? null,
     getBlock: (x, y, z) => x >= 0 && x < 16 && z >= 0 && z < 16 && y >= 0 && y < 48
       ? data[(y * 16 + z) * 16 + x] : 0,
-    opq: b => b !== 0 && b !== 17, isBed: b => b >= 19 && b <= 26,
-    tiles: { 3: [3, 3, 3] }, height: 48, chunkSize: 16,
+    opq: b => b !== 0 && b !== 17 && b !== 34 && b !== 35, isBed: b => b >= 19 && b <= 26,
+    tiles: { 3: [3, 3, 3], 34: [96, 96, 96], 35: [97, 97, 97] }, height: 48, chunkSize: 16,
     atlasTiles: 128, bedHeight: 0.5625, torchId: 17,
     waterId: 34, lavaId: 35,
   });
