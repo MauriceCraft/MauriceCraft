@@ -14,7 +14,7 @@ function fixture() {
   const showHint = vi.fn();
   const playSound = vi.fn();
   const giveItem = vi.fn();
-  const addMob = vi.fn((kind: string, x: number, y: number, z: number, _opts: { job?: string; leader?: boolean } | null): SpawnMob => {
+  const addMob = vi.fn((kind: string, x: number, y: number, z: number): SpawnMob => {
     const mob = { kind, x, y, z, raid: false, village: null, hx: 0, hz: 0 } as SpawnMob;
     mobs.push(mob);
     return mob;
