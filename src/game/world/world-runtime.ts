@@ -36,7 +36,9 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     BRICK, COBBLE, CTABLE, DIRT, GOLD, GRAVEL, HAY, LEAVES,
     MOSSY, PLANKS, SANDSTONE, STONEBRICK, TORCH, WOOD,
     COAL_ORE, COPPER_ORE, DIAMOND_ORE, GRASS, IRON_ORE, LAVA,
-    SAND, STONE, WATER, SNOW, PINE_LEAVES, RED_SAND, DARK_WOOD, toolTile, ALL_BLOCKS, TILES,
+    SAND, STONE, WATER, SNOW, PINE_LEAVES, RED_SAND, DARK_WOOD,
+    BIRCH_WOOD, BIRCH_LEAVES, ACACIA_WOOD, ACACIA_LEAVES, WILLOW_WOOD,
+    WILLOW_LEAVES, AUTUMN_LEAVES, MUD, FLOWERING_GRASS, toolTile, ALL_BLOCKS, TILES,
     ATLAS_N, BED_H, isBed, opq, solid,
   } = catalog;
   const hotbar = ALL_BLOCKS.slice(0, 9);
@@ -97,7 +99,9 @@ export function createWorldRuntime(deps: WorldRuntimeDependencies) {
     forceSand, inStructZone, structureFor, buildStructure,
     blocks: { BRICK, COAL_ORE, COPPER_ORE, DIAMOND_ORE, DIRT,
       GOLD, GRASS, IRON_ORE, LAVA, LEAVES, SAND, SANDSTONE,
-      STONE, STONEBRICK, TORCH, WATER, WOOD, SNOW, PINE_LEAVES, RED_SAND, DARK_WOOD },
+      STONE, STONEBRICK, TORCH, WATER, WOOD, SNOW, PINE_LEAVES, RED_SAND, DARK_WOOD,
+      BIRCH_WOOD, BIRCH_LEAVES, ACACIA_WOOD, ACACIA_LEAVES, WILLOW_WOOD,
+      WILLOW_LEAVES, AUTUMN_LEAVES, MUD, FLOWERING_GRASS },
   });
   const lifecycle = createChunkLifecycle({
     chunks, savedChunks, height: WORLD_HEIGHT,

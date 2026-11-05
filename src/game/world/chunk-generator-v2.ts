@@ -17,12 +17,16 @@ export function createModernChunkGenerator(
     seaLevel: SEA, maxHeight: H, waterBlock: blocks.WATER, lavaBlock: blocks.LAVA,
   });
   const trees = createTreeDecorator({
-    getSeed, getBiome, groundHeight: groundH, canGrowAt: (x, z) => natural.lakeAt(x, z) === null,
+    getSeed, getGeneratorVersion: deps.getGeneratorVersion, getBiome, groundHeight: groundH, canGrowAt: (x, z) => natural.lakeAt(x, z) === null,
     inStructureZone: inStructZone, seaLevel: SEA, maxHeight: H,
     blocks: {
       wood: blocks.WOOD, leaves: blocks.LEAVES,
       darkWood: blocks.DARK_WOOD ?? blocks.WOOD,
       pineLeaves: blocks.PINE_LEAVES ?? blocks.LEAVES,
+      birchWood: blocks.BIRCH_WOOD, birchLeaves: blocks.BIRCH_LEAVES,
+      acaciaWood: blocks.ACACIA_WOOD, acaciaLeaves: blocks.ACACIA_LEAVES,
+      willowWood: blocks.WILLOW_WOOD, willowLeaves: blocks.WILLOW_LEAVES,
+      autumnLeaves: blocks.AUTUMN_LEAVES,
     },
   });
   return function generateModernChunk(cx: number, cz: number): Uint8Array {
@@ -35,11 +39,14 @@ export function createModernChunkGenerator(
       const top = lake ? Math.max(1, lake.bottom) : height;
       const beach = height <= SEA + 1 || forceSand(x, z);
       const surface = biomeSurface(getBiome(x, z), height, SEA);
+      const modernColors = (deps.getGeneratorVersion?.() ?? 2) >= 3;
       const topBlock = beach ? blocks.SAND :
         surface === 'snow' ? blocks.SNOW ?? blocks.GRASS :
         surface === 'red-sand' ? blocks.RED_SAND ?? blocks.SAND :
         surface === 'stone' ? blocks.STONE :
-        surface === 'moss' ? blocks.GRASS : surface === 'sand' ? blocks.SAND : blocks.GRASS;
+        surface === 'moss' ? (modernColors ? blocks.MUD ?? blocks.GRASS : blocks.GRASS) :
+        surface === 'sand' ? blocks.SAND :
+        modernColors && getBiome(x, z) === 'meadow' ? blocks.FLOWERING_GRASS ?? blocks.GRASS : blocks.GRASS;
       for (let y = 0; y <= top; y++) {
         const block = y === top ? topBlock :
           y >= top - 3 ? (topBlock === blocks.SAND || topBlock === blocks.RED_SAND ? topBlock : blocks.DIRT) :

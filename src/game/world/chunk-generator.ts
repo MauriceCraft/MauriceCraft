@@ -5,7 +5,7 @@ import type { GeneratedStructure } from './structure-regions';
 import type { WriteBlock } from './structure-builders';
 
 export type WorldDimension = 'overworld' | 'nether' | 'end';
-export type TerrainBlockIds = Record<'BRICK' | 'COAL_ORE' | 'COPPER_ORE' | 'DIAMOND_ORE' | 'DIRT' | 'GOLD' | 'GRASS' | 'IRON_ORE' | 'LAVA' | 'LEAVES' | 'SAND' | 'SANDSTONE' | 'STONE' | 'STONEBRICK' | 'TORCH' | 'WATER' | 'WOOD', number> & Partial<Record<'SNOW' | 'PINE_LEAVES' | 'RED_SAND' | 'DARK_WOOD', number>>;
+export type TerrainBlockIds = Record<'BRICK' | 'COAL_ORE' | 'COPPER_ORE' | 'DIAMOND_ORE' | 'DIRT' | 'GOLD' | 'GRASS' | 'IRON_ORE' | 'LAVA' | 'LEAVES' | 'SAND' | 'SANDSTONE' | 'STONE' | 'STONEBRICK' | 'TORCH' | 'WATER' | 'WOOD', number> & Partial<Record<'SNOW' | 'PINE_LEAVES' | 'RED_SAND' | 'DARK_WOOD' | 'BIRCH_WOOD' | 'BIRCH_LEAVES' | 'ACACIA_WOOD' | 'ACACIA_LEAVES' | 'WILLOW_WOOD' | 'WILLOW_LEAVES' | 'AUTUMN_LEAVES' | 'MUD' | 'FLOWERING_GRASS', number>>;
 export interface ChunkGeneratorDependencies {
   getSeed: () => number;
   getDimension: () => WorldDimension;
