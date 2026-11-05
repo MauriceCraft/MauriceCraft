@@ -18,7 +18,7 @@ function fixture(blockId: number) {
     getBlock: (x, y, z) => x >= 0 && x < 16 && z >= 0 && z < 16 && y >= 0 && y < 48
       ? data[(y * 16 + z) * 16 + x] : 0,
     opq: b => b !== 0 && b !== 17 && b !== 34 && b !== 35, isBed: b => b >= 19 && b <= 26,
-    tiles: { 3: [3, 3, 3], 34: [96, 96, 96], 35: [97, 97, 97] }, height: 48, chunkSize: 16,
+    tiles: { 3: [3, 3, 3], 34: [96, 96, 96], 35: [97, 97, 97], 162: [96, 96, 96] }, height: 48, chunkSize: 16,
     atlasTiles: 128, bedHeight: 0.5625, torchId: 17,
     waterId: 34, lavaId: 35,
   });
@@ -43,6 +43,18 @@ describe('typed chunk meshing', () => {
     mesher.buildChunk(0, 0);
     expect(chunk.mesh).toBeInstanceOf(THREE.Mesh);
     expect((chunk.mesh!.geometry as THREE.BufferGeometry).getIndex()!.count).toBeLessThan(72);
+  });
+  it('slopes flowing water surfaces with heights shared by neighboring blocks', () => {
+    const { chunk, mesher } = fixture(34);
+    chunk.data[(1 * 16 + 1) * 16 + 2] = 162;
+    mesher.buildChunk(0, 0);
+    const positions = chunk.mesh!.geometry.getAttribute('position');
+    const yLevels = new Set<number>();
+    for (let i = 0; i < positions.count; i++) {
+      const y = positions.getY(i);
+      if (y > 1 && y < 2) yLevels.add(Math.round(y * 1000));
+    }
+    expect(yLevels.size).toBeGreaterThan(1);
   });
   it('creates a separate, always-bright torch mesh and glow', () => {
     const { scene, chunk, mesher } = fixture(17);

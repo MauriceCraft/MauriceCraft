@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ckey } from '../world/chunk-key';
+import { liquidKind, liquidCornerHeight } from '../world/fluid-blocks';
 
 export interface MeshChunk {
   cx: number;
@@ -37,7 +38,6 @@ export function createChunkMesher<T extends MeshChunk>(deps: MesherDependencies<
   const get = deps.getBlock;
   const TILES = deps.tiles, H = deps.height, CS = deps.chunkSize;
   const ATLAS_N = deps.atlasTiles, BED_H = deps.bedHeight, TORCH = deps.torchId;
-  const liquids = new Set([deps.waterId, deps.lavaId].filter((id): id is number => id !== undefined));
 
   /* ---------- Chunk meshing and lighting ---------- */
   const FACES = [
@@ -177,7 +177,8 @@ export function createChunkMesher<T extends MeshChunk>(deps: MesherDependencies<
             const neighbor = get(nx, ny, nz);
             // Do not draw internal water/lava faces: they create visible square seams
             // and cause large lakes to look like stacks of disconnected cubes.
-            if (opq(neighbor) || (liquids.has(b) && neighbor === b)) continue;
+            const fluid = liquidKind(b);
+            if (opq(neighbor) || (fluid && liquidKind(neighbor) === fluid)) continue;
             const ax = f.n[0] ? 0 : (f.n[1] ? 1 : 2);
             const t1 = (ax + 1) % 3, t2 = (ax + 2) % 3;
             for (let i = 0; i < 4; i++) {
@@ -200,7 +201,10 @@ export function createChunkMesher<T extends MeshChunk>(deps: MesherDependencies<
             const uvs = [[u0, EPS], [u1, EPS], [u1, 1 - EPS], [u0, 1 - EPS]];
             for (let i = 0; i < 4; i++) {
               const c = f.c[i];
-              pos.push(x + c[0], y + c[1], z + c[2]);
+              const vertexY = fluid && c[1] === 1
+                ? y + liquidCornerHeight(get, x, y, z, c[0], c[2])
+                : y + c[1];
+              pos.push(x + c[0], vertexY, z + c[2]);
               uv.push(uvs[i][0], uvs[i][1]);
               const sh = f.s * AO_LEVELS[aoV[i]];
               col.push(sh, sh, sh);

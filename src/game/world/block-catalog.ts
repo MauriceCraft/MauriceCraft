@@ -1,3 +1,5 @@
+import { liquidKind, WATER_FLOW_START, LAVA_FLOW_START, WATER_REACH, LAVA_REACH } from './fluid-blocks';
+
 /** Persistent IDs and item metadata. Never renumber items in an existing save. */
 export function createBlockCatalog() {
   const GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, WOOD = 5, LEAVES = 6, PLANKS = 7, BRICK = 8, COBBLE = 9;
@@ -19,14 +21,16 @@ export function createBlockCatalog() {
     39: [101, 101, 101], 40: [103, 102, 103],
     27: [68, 68, 68], 28: [69, 69, 69], 29: [70, 70, 70], 30: [71, 71, 71], 31: [72, 72, 72], 32: [73, 73, 73], 33: [74, 74, 74]
   };
+  for (let n = 0; n < WATER_REACH; n++) TILES[WATER_FLOW_START + n] = [96, 96, 96];
+  for (let n = 0; n < LAVA_REACH; n++) TILES[LAVA_FLOW_START + n] = [97, 97, 97];
   const tileOf = (b: number): number | undefined => TILES[b] ? TILES[b][1] : ITEM_TILE[b];
   const ATLAS_N = 128;   // tiles across the texture atlas
   // Torches are see-through and walk-through; everything else non-empty is solid
   const isBed = (b: number): boolean => b >= 19 && b <= 26;                        // 19 + facing * 2 + (head ? 1 : 0)
   const BED_H = 0.5625;                                         // beds are only a little over half a block tall
   const BED_DIR = [[1, 0], [0, 1], [-1, 0], [0, -1]];           // direction from the foot towards the head
-  const solid = (b: number): boolean => b !== 0 && b !== TORCH && b !== WATER && b !== LAVA;
-  const opq = (b: number): boolean => b !== 0 && b !== TORCH && b !== WATER && b !== LAVA && !(b >= 19 && b <= 26);
+  const solid = (b: number): boolean => b !== 0 && b !== TORCH && !liquidKind(b);
+  const opq = (b: number): boolean => b !== 0 && b !== TORCH && !liquidKind(b) && !(b >= 19 && b <= 26);
   const NAMES: Record<number, string> = { 1: 'Grass', 2: 'Dirt', 3: 'Stone', 4: 'Sand', 5: 'Log', 6: 'Leaves', 7: 'Planks', 8: 'Brick', 9: 'Cobblestone', 10: 'Stone Brick', 11: 'Sandstone', 12: 'Gravel', 13: 'Hay Bale', 14: 'Gold Block', 15: 'Mossy Cobble', 16: 'TNT', 17: 'Torch', 18: 'Crafting Table', 19: 'Bed', 34: 'Water', 35: 'Lava', 36: 'Obsidian', 37: 'Snow', 38: 'Pine Leaves', 39: 'Red Sand', 40: 'Dark Wood', 27: 'Coal Ore', 28: 'Copper Ore', 29: 'Iron Ore', 30: 'Diamond Ore', 31: 'Iron Block', 32: 'Copper Block', 33: 'Diamond Block',
     101: 'Raw Beef', 102: 'Raw Pork', 103: 'Raw Mutton', 104: 'Raw Chicken', 105: 'Cooked Meat', 106: 'Wool', 107: 'Feather', 108: 'Leather', 109: 'Gunpowder', 110: 'Dynamite', 111: 'Flint & Steel', 112: 'Emerald', 113: 'Bone', 114: 'String', 115: 'Stick', 116: 'Coal', 117: 'Raw Copper', 118: 'Raw Iron', 119: 'Copper Ingot', 151: 'Iron Ingot', 152: 'Diamond',
     120: 'Cow Spawn Egg', 121: 'Pig Spawn Egg', 122: 'Sheep Spawn Egg', 123: 'Chicken Spawn Egg', 124: 'Villager Spawn Egg', 125: 'Zombie Spawn Egg', 126: 'Creeper Spawn Egg', 127: 'Skeleton Spawn Egg', 128: 'Spider Spawn Egg' };

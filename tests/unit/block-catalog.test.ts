@@ -19,6 +19,9 @@ describe('persisted item and block catalog', () => {
     expect(catalog.tileOf(catalog.SNOW)).toBe(99);
     expect(catalog.tileOf(catalog.PINE_LEAVES)).toBe(100);
     expect(catalog.solid(catalog.WATER)).toBe(false);
+    expect(catalog.solid(163)).toBe(false);
+    expect(catalog.opq(171)).toBe(false);
+    expect(catalog.tileOf(163)).toBe(96);
     expect(catalog.solid(catalog.STONE)).toBe(true);
     expect(catalog.opq(catalog.BED)).toBe(false);
     expect(catalog.isBed(26)).toBe(true);
