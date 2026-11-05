@@ -2,6 +2,7 @@
 // This legacy gameplay loop is being migrated to typed, focused modules.
 // Keep IndexedDB store names/keys and world serialization compatible.
 import * as THREE from 'three';
+import { raycastActors } from './entities/actor-targeting';
 import { bg, bm, part, JOBS, JOB_NAMES, makeZombie, makeCow, makePig, makeSheep, makeChicken, makeCreeper, makeSkeleton, makeSpider, makePillager, makeVindicator, makeIronGolem, makeCopperGolem, makeDiamondGolem, makeVillager, makeEnderDragon } from './entities/mob-models';
 import { ckey } from './world/chunk-key';
 import { createChunkStreamer } from './world/chunk-streamer';
@@ -671,26 +672,9 @@ import { createAudioEngine } from './audio/sound-engine';
   }
 
   const rayDir = new THREE.Vector3();
-  function raycastMobs(maxD) {
-    const o = camera.position;
+  function raycastMobs(maxDistance) {
     camera.getWorldDirection(rayDir);
-    let best = null;
-    for (const m of mobs) {
-      const min = [m.x - m.r, m.y, m.z - m.r], max = [m.x + m.r, m.y + m.h, m.z + m.r];
-      const org = [o.x, o.y, o.z], dir = [rayDir.x, rayDir.y, rayDir.z];
-      let t0 = 0, t1 = maxD, ok = true;
-      for (let a = 0; a < 3; a++) {
-        if (Math.abs(dir[a]) < 1e-8) { if (org[a] < min[a] || org[a] > max[a]) { ok = false; break; } }
-        else {
-          let ta = (min[a] - org[a]) / dir[a], tb = (max[a] - org[a]) / dir[a];
-          if (ta > tb) { const sw = ta; ta = tb; tb = sw; }
-          t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
-          if (t0 > t1) { ok = false; break; }
-        }
-      }
-      if (ok && (!best || t0 < best.t)) best = { mob: m, t: t0 };
-    }
-    return best;
+    return raycastActors(mobs, camera.position, rayDir, maxDistance);
   }
   function giveItem(id, n) { inv[id] = (inv[id] || 0) + n; updateHotbar(false); }
   function killMob(m) {
