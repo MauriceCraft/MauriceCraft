@@ -228,5 +228,5 @@ export function createInputControls(deps: InputControlDependencies) {
     if (state.playing) deps.openCommand('/');
   }, { passive: false });
 
-  return { touchUI, jumpButton, toggleFly };
+  return { touchUI, jumpButton, placeButton, flyButton, inventoryButton, toggleFly };
 }
