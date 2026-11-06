@@ -43,14 +43,19 @@
   #mineBar { position: fixed; left: 50%; top: calc(50% + 22px); width: 64px; height: 7px; margin-left: -32px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.5); display: none; pointer-events: none; }
   #mineBar i { display: block; height: 100%; width: 0; background: var(--accent); }
 
+  #portalfx { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 3; background: radial-gradient(ellipse at center, rgba(150,70,255,0.15) 0%, rgba(90,20,170,0.85) 100%); }
   #bolt { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 3; }
   #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 4; }
   #raid { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 10px); transform: translateX(-50%); display: none; padding: 6px 12px; font-size: 14px; background: var(--panel); border: 2px solid #b3261e; color: var(--text); pointer-events: none; white-space: nowrap; }
   #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s;
     background: radial-gradient(ellipse at center, rgba(200,0,0,0) 40%, rgba(200,0,0,.75) 100%); }
 
-  /* Hide the developer stats panel during normal gameplay. */
-  #info { display: none !important; }
+  #info {
+    position: fixed; left: 12px; top: calc(env(safe-area-inset-top, 0px) + 10px);
+    padding: 6px 10px; font-size: 14px; line-height: 1.35;
+    background: var(--panel); border: 2px solid var(--panel-edge); color: var(--text);
+    pointer-events: none; white-space: pre;
+  }
   #objective {
     position: fixed; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 10px);
     padding: 6px 10px; font-size: 14px; line-height: 1.35; text-align: right;
@@ -209,6 +214,7 @@
 <div id="flash"></div>
 <div id="fade"></div>
 <div id="bolt"></div>
+<div id="portalfx"></div>
 <div id="raid"></div>
 <div id="info"></div>
 <div id="objective"></div>
@@ -306,7 +312,7 @@
       <dt>M</dt><dd>Mute or unmute all sound</dd>
       <dt>1–9 / scroll</dt><dd>Choose a block</dd>
       <dt>Double-tap Space / F</dt><dd>Toggle flying in Creative (Space up, Shift down)</dd>
-      <dt>T or /</dt><dd>Open commands; use /portal build to build a portal, or /dimension nether/end/overworld to travel; Water and Lava are in the inventory; defeat the Ender Dragon in the End</dd>
+      <dt>T or /</dt><dd>Open the command line. Type /help to list every command</dd>
       <dt>I / Tab</dt><dd>Open the inventory (Creative: every block. Survival: backpack and crafting)</dd>
       <dt>Esc</dt><dd>Pause, then pick a different mode any time</dd>
     </dl>
@@ -321,27 +327,23 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function () {
   'use strict';
 
-  // Nether portal state belongs inside the game runtime.
-  let dimension = 'overworld';
-  const portals = [];
-  const portalVisuals = [];
-  let portalCooldown = 0;
-
   /* ---------- World constants ---------- */
   const H = 48, CS = 16, SEA = 14, R = 5;   // R = view distance in chunks
-  const chunks = new Map();
+  const dims = { overworld: { chunks: new Map(), saved: new Map() }, sift: { chunks: new Map(), saved: new Map() }, end: { chunks: new Map(), saved: new Map() } };
+  let dimension = 'overworld', chunks = dims.overworld.chunks;
+  const DIM_NAME = { overworld: 'Overworld', sift: 'The Sift', end: 'The End' };
   let _ck = null, _cc = null;
   function ckey(cx, cz) { return ((cx & 0xffff) << 16) | (cz & 0xffff); }
   function chunkAt(cx, cz) { const k = ckey(cx, cz); if (k === _ck) return _cc; _ck = k; _cc = chunks.get(k) || null; return _cc; }
   function resetChunkCache() { _ck = null; _cc = null; }
   // Unloaded space counts as solid, so nothing can walk into it
   function get(x, y, z) {
-    if (y < 0) return 3;
+    if (y < 0) return dimension === 'end' ? 0 : 3;   // the End has a void underneath
     if (y >= H) return 0;
     const c = chunkAt(x >> 4, z >> 4);
     if (!c) return 3;
@@ -357,10 +359,12 @@
 
     const GRASS = 1, DIRT = 2, STONE = 3, SAND = 4, WOOD = 5, LEAVES = 6, PLANKS = 7, BRICK = 8, COBBLE = 9;
   const STONEBRICK = 10, SANDSTONE = 11, GRAVEL = 12, HAY = 13, GOLD = 14, MOSSY = 15, TNT = 16, TORCH = 17, CTABLE = 18, BED = 19;
-  const WATER = 34, LAVA = 35, OBSIDIAN = 36;
   const COAL_ORE = 27, COPPER_ORE = 28, IRON_ORE = 29, DIAMOND_ORE = 30, IRON_BLOCK = 31, COPPER_BLOCK = 32, DIAMOND_BLOCK = 33;
   // Items (not placeable) start at 100
   const BEEF = 101, PORK = 102, MUTTON = 103, CHICKEN = 104, COOKED = 105, WOOL = 106, FEATHER = 107, LEATHER = 108, GUNPOWDER = 109, DYNAMITE = 110, FLINT = 111, EMERALD = 112, BONE = 113, STRING = 114, STICK = 115;
+  const SIFTROCK = 34, SIFT_SAND = 35, LUMENITE = 36, EMBER_ORE = 37, OBSIDIAN = 38, LAVA = 39, PORTAL = 40, SIFTBRICK = 41;
+  const VOID_FRAME = 42, VOID_FRAME_EYE = 43, END_PORTAL = 44, END_STONE = 45, DRAGON_EGG = 46;
+  const EMBER_SHARD = 156, WISP_TEAR = 157, VOID_EYE = 158;
   const COAL = 116, RAW_COPPER = 117, RAW_IRON = 118, COPPER_INGOT = 119, IRON_INGOT = 151, DIAMOND = 152;
   const ITEM_TILE = { 101: 21, 102: 22, 103: 23, 104: 24, 105: 25, 106: 26, 107: 27, 108: 28, 109: 29, 110: 30, 111: 31, 112: 34, 113: 35, 114: 36, 115: 40, 19: 67, 116: 75, 117: 76, 118: 77, 119: 78, 151: 79, 152: 80, 120: 41, 121: 42, 122: 43, 123: 44, 124: 45, 125: 46, 126: 47, 127: 48, 128: 49 };
   // Spawn eggs: item id -> creature
@@ -369,8 +373,10 @@
   const TILES = {
     1: [0, 1, 2], 2: [2, 2, 2], 3: [3, 3, 3], 4: [4, 4, 4], 5: [6, 5, 6],
     6: [7, 7, 7], 7: [8, 8, 8], 8: [9, 9, 9], 9: [10, 10, 10],
-    10: [11, 11, 11], 11: [13, 12, 13], 12: [14, 14, 14], 13: [16, 15, 16], 14: [17, 17, 17], 15: [18, 18, 18], 16: [19, 20, 19], 17: [37, 37, 37], 18: [38, 39, 8], 34: [96, 96, 96], 35: [97, 97, 97], 36: [98, 98, 98],
-    27: [68, 68, 68], 28: [69, 69, 69], 29: [70, 70, 70], 30: [71, 71, 71], 31: [72, 72, 72], 32: [73, 73, 73], 33: [74, 74, 74]
+    10: [11, 11, 11], 11: [13, 12, 13], 12: [14, 14, 14], 13: [16, 15, 16], 14: [17, 17, 17], 15: [18, 18, 18], 16: [19, 20, 19], 17: [37, 37, 37], 18: [38, 39, 8],
+    27: [68, 68, 68], 28: [69, 69, 69], 29: [70, 70, 70], 30: [71, 71, 71], 31: [72, 72, 72], 32: [73, 73, 73], 33: [74, 74, 74],
+    34: [92, 92, 92], 35: [93, 93, 93], 36: [94, 94, 94], 37: [95, 95, 95], 38: [96, 96, 96], 39: [97, 97, 97], 40: [98, 98, 98], 41: [99, 99, 99],
+    42: [100, 101, 101], 43: [102, 101, 101], 44: [103, 103, 103], 45: [104, 104, 104], 46: [105, 105, 105]
   };
   const tileOf = b => TILES[b] ? TILES[b][1] : ITEM_TILE[b];
   const ATLAS_N = 128;   // tiles across the texture atlas
@@ -378,18 +384,19 @@
   const isBed = b => b >= 19 && b <= 26;                        // 19 + facing * 2 + (head ? 1 : 0)
   const BED_H = 0.5625;                                         // beds are only a little over half a block tall
   const BED_DIR = [[1, 0], [0, 1], [-1, 0], [0, -1]];           // direction from the foot towards the head
-  const solid = b => b !== 0 && b !== TORCH && b !== WATER && b !== LAVA;
-  const opq = b => b !== 0 && b !== TORCH && b !== WATER && b !== LAVA && !(b >= 19 && b <= 26);
-  const NAMES = { 1: 'Grass', 2: 'Dirt', 3: 'Stone', 4: 'Sand', 5: 'Log', 6: 'Leaves', 7: 'Planks', 8: 'Brick', 9: 'Cobblestone', 10: 'Stone Brick', 11: 'Sandstone', 12: 'Gravel', 13: 'Hay Bale', 14: 'Gold Block', 15: 'Mossy Cobble', 16: 'TNT', 17: 'Torch', 18: 'Crafting Table', 19: 'Bed', 34: 'Water', 35: 'Lava', 36: 'Obsidian', 27: 'Coal Ore', 28: 'Copper Ore', 29: 'Iron Ore', 30: 'Diamond Ore', 31: 'Iron Block', 32: 'Copper Block', 33: 'Diamond Block',
-    101: 'Raw Beef', 102: 'Raw Pork', 103: 'Raw Mutton', 104: 'Raw Chicken', 105: 'Cooked Meat', 106: 'Wool', 107: 'Feather', 108: 'Leather', 109: 'Gunpowder', 110: 'Dynamite', 111: 'Flint & Steel', 112: 'Emerald', 113: 'Bone', 114: 'String', 115: 'Stick', 116: 'Coal', 117: 'Raw Copper', 118: 'Raw Iron', 119: 'Copper Ingot', 151: 'Iron Ingot', 152: 'Diamond',
+  const isFluid = b => b === 39 || b === 40 || b === 44;      // lava and the two portals: see-through and walk-through
+  const solid = b => b !== 0 && b !== TORCH && !isFluid(b);
+  const opq = b => b !== 0 && b !== TORCH && !isFluid(b) && !(b >= 19 && b <= 26);
+  const NAMES = { 1: 'Grass', 2: 'Dirt', 3: 'Stone', 4: 'Sand', 5: 'Log', 6: 'Leaves', 7: 'Planks', 8: 'Brick', 9: 'Cobblestone', 10: 'Stone Brick', 11: 'Sandstone', 12: 'Gravel', 13: 'Hay Bale', 14: 'Gold Block', 15: 'Mossy Cobble', 16: 'TNT', 17: 'Torch', 18: 'Crafting Table', 19: 'Bed', 27: 'Coal Ore', 28: 'Copper Ore', 29: 'Iron Ore', 30: 'Diamond Ore', 31: 'Iron Block', 32: 'Copper Block', 33: 'Diamond Block', 34: 'Siftrock', 35: 'Sift Sand', 36: 'Lumenite', 37: 'Ember Ore', 38: 'Obsidian', 39: 'Lava', 40: 'Sift Portal', 41: 'Siftbrick', 42: 'Void Frame', 43: 'Void Frame (Eye)', 44: 'End Portal', 45: 'End Stone', 46: 'Dragon Egg',
+    101: 'Raw Beef', 102: 'Raw Pork', 103: 'Raw Mutton', 104: 'Raw Chicken', 105: 'Cooked Meat', 106: 'Wool', 107: 'Feather', 108: 'Leather', 109: 'Gunpowder', 110: 'Dynamite', 111: 'Flint & Steel', 112: 'Emerald', 113: 'Bone', 114: 'String', 115: 'Stick', 116: 'Coal', 117: 'Raw Copper', 118: 'Raw Iron', 119: 'Copper Ingot', 151: 'Iron Ingot', 152: 'Diamond', 156: 'Ember Shard', 157: 'Wisp Tear', 158: 'Void Eye',
     120: 'Cow Spawn Egg', 121: 'Pig Spawn Egg', 122: 'Sheep Spawn Egg', 123: 'Chicken Spawn Egg', 124: 'Villager Spawn Egg', 125: 'Zombie Spawn Egg', 126: 'Creeper Spawn Egg', 127: 'Skeleton Spawn Egg', 128: 'Spider Spawn Egg' };
-  const ALL_BLOCKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 34, 35, 36, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 120, 121, 122, 123, 124, 125, 126, 127, 128];   // blocks first, then items (tools are appended below)
+  const ALL_BLOCKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 120, 121, 122, 123, 124, 125, 126, 127, 128];   // blocks first, then items (tools are appended below)
   const hotbar = ALL_BLOCKS.slice(0, 9);   // which block sits in each hotbar slot (editable from the inventory)
   // Survival: seconds to break, and what a block drops
-  const BREAK_TIME = { 36: 5.5, 1: 0.6, 2: 0.5, 3: 2.2, 4: 0.5, 5: 1.3, 6: 0.25, 7: 1.0, 8: 2.4, 9: 2.2, 10: 2.4, 11: 1.2, 12: 0.6, 13: 0.5, 14: 2.0, 15: 2.2, 16: 0.3, 17: 0.1, 18: 1.2 };
+  const BREAK_TIME = { 1: 0.6, 2: 0.5, 3: 2.2, 4: 0.5, 5: 1.3, 6: 0.25, 7: 1.0, 8: 2.4, 9: 2.2, 10: 2.4, 11: 1.2, 12: 0.6, 13: 0.5, 14: 2.0, 15: 2.2, 16: 0.3, 17: 0.1, 18: 1.2 };
   for (let bi = 19; bi <= 26; bi++) BREAK_TIME[bi] = 0.4;
-  Object.assign(BREAK_TIME, { 27: 2.6, 28: 3, 29: 3.2, 30: 4.2, 31: 4, 32: 3.5, 33: 5 });
-  const DROPS = { 1: 2, 3: 9, 27: COAL, 28: RAW_COPPER, 29: RAW_IRON, 30: DIAMOND };
+  Object.assign(BREAK_TIME, { 27: 2.6, 28: 3, 29: 3.2, 30: 4.2, 31: 4, 32: 3.5, 33: 5, 34: 1.2, 35: 0.6, 36: 0.8, 37: 2.8, 38: 9, 39: 1, 40: 1, 41: 2.4, 42: 5000, 43: 5000, 44: 1, 45: 2.4, 46: 3 });
+  const DROPS = { 1: 2, 3: 9, 27: COAL, 28: RAW_COPPER, 29: RAW_IRON, 30: DIAMOND, 37: EMBER_SHARD };
   // Tools. Tool ids run 130..141: tier * 4 + kind.
   const TOOL_KINDS = ['pickaxe', 'axe', 'shovel', 'sword'], TOOL_TIERS = ['Wooden', 'Stone', 'Emerald', 'Iron', 'Diamond'];
   const toolId = (ti, ki) => ti < 3 ? 130 + ti * 4 + ki : 143 + (ti - 3) * 4 + ki;
@@ -405,19 +412,23 @@
   ALL_BLOCKS.push.apply(ALL_BLOCKS, TOOL_IDS);
   EGG_KINDS[129] = 'pillager'; EGG_KINDS[142] = 'vindicator'; EGG_KINDS[153] = 'irongolem'; EGG_KINDS[154] = 'coppergolem'; EGG_KINDS[155] = 'diamondgolem';
   NAMES[129] = 'Pillager Spawn Egg'; NAMES[142] = 'Vindicator Spawn Egg'; NAMES[153] = 'Iron Golem Spawn Egg'; NAMES[154] = 'Copper Golem Spawn Egg'; NAMES[155] = 'Diamond Golem Spawn Egg';
+  ITEM_TILE[156] = 106; ITEM_TILE[157] = 107; ITEM_TILE[158] = 108; ITEM_TILE[159] = 109; ITEM_TILE[160] = 110;
   ITEM_TILE[129] = 64; ITEM_TILE[142] = 65; ITEM_TILE[153] = 89; ITEM_TILE[154] = 90; ITEM_TILE[155] = 91;
-  ALL_BLOCKS.push(129, 142, 153, 154, 155);
+  EGG_KINDS[159] = 'cinderhusk'; EGG_KINDS[160] = 'wisp';
+  NAMES[159] = 'Cinder Husk Spawn Egg'; NAMES[160] = 'Wisp Spawn Egg';
+  ALL_BLOCKS.push(129, 142, 153, 154, 155, 159, 160);
+  ALL_BLOCKS.push(34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 156, 157, 158);   // The Sift and The End
   ALL_BLOCKS.push(27, 28, 29, 30, 31, 32, 33, 116, 117, 118, 119, 151, 152);   // ores, metal blocks, ore items
   const TOOL_MAX = [40, 90, 400, 250, 800];             // uses before a tool breaks
   const TOOL_LVL = [0, 1, 2, 2, 3];                     // mining level per tier
   const TOOL_SPD = [2.4, 4, 6.5, 5.5, 8];               // mining speed per tier
   const TOOL_DMG = { sword: [6, 8, 12, 9, 14], axe: [5, 7, 10, 8, 12], pickaxe: [4, 6, 8, 6, 9], shovel: [4, 5, 7, 5, 8] };
   // blocks that only drop with a pickaxe of at least this level
-  const NEEDS_PICK = { 3: 0, 8: 0, 9: 0, 10: 0, 11: 0, 15: 0, 14: 1, 27: 0, 28: 1, 29: 1, 30: 2, 31: 1, 32: 1, 33: 2 };
+  const NEEDS_PICK = { 3: 0, 8: 0, 9: 0, 10: 0, 11: 0, 15: 0, 14: 1, 27: 0, 28: 1, 29: 1, 30: 2, 31: 1, 32: 1, 33: 2, 37: 0, 38: 3 };
   function blockKind(b) {
-    if (b === 3 || b === 8 || b === 9 || b === 10 || b === 11 || b === 14 || b === 15 || (b >= 27 && b <= 33)) return 'pickaxe';
+    if (b === 3 || b === 8 || b === 9 || b === 10 || b === 11 || b === 14 || b === 15 || (b >= 27 && b <= 33) || b === 34 || b === 37 || b === 38 || b === 41 || b === 45 || b === 46) return 'pickaxe';
     if (b === 5 || b === 6 || b === 7 || b === 13 || b === 18) return 'axe';
-    if (b === 1 || b === 2 || b === 4 || b === 12) return 'shovel';
+    if (b === 1 || b === 2 || b === 4 || b === 12 || b === 35) return 'shovel';
     return null;
   }
 
@@ -513,13 +524,6 @@
         }
         put(20, x, y, tr + n, tg + n * 0.6, tb + n * 0.6);
       }
-    }
-    // Obsidian texture (tile 98): nearly black purple stone with violet cracks.
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      const n = (hash2(x, y, 98) - 0.5) * 24;
-      let col = [31 + n, 22 + n, 48 + n];
-      if ((x + y * 2) % 11 === 0 || (x * 3 + y) % 17 === 0) col = [83 + n, 49 + n, 119 + n];
-      put(98, x, y, col[0], col[1], col[2]);
     }
     // item icons (tiles 21-31), drawn on a transparent background
     const R = function (t, x, y, w, h, col) { g.fillStyle = col; g.fillRect(t * 16 + x, y, w, h); };
@@ -637,15 +641,39 @@
         if (ex * ex + ey * ey <= 1) R(89 + i, x, y, 1, 1, hash2(x, y, 89 + i) < 0.28 ? c[1] : c[0]);
       }
     });
+    const rgb = function (r, g, b) { return 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')'; };
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const n1 = hash2(x, y, 300), n2 = hash2(x >> 1, y >> 1, 301), n3 = hash2(x, y, 302), kk = (n1 - 0.5) * 34 + (n2 - 0.5) * 20;
+      R(92, x, y, 1, 1, rgb(112 + kk, 46 + kk * 0.5, 44 + kk * 0.5));
+      R(93, x, y, 1, 1, n3 < 0.2 ? '#6a5446' : rgb(98 + (n1 - 0.5) * 22, 78 + (n1 - 0.5) * 18, 66 + (n1 - 0.5) * 14));
+      R(94, x, y, 1, 1, ((x + y) % 5 === 0) ? '#be7a2a' : (n2 < 0.4 ? '#fff0b0' : rgb(255, 205 + (n1 - 0.5) * 40, 110)));
+      const spot = hash2(x >> 1, y >> 1, 310) < 0.3 && n3 < 0.85;
+      R(95, x, y, 1, 1, spot ? (n1 < 0.5 ? '#ffb347' : '#ffe9b0') : rgb(112 + kk, 46 + kk * 0.5, 44 + kk * 0.5));
+      R(96, x, y, 1, 1, n3 < 0.12 ? '#5a3d8a' : rgb(22 + (n1 - 0.5) * 14, 12 + (n1 - 0.5) * 8, 38 + (n1 - 0.5) * 20));
+      R(97, x, y, 1, 1, n2 < 0.28 ? '#ffc03c' : (n1 < 0.3 ? '#a82a0a' : rgb(228 + (n1 - 0.5) * 30, 88 + (n3 - 0.5) * 50, 18)));
+      const sw = Math.sin((x + y * 0.7) * 0.9) + Math.sin((y - x * 0.5) * 0.8);
+      R(98, x, y, 1, 1, sw > 0.9 ? '#c48aff' : (sw < -0.9 ? '#3c1478' : rgb(112 + (n1 - 0.5) * 30, 42, 190)));
+      const brm = (y % 8 === 7) || (((x + (Math.floor(y / 8) % 2) * 4) % 8) === 7);
+      R(99, x, y, 1, 1, brm ? '#2c1010' : rgb(92 + (n1 - 0.5) * 16, 34, 34));
+      const ring = Math.hypot(x - 7.5, y - 7.5);
+      R(100, x, y, 1, 1, ring < 3.3 ? '#14282a' : (ring < 5.2 ? '#3f6b5b' : rgb(70 + (n1 - 0.5) * 12, 104, 88)));
+      R(101, x, y, 1, 1, (y === 0 || y === 15 || x === 0 || x === 15) ? '#2f4a3f' : rgb(72 + (n1 - 0.5) * 14, 106 + (n1 - 0.5) * 12, 90));
+      R(102, x, y, 1, 1, ring < 2 ? '#d8fff0' : (ring < 3.6 ? '#1f7a5a' : (ring < 5.2 ? '#3f6b5b' : rgb(70 + (n1 - 0.5) * 12, 104, 88))));
+      R(103, x, y, 1, 1, n3 < 0.06 ? '#9ff6ff' : (n3 < 0.1 ? '#6a8cff' : rgb(8 + (n1 - 0.5) * 6, 6, 18)));
+      R(104, x, y, 1, 1, n3 < 0.18 ? '#c9c58a' : rgb(222 + (n1 - 0.5) * 14, 224 + (n1 - 0.5) * 12, 168 + (n1 - 0.5) * 18));
+      R(105, x, y, 1, 1, ((x * 3 + y * 2) % 11 === 0) ? '#c04cff' : rgb(16 + (n1 - 0.5) * 10, 8, 26 + (n1 - 0.5) * 12));
+      const eyeR = Math.hypot(x - 7.5, y - 8);
+      if (eyeR < 6.5) R(108, x, y, 1, 1, eyeR < 2.2 ? '#0b1f1a' : (eyeR < 4 ? '#3ad6a0' : (eyeR < 5.4 ? '#1f7a5a' : '#103d2e')));
+    }
+    blob(106, 8, 8, 5, 5.5, '#ff8a2a', '#ffd070', 106); blob(107, 8, 9, 3.6, 5.2, '#cfe8ff', '#ffffff', 107);
+    [['#2a2020', '#ff6a1a'], ['#e8dcea', '#9b6cff']].forEach(function (c, i) {
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+        const ey = (y - 8.5) / 6.8, ex = (x - 7.5) / (y < 8.5 ? 4.6 : 5.6);
+        if (ex * ex + ey * ey <= 1) R(109 + i, x, y, 1, 1, hash2(x, y, 109 + i) < 0.28 ? c[1] : c[0]);
+      }
+    });
     R(37, 7, 6, 2, 9, '#8a6a3c'); R(37, 7, 6, 1, 9, '#6b4f2e'); R(37, 6, 2, 4, 4, '#ffb020'); R(37, 7, 1, 2, 1, '#ffd24a'); R(37, 7, 3, 2, 2, '#fff7b0');
     R(31, 2, 9, 12, 3, '#9aa0a8'); R(31, 2, 9, 12, 1, '#cfd3d8'); R(31, 9, 5, 4, 4, '#3b3b42'); R(31, 10, 3, 2, 2, '#ff9a2e'); R(31, 10, 2, 1, 1, '#ffd36b');
-    // Custom liquid textures: rippling blue water and glowing orange lava.
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      const wave = ((x + Math.floor(y / 3)) % 5 === 0) ? 24 : 0;
-      put(96, x, y, 25 + wave, 112 + wave, 224 + Math.floor(wave * 0.5));
-      const hot = ((x * 3 + y * 5) % 7 < 2) ? 55 : 0;
-      put(97, x, y, 255, 76 + hot, 8 + Math.floor(hot * 0.15));
-    }
     return c;
   }
 
@@ -739,6 +767,22 @@
     });
     gpos.push(x + 0.5, y + 0.8, z + 0.5);
   }
+  // Lava and portals are drawn as full cubes (only the faces that touch air), bright and unshaded
+  function addFluid(pos, uv, col, ind, light, x, y, z, b) {
+    const tile = TILES[b][0], u0 = tile / ATLAS_N + EPS, u1 = (tile + 1) / ATLAS_N - EPS;
+    const lv = b === LAVA ? 1 : 0, br = b === LAVA ? 1 : 2.2;
+    FACES.forEach(function (f) {
+      const nb = get(x + f.n[0], y + f.n[1], z + f.n[2]);
+      if (nb === b || opq(nb)) return;
+      const vi = pos.length / 3;
+      const uvs = [[u0, EPS], [u1, EPS], [u1, 1 - EPS], [u0, 1 - EPS]];
+      for (let i = 0; i < 4; i++) {
+        const c = f.c[i];
+        pos.push(x + c[0], y + c[1], z + c[2]); uv.push(uvs[i][0], uvs[i][1]); col.push(br, br, br); light.push(lv);
+      }
+      ind.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
+    });
+  }
   // A bed is two low blocks (foot and head). The top texture is turned so the pillow sits at the head end.
   function addBed(pos, uv, col, ind, light, x, y, z, id, lv) {
     const k = id - 19, dir = k >> 1, head = k & 1, topTile = head ? 66 : 62, sideTile = 63;
@@ -778,7 +822,7 @@
   function torchesOf(c) {
     if (c.torches) return c.torches;
     const out = [], d = c.data;
-    for (let i = 0; i < d.length; i++) if (d[i] === TORCH) out.push([c.cx * 16 + (i & 15), i >> 8, c.cz * 16 + ((i >> 4) & 15)]);
+    for (let i = 0; i < d.length; i++) if (d[i] === TORCH || d[i] === LUMENITE || (d[i] === LAVA && (i >> 8) + 1 < H && d[i + 256] === 0)) out.push([c.cx * 16 + (i & 15), i >> 8, c.cz * 16 + ((i >> 4) & 15)]);
     c.torches = out;
     return out;
   }
@@ -833,6 +877,7 @@
         for (let x = x0; x < x0 + CS; x++) {
           const b = data[(y * 16 + (z - z0)) * 16 + (x - x0)];
           if (!b) continue;
+          if (isFluid(b)) { addFluid(pos, uv, col, ind, light, x, y, z, b); continue; }
           if (b === TORCH) { addTorch(tpos, tuv, tcol, tind, gpos, x, y, z); continue; }
           if (isBed(b)) { addBed(pos, uv, col, ind, light, x, y, z, b, lightAt ? Math.pow(lightAt(x, y, z) / TORCH_LEVEL, 1.3) : 0); continue; }
           const tl = TILES[b];
@@ -904,11 +949,7 @@
 
   /* ---------- Endless world generation, one chunk at a time ---------- */
   let seed = 1;
-  let dimension = 'overworld'; // overworld, nether, or end
-  const portals = []; // portal frames are saved with the world and paired between Overworld and Nether
-  const portalVisuals = [];
-  let portalCooldown = 0;
-  const savedChunks = new Map();   // edited chunks loaded from a saved world, keyed like chunks
+  let savedChunks = dims.overworld.saved;   // edited chunks loaded from a saved world, keyed like chunks
   function heightAt(x, z) {
     const n = fbm(x / 40, z / 40, seed), n2 = fbm(x / 170, z / 170, seed + 300), m = fbm(x / 12, z / 12, seed + 50);
     const h = Math.floor(5 + (n * 0.72 + n2 * 0.28) * 34 + m * 4);
@@ -920,11 +961,12 @@
   const REG = 80;
   const structCache = new Map();
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  const STRUCT_NAMES = { village: 'Village', temple: 'Desert temple', tower: 'Ruined tower', dungeon: 'Old dungeon', cabin: 'Cabin', circle: 'Stone circle' };
+  const STRUCT_NAMES = { village: 'Village', temple: 'Desert temple', tower: 'Ruined tower', dungeon: 'Old dungeon', cabin: 'Cabin', circle: 'Stone circle', gateway: 'Void gateway', citadel: 'Sift citadel' };
   function structureFor(rx, rz) {
+    if (dimension === 'end') return null;
     const k = ckey(rx, rz);
     if (structCache.has(k)) return structCache.get(k);
-    const st = makeStructure(rx, rz);
+    const st = dimension === 'sift' ? makeSiftStructure(rx, rz) : makeStructure(rx, rz);
     structCache.set(k, st);
     return st;
   }
@@ -960,6 +1002,9 @@
     } else if (r < 0.68) {
       const cx = ox + 14 + Math.floor(jx * 53), cz = oz + 14 + Math.floor(jz * 53), f = sampleGround(cx, cz, 6);
       if (f.min > SEA + 1 && f.spread <= 7) st = { type: 'circle', cx: cx, cz: cz, gy: f.avg, pad: 8, blend: 5, reach: 9 };
+    } else if (r < 0.74) {
+      const cx = ox + 6 + Math.floor(jx * 24), cz = oz + 10 + Math.floor(jz * 60), gy = heightAt(cx, cz);
+      if (gy >= 16 && gy <= H - 12) st = { type: 'gateway', cx: cx, cz: cz, gy: gy, pad: 0, blend: 0, reach: 48, zone: 4 };
     }
     if (st) {
       st.rx = rx; st.rz = rz;
@@ -1185,6 +1230,65 @@
     P(x0 + 11, gy - 6, z0 - 2, TORCH); P(x0 + 11, gy - 6, z0 + 2, TORCH);
     [[11, -2], [11, 2], [15, -2], [15, 2]].forEach(function (o) { for (let y = gy - 9; y <= gy - 7; y++) P(x0 + o[0], y, z0 + o[1], STONEBRICK); });
   }
+  // Underground chamber with a ring of void frames: feed them Void Eyes to open the way to The End
+  function buildGateway(P, st) {
+    const gy = st.gy, x0 = st.cx, z0 = st.cz, steps = gy - 9, rx = x0 + steps + 8, rz = z0;
+    const mix = function (x, y, z) { return hash2(x, y * 7 + z, seed + 7040) < 0.4 ? MOSSY : STONEBRICK; };
+    for (let x = rx - 6; x <= rx + 6; x++) for (let z = rz - 6; z <= rz + 6; z++) for (let y = 8; y <= 14; y++) P(x, y, z, mix(x, y, z));
+    for (let x = rx - 5; x <= rx + 5; x++) for (let z = rz - 5; z <= rz + 5; z++) for (let y = 9; y <= 13; y++) P(x, y, z, 0);
+    for (let i = 0; i <= steps + 3; i++) {
+      const x = x0 + i, fy = i <= steps ? gy - i - 1 : 8;
+      for (let dz = -2; dz <= 2; dz++) {
+        if (Math.abs(dz) === 2) { for (let y = fy + 1; y <= fy + 3; y++) P(x, y, z0 + dz, mix(x, y, z0 + dz)); }
+        else {
+          P(x, fy, z0 + dz, mix(x, fy, z0 + dz));
+          for (let y = fy + 1; y <= fy + 3; y++) P(x, y, z0 + dz, 0);
+          if (i >= 2) P(x, fy + 4, z0 + dz, mix(x, fy + 4, z0 + dz));
+        }
+      }
+    }
+    for (let dz = -2; dz <= 2; dz++) P(x0, gy + 4, z0 + dz, MOSSY);
+    for (const dz of [-2, 2]) for (let y = gy + 1; y <= gy + 3; y++) P(x0, y, z0 + dz, MOSSY);
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+      if (Math.max(Math.abs(dx), Math.abs(dz)) === 2 && !(Math.abs(dx) === 2 && Math.abs(dz) === 2)) P(rx + dx, 9, rz + dz, hash2(rx + dx, rz + dz, seed + 7041) < 0.1 ? VOID_FRAME_EYE : VOID_FRAME);
+    }
+    [[-4, -4], [4, -4], [-4, 4], [4, 4]].forEach(function (o) { P(rx + o[0], 9, rz + o[1], TORCH); });
+  }
+  function makeSiftStructure(rx, rz) {
+    const r = hash2(rx, rz, seed + 5100), jx = hash2(rx, rz, seed + 5101), jz = hash2(rx, rz, seed + 5102);
+    if (r > 0.3) return null;
+    return { type: 'citadel', cx: rx * REG + 28 + Math.floor(jx * 24), cz: rz * REG + 28 + Math.floor(jz * 24), gy: 20, pad: 0, blend: 0, reach: 22, zone: 0, rx: rx, rz: rz };
+  }
+  function buildCitadel(P, st, x0, z0) {
+    const gy = st.gy, cx = st.cx, cz = st.cz;
+    eachXZ(x0, z0, cx - 12, cz - 12, cx + 12, cz + 12, function (x, z) {
+      for (let y = 1; y < gy; y++) P(x, y, z, SIFTROCK);
+      P(x, gy, z, SIFTBRICK);
+      for (let y = gy + 1; y <= gy + 16; y++) P(x, y, z, 0);
+    });
+    eachXZ(x0, z0, cx - 11, cz - 11, cx + 11, cz + 11, function (x, z) {
+      const dx = x - cx, dz = z - cz;
+      if (Math.max(Math.abs(dx), Math.abs(dz)) !== 11) return;
+      for (let y = gy + 1; y <= gy + 7; y++) { if (dz === 11 && Math.abs(dx) <= 1 && y <= gy + 3) continue; P(x, y, z, SIFTBRICK); }
+      if (((dx + dz) & 1) === 0) P(x, gy + 8, z, SIFTBRICK);
+    });
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      eachXZ(x0, z0, cx + sx * 11 - 2, cz + sz * 11 - 2, cx + sx * 11 + 2, cz + sz * 11 + 2, function (x, z) {
+        for (let y = gy + 1; y <= gy + 12; y++) P(x, y, z, SIFTBRICK);
+        if (x === cx + sx * 11 && z === cz + sz * 11) { P(x, gy + 13, z, LUMENITE); P(x, gy + 14, z, LUMENITE); }
+      });
+    }
+    eachXZ(x0, z0, cx - 4, cz - 4, cx + 4, cz + 4, function (x, z) {
+      const dx = x - cx, dz = z - cz, edge = Math.max(Math.abs(dx), Math.abs(dz)) === 4;
+      for (let y = gy + 1; y <= gy + 5; y++) {
+        if (edge) { if (!(dz === 4 && Math.abs(dx) <= 1 && y <= gy + 2)) P(x, y, z, SIFTBRICK); } else P(x, y, z, 0);
+      }
+      P(x, gy + 6, z, SIFTBRICK);
+    });
+    P(cx, gy + 1, cz, SIFTBRICK); P(cx, gy + 2, cz, GOLD);
+    [[-3, -3], [3, -3], [-3, 3], [3, 3]].forEach(function (o) { P(cx + o[0], gy + 5, cz + o[1], LUMENITE); });
+    [[-6, 0], [6, 0], [0, -6], [0, 6]].forEach(function (o) { P(cx + o[0], gy + 1, cz + o[1], SIFTBRICK); P(cx + o[0], gy + 2, cz + o[1], LUMENITE); });
+  }
   function buildStructure(st, put, x0, z0) {
     const P = function (x, y, z, b) { put(x, y, z, b, false); };
     switch (st.type) {
@@ -1194,101 +1298,93 @@
       case 'dungeon': buildDungeon(P, st); break;
       case 'cabin': buildCabin(P, st, x0, z0); break;
       case 'circle': buildCircle(P, st, x0, z0); break;
+      case 'gateway': buildGateway(P, st); break;
+      case 'citadel': buildCitadel(P, st, x0, z0); break;
     }
   }
 
+  /* ---------- The Sift (a cavern of siftrock, lava and light) and The End (a floating island) ---------- */
+  const LAVA_Y = 17;
+  function siftFloor(x, z) { return Math.floor(2 + fbm(x / 28, z / 28, seed + 5000) * 32 + fbm(x / 8, z / 8, seed + 5001) * 3); }
+  function siftCeil(x, z, fl) { let ce = Math.floor(43 - fbm(x / 34, z / 34, seed + 5002) * 6); if (ce < fl + 9) ce = Math.min(H - 2, fl + 9); return ce; }
+  function registerChunk(cx, cz, data) {
+    const c = { cx: cx, cz: cz, data: data, mesh: null, meshed: false, edited: false, dirty: false };
+    chunks.set(ckey(cx, cz), c); resetChunkCache();
+    return c;
+  }
+  function putData(data, x0, z0, x, y, z, b) {
+    if (x < x0 || x >= x0 + 16 || z < z0 || z >= z0 + 16 || y < 0 || y >= H) return;
+    data[(y * 16 + (z - z0)) * 16 + (x - x0)] = b;
+  }
+  // list items: [ore, attempts per chunk, min y, max y, max vein size]
+  function veins(data, cx, cz, list, target, salt) {
+    const rng = mulberry32((Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663) ^ Math.imul(seed, 83492791) ^ salt) >>> 0);
+    list.forEach(function (o) {
+      for (let a = 0; a < o[1]; a++) {
+        let vx = Math.floor(rng() * 16), vz = Math.floor(rng() * 16), vy = o[2] + Math.floor(rng() * (o[3] - o[2] + 1));
+        const size = 1 + Math.floor(rng() * o[4]);
+        for (let k = 0; k < size; k++) {
+          if (vx >= 0 && vx < 16 && vz >= 0 && vz < 16 && vy >= 1 && vy < H) { const i = (vy * 16 + vz) * 16 + vx; if (data[i] === target) data[i] = o[0]; }
+          vx += Math.floor(rng() * 3) - 1; vy += Math.floor(rng() * 3) - 1; vz += Math.floor(rng() * 3) - 1;
+        }
+      }
+    });
+  }
+  function genSift(cx, cz) {
+    const data = new Uint8Array(16 * H * 16), x0 = cx * 16, z0 = cz * 16;
+    for (let lz = 0; lz < 16; lz++) {
+      for (let lx = 0; lx < 16; lx++) {
+        const x = x0 + lx, z = z0 + lz, fl = siftFloor(x, z), ce = siftCeil(x, z, fl);
+        const put1 = function (y, b) { data[(y * 16 + lz) * 16 + lx] = b; };
+        for (let y = 0; y <= fl; y++) put1(y, SIFTROCK);
+        if (fl > LAVA_Y && hash2(x, z, seed + 5020) < 0.22) put1(fl, SIFT_SAND);
+        for (let y = fl + 1; y <= LAVA_Y; y++) put1(y, LAVA);
+        for (let y = ce; y < H; y++) put1(y, SIFTROCK);
+        if (hash2(x, z, seed + 5010) < 0.035) { const len = 2 + Math.floor(hash2(x, z, seed + 5012) * 4); for (let y = ce - 1; y >= ce - len && y > fl + 1; y--) put1(y, SIFTROCK); }
+        if (hash2(x, z, seed + 5011) < 0.012) { put1(ce - 1, LUMENITE); put1(ce - 2, LUMENITE); }
+        if (fl > LAVA_Y && hash2(x, z, seed + 5013) < 0.02) { const len = 1 + Math.floor(hash2(x, z, seed + 5014) * 3); for (let y = fl + 1; y <= fl + len; y++) put1(y, SIFTROCK); }
+      }
+    }
+    veins(data, cx, cz, [[EMBER_ORE, 14, 2, 40, 5], [LUMENITE, 3, 6, 36, 3]], SIFTROCK, 5);
+    const rs = structureFor(Math.floor(x0 / REG), Math.floor(z0 / REG));
+    if (rs && Math.abs(rs.cx - (x0 + 8)) <= rs.reach + 8 && Math.abs(rs.cz - (z0 + 8)) <= rs.reach + 8) buildStructure(rs, function (x, y, z, b) { putData(data, x0, z0, x, y, z, b); }, x0, z0);
+    return registerChunk(cx, cz, data);
+  }
+  const endTop = function (x, z) { return 24 + Math.round((fbm(x / 22, z / 22, seed + 6000) - 0.5) * 5); };
+  function endPillars() {
+    const out = [];
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; out.push({ x: Math.round(Math.cos(a) * 22), z: Math.round(Math.sin(a) * 22), r: (i % 3 === 0) ? 2 : 1, top: 30 + ((i * 5) % 4) * 4 }); }
+    return out;
+  }
+  function genEnd(cx, cz) {
+    const data = new Uint8Array(16 * H * 16), x0 = cx * 16, z0 = cz * 16, pil = endPillars();
+    for (let lz = 0; lz < 16; lz++) {
+      for (let lx = 0; lx < 16; lx++) {
+        const x = x0 + lx, z = z0 + lz, d = Math.hypot(x, z), top = endTop(x, z);
+        const edge = 38 * (0.82 + 0.3 * fbm(x / 14 + 77, z / 14 - 31, seed + 6001));
+        if (d < edge) {
+          const t = 1 - (d / edge) * (d / edge), thick = 2 + Math.floor(t * 18);
+          for (let y = Math.max(0, top - thick); y <= top; y++) data[(y * 16 + lz) * 16 + lx] = END_STONE;
+        }
+        for (let q = 0; q < pil.length; q++) {
+          const pp = pil[q];
+          if (Math.hypot(x - pp.x, z - pp.z) <= pp.r + 0.4) for (let y = Math.max(0, top - 4); y <= pp.top; y++) data[(y * 16 + lz) * 16 + lx] = OBSIDIAN;
+        }
+      }
+    }
+    return registerChunk(cx, cz, data);
+  }
   function genChunk(cx, cz) {
-    const sv = dimension === 'overworld' ? savedChunks.get(ckey(cx, cz)) : null;
+    const sv = savedChunks.get(ckey(cx, cz));
     if (sv) {
       const sc = { cx: cx, cz: cz, data: new Uint8Array(sv), mesh: null, meshed: false, edited: true, dirty: false };
       chunks.set(ckey(cx, cz), sc); resetChunkCache();
       return sc;
     }
+    if (dimension === 'sift') return genSift(cx, cz);
+    if (dimension === 'end') return genEnd(cx, cz);
     const data = new Uint8Array(16 * H * 16);
     const x0 = cx * 16, z0 = cz * 16;
-    // Separate Nether and End terrain generators. They reuse the game's block atlas,
-    // but create distinct landscapes and keep the normal Overworld generator unchanged.
-    if (dimension === 'nether' || dimension === 'end') {
-      for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
-        const wx = x0 + lx, wz = z0 + lz;
-        const dist = Math.hypot(wx, wz);
-        if (dimension === 'nether') {
-          const floor = 8 + Math.floor(fbm(wx / 19, wz / 19, seed + 810) * 7);
-          for (let y = 0; y <= floor; y++) {
-            let b = y < 3 ? STONEBRICK : (y < floor - 1 ? BRICK : (y === floor ? BRICK : DIRT));
-            if (y === floor && hash2(wx, wz, seed + 811) > 0.94) b = GOLD;
-            data[(y * 16 + lz) * 16 + lx] = b;
-          }
-          // Hanging netherrack-like ceiling makes the dimension feel enclosed.
-          const ceil = 39 + Math.floor(fbm(wx / 23, wz / 23, seed + 812) * 5);
-          for (let y = ceil; y < H; y++) data[(y * 16 + lz) * 16 + lx] = (y === ceil ? BRICK : STONEBRICK);
-          if (hash2(wx, wz, seed + 813) > 0.985) {
-            for (let y = floor + 1; y < Math.min(ceil, floor + 5); y++) data[(y * 16 + lz) * 16 + lx] = 0;
-          }
-        } else {
-          // The End is a floating central island surrounded by the void.
-          const edge = 29 + fbm(wx / 12, wz / 12, seed + 820) * 7;
-          if (dist < edge) {
-            const top = 19 + Math.floor(fbm(wx / 10, wz / 10, seed + 821) * 3);
-            for (let y = top - 5; y <= top; y++) {
-              if (y >= 0) data[(y * 16 + lz) * 16 + lx] = y === top ? SANDSTONE : STONEBRICK;
-            }
-          }
-          // Small distant floating islands
-          const island = Math.hypot(wx - 48, wz + 24);
-          if (island < 7 + fbm(wx / 5, wz / 5, seed + 822) * 2) {
-            for (let y = 15; y <= 18; y++) data[(y * 16 + lz) * 16 + lx] = y === 18 ? SANDSTONE : STONEBRICK;
-          }
-        }
-      }
-      // Procedurally generate Nether structures inside this chunk so they stay
-      // deterministic and do not pop in differently when neighbouring chunks load.
-      if (dimension === 'nether') {
-        const putNether = function (x, y, z, b) {
-          if (x < x0 || x >= x0 + 16 || z < z0 || z >= z0 + 16 || y < 0 || y >= H) return;
-          data[(y * 16 + (z - z0)) * 16 + (x - x0)] = b;
-        };
-        const structureRoll = hash2(cx, cz, seed + 860);
-        const sx = x0 + 3 + Math.floor(hash2(cx, cz, seed + 861) * 6);
-        const sz = z0 + 3 + Math.floor(hash2(cx, cz, seed + 862) * 6);
-        const baseY = 13 + Math.floor(fbm(sx / 19, sz / 19, seed + 810) * 7);
-        if (structureRoll > 0.90) {
-          // Nether fortress: a raised brick keep with towers, battlements and a bridge.
-          for (let dx = 0; dx < 10; dx++) for (let dz = 0; dz < 10; dz++) {
-            const edge = dx === 0 || dx === 9 || dz === 0 || dz === 9;
-            putNether(sx + dx, baseY, sz + dz, BRICK);
-            if (edge) for (let dy = 1; dy <= 4; dy++) {
-              if (dy === 2 && (dx === 0 || dx === 9 || dz === 0 || dz === 9) && ((dx + dz) % 3 === 0)) continue;
-              putNether(sx + dx, baseY + dy, sz + dz, BRICK);
-            }
-            if (dx % 3 === 0 && dz % 3 === 0) putNether(sx + dx, baseY + 5, sz + dz, STONEBRICK);
-          }
-          // Raised walkway and chunky support pillars.
-          for (let dx = -3; dx <= 2; dx++) {
-            for (let dz = 4; dz <= 5; dz++) putNether(sx + dx, baseY + 2, sz + dz, BRICK);
-            for (let dy = -3; dy <= 1; dy++) putNether(sx + dx, baseY + dy, sz + 4, STONEBRICK);
-          }
-          putNether(sx + 4, baseY + 1, sz + 4, TORCH);
-        } else if (structureRoll > 0.84) {
-          // Bastion-like ruin: dark stonebrick courtyard, gold treasure pile and broken walls.
-          for (let dx = 0; dx < 10; dx++) for (let dz = 0; dz < 9; dz++) {
-            putNether(sx + dx, baseY, sz + dz, STONEBRICK);
-            if ((dx === 0 || dx === 9 || dz === 0 || dz === 8) && hash2(sx + dx, sz + dz, seed + 863) > 0.16) {
-              const wallH = 2 + Math.floor(hash2(dx, dz, seed + 864) * 3);
-              for (let dy = 1; dy <= wallH; dy++) putNether(sx + dx, baseY + dy, sz + dz, STONEBRICK);
-            }
-          }
-          for (let dx = 3; dx <= 6; dx++) for (let dz = 3; dz <= 5; dz++) putNether(sx + dx, baseY + 1, sz + dz, GOLD);
-          for (let dy = 1; dy <= 4; dy++) {
-            putNether(sx + 2, baseY + dy, sz + 2, BRICK);
-            putNether(sx + 7, baseY + dy, sz + 6, BRICK);
-          }
-        }
-      }
-      const c = { cx: cx, cz: cz, data: data, mesh: null, meshed: false, edited: false, dirty: false };
-      chunks.set(ckey(cx, cz), c); resetChunkCache();
-      return c;
-    }
     for (let lz = 0; lz < 16; lz++) {
       for (let lx = 0; lx < 16; lx++) {
         const h = groundH(x0 + lx, z0 + lz), beach = h <= SEA + 1 || forceSand(x0 + lx, z0 + lz);
@@ -1301,22 +1397,9 @@
         }
       }
     }
-    // Fill low coastal areas with walk-through water up to sea level.
-    for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
-      const wx = x0 + lx, wz = z0 + lz, h = groundH(wx, wz);
-      if (h < SEA && !inStructZone(wx, wz)) {
-        for (let wy = h + 1; wy <= SEA; wy++) data[(wy * 16 + lz) * 16 + lx] = WATER;
-      }
-      // Small underground lava pockets, deterministic for each world seed.
-      if (h > 7 && hash2(wx, wz, seed + 940) > 0.992) {
-        const ly = 3 + Math.floor(hash2(wx, wz, seed + 941) * 3);
-        const li = (ly * 16 + lz) * 16 + lx;
-        if (data[li] === STONE) data[li] = LAVA;
-      }
-    }
     // Ore veins hide inside the stone: [ore, attempts per chunk, min y, max y, max vein size]
     const oreRng = mulberry32((Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663) ^ Math.imul(seed, 83492791)) >>> 0);
-    [[COAL_ORE, 16, 4, 42, 8], [COPPER_ORE, 9, 3, 32, 6], [IRON_ORE, 9, 2, 30, 5], [DIAMOND_ORE, 2, 1, 12, 2]].forEach(function (o) {
+    [[COAL_ORE, 16, 4, 42, 8], [COPPER_ORE, 9, 3, 32, 6], [IRON_ORE, 9, 2, 30, 5], [DIAMOND_ORE, 2, 1, 12, 2], [OBSIDIAN, 3, 1, 9, 4]].forEach(function (o) {
       for (let a = 0; a < o[1]; a++) {
         let vx = Math.floor(oreRng() * 16), vz = Math.floor(oreRng() * 16), vy = o[2] + Math.floor(oreRng() * (o[3] - o[2] + 1));
         const size = 1 + Math.floor(oreRng() * o[4]);
@@ -1362,15 +1445,27 @@
   function getOrGen(cx, cz) { return chunkAt(cx, cz) || genChunk(cx, cz); }
   function topY(x, z) { for (let y = H - 1; y >= 0; y--) if (solid(get(x, y, z))) return y; return 0; }
 
-  function resetWorld(newSeed, ox, oz) {
-    chunks.forEach(function (c) { disposeMesh(c); });
-    chunks.clear(); resetChunkCache();
+  function resetWorld(newSeed, ox, oz, dim) {
+    for (const dn in dims) { dims[dn].chunks.forEach(function (c) { disposeMesh(c); }); dims[dn].chunks.clear(); }
+    dimension = dim || 'overworld'; chunks = dims[dimension].chunks; savedChunks = dims[dimension].saved;
+    resetChunkCache();
     seed = newSeed; structCache.clear();
-    // Build only the spawn area immediately. streamChunks() fills in the view
-    // distance a few chunks per frame, preventing the loading screen from
-    // freezing on slower school Chromebooks.
-    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) genChunk(ox + dx, oz + dz);
-    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) buildChunk(ox + dx, oz + dz);
+    for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) genChunk(ox + dx, oz + dz);
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) buildChunk(ox + dx, oz + dz);
+  }
+  // Move to another dimension's chunk set (the caller then places the player). Returns the golems that come along.
+  function switchDimension(d) {
+    if (d === dimension) return [];
+    const carry = mobs.filter(function (m) { return m.golem && m.persist && KINDS[m.kind].follow && Math.hypot(m.x - player.x, m.z - player.z) < 14; }).map(function (m) { return { kind: m.kind, hp: m.hp }; });
+    chunks.forEach(function (c) { disposeMesh(c); });
+    const drop = [];
+    chunks.forEach(function (c, k) { if (!c.edited) drop.push(k); });
+    drop.forEach(function (k) { chunks.delete(k); });
+    clearMobs();
+    dimension = d; chunks = dims[d].chunks; savedChunks = dims[d].saved;
+    resetChunkCache(); structCache.clear();
+    for (let i = 0; i < relics.length; i++) relics[i].group.visible = (mode === 'adventure') && !relics[i].got && d === 'overworld';
+    return carry;
   }
 
   // Load and mesh chunks around the player as they move; drop the ones left far behind
@@ -1418,6 +1513,7 @@
   let mode = 'creative';
   let difficulty = 'normal';
   let spawnPoint = null, sleepT = 0, slept = false, omen = false;
+  let dragonDefeated = false, portalT = 0, portalCd = 0, lavaT = 0;
   let hunger = 20, sat = 5, exhaust = 0, starveT = 0, shownHunger = -1;
   let weather = 'clear', weatherT = 420, rainLevel = 0, rainTarget = 0, lightningT = 0, nextBolt = 8;   // rain and thunderstorms   // Survival hunger: 20 = full   // bed respawn point, sleeping timer, raid omen
   // Difficulty only matters in Survival and Adventure (the modes with health and monsters)
@@ -1435,6 +1531,7 @@
 
   const player = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, onGround: false, fly: false, fallStart: null };
   function respawn() {
+    if (dimension !== 'overworld') switchDimension('overworld');
     if (spawnPoint) {
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) getOrGen((spawnPoint.x >> 4) + dx, (spawnPoint.z >> 4) + dz);
       if (isBed(get(spawnPoint.x, spawnPoint.y, spawnPoint.z))) {
@@ -1541,7 +1638,7 @@
     src.start(t0, Math.random() * 0.4); src.stop(t0 + d + 0.05);
   }
   function matOf(b) {
-    if (b === 3 || b === 8 || b === 9 || b === 10 || b === 11 || b === 14 || b === 15 || b === 16 || (b >= 27 && b <= 33)) return 'stone';
+    if (b === 3 || b === 8 || b === 9 || b === 10 || b === 11 || b === 14 || b === 15 || b === 16 || (b >= 27 && b <= 33) || b === 34 || b === 37 || b === 38 || b === 41 || b === 45) return 'stone';
     if (b === 5 || b === 7 || b === 17 || b === 18) return 'wood';
     if (b === 6) return 'leaf';
     if (b === 4 || b === 12) return 'sand';
@@ -1596,6 +1693,11 @@
       case 'irongolem': tone({ f: 95, f2: 70, d: 0.7, type: 'sine', vol: 0.25 * v, pan: pan }); hiss({ d: 0.2, vol: 0.12 * v, type: 'bandpass', f: 700, q: 3, pan: pan }); break;
       case 'coppergolem': tone({ f: 900, f2: 1200, d: 0.08, type: 'square', vol: 0.08 * v, pan: pan }); tone({ f: 1200, f2: 800, d: 0.1, type: 'square', vol: 0.08 * v, delay: 0.1, pan: pan }); break;
       case 'diamondgolem': tone({ f: 70, f2: 55, d: 0.9, type: 'sine', vol: 0.3 * v, pan: pan }); tone({ f: 880, f2: 880, d: 0.6, type: 'triangle', vol: 0.05 * v, delay: 0.1, pan: pan }); break;
+      case 'portal': tone({ f: 120, f2: 520, d: 1.1, type: 'sine', vol: 0.3 * v, vib: 6 }); tone({ f: 180, f2: 90, d: 1.4, type: 'triangle', vol: 0.2 * v, delay: 0.3 }); hiss({ d: 1.0, vol: 0.12 * v, type: 'bandpass', f: 600, f2: 2400, q: 2 }); break;
+      case 'wisp': tone({ f: 620, f2: 300, d: 0.9, type: 'sine', vol: 0.18 * v, vib: 9, pan: pan }); tone({ f: 940, f2: 480, d: 0.7, type: 'sine', vol: 0.08 * v, vib: 7, delay: 0.1, pan: pan }); break;
+      case 'cinderhusk': tone({ f: 85, f2: 55, d: 0.9, type: 'sawtooth', vol: 0.26 * v, lp: 300, vib: 4, pan: pan }); hiss({ d: 0.3, vol: 0.06 * v, type: 'bandpass', f: 500, pan: pan }); break;
+      case 'dragon': tone({ f: 70, f2: 38, d: 1.6, type: 'sawtooth', vol: 0.4 * v, lp: 420, vib: 5, pan: pan }); hiss({ d: 1.3, vol: 0.25 * v, type: 'lowpass', f: 900, f2: 120, pan: pan }); break;
+      case 'fireball': hiss({ d: 0.5, vol: 0.2 * v, type: 'bandpass', f: 500, f2: 1800, q: 1, pan: pan }); tone({ f: 200, f2: 90, d: 0.4, type: 'sawtooth', vol: 0.1 * v, pan: pan }); break;
       case 'pillager': tone({ f: 150, f2: 115, d: 0.5, type: 'sawtooth', vol: 0.2 * v, lp: 650, vib: 4, pan: pan }); break;
       case 'vindicator': tone({ f: 105, f2: 80, d: 0.6, type: 'sawtooth', vol: 0.26 * v, lp: 500, vib: 6, pan: pan }); hiss({ d: 0.15, vol: 0.1 * v, type: 'bandpass', f: 900, pan: pan }); break;
       case 'villager': tone({ f: 170, f2: 210, d: 0.15, type: 'sawtooth', vol: 0.2 * v, lp: 800, pan: pan }); tone({ f: 210, f2: 150, d: 0.26, type: 'sawtooth', vol: 0.2 * v, lp: 800, delay: 0.15, pan: pan }); break;
@@ -1624,7 +1726,6 @@
   }
 
   /* ---------- Mobs: hostile monsters, villagers and farm animals ---------- */
-  let enderDragonDefeated = false;
   const mobs = [];
   const GEO = {}, MAT = {};
   const bg = function (w, h, d) { const k = w + ',' + h + ',' + d; return GEO[k] || (GEO[k] = new THREE.BoxGeometry(w, h, d)); };
@@ -1787,28 +1888,9 @@
     else if (o.job === 'cleric') part(g, 0.54, 0.3, 0.54, 0x7a3aa0, 0, 2.08, 0);
     return g;
   }
-  function makeEnderDragon() {
-    const g = new THREE.Group(); g.userData.legs = [];
-    // Long black-purple body, neck, head, tail and angular wings.
-    part(g, 1.35, 1.15, 3.8, 0x171322, 0, 0, 0);
-    part(g, 0.8, 0.8, 2.0, 0x21172f, 0, 0.15, 2.2);
-    part(g, 0.95, 0.8, 1.0, 0x171322, 0, 0.3, 3.4);
-    part(g, 0.22, 0.22, 0.08, 0xff35f2, -0.28, 0.42, 3.92);
-    part(g, 0.22, 0.22, 0.08, 0xff35f2, 0.28, 0.42, 3.92);
-    for (let i=0;i<4;i++) part(g, 0.38-i*0.065, 0.38-i*0.065, 1.35, 0x21172f, 0, -0.08-i*0.02, -2.0-i*1.0);
-    for (const side of [-1,1]) {
-      const wing = new THREE.Group(); wing.position.set(side*0.55,0.25,0.25); g.add(wing);
-      part(wing, 3.2, 0.12, 1.65, 0x21172f, side*1.6, 0, -0.2);
-      part(wing, 2.7, 0.1, 0.12, 0x49305e, side*1.7, 0, 0.62);
-      part(wing, 0.12, 0.1, 1.7, 0x49305e, side*3.05, 0, -0.2);
-      wing.userData.flapSide = side; g.userData.wings = g.userData.wings || []; g.userData.wings.push(wing);
-    }
-    return g;
-  }
   const rnd3 = n => 1 + Math.floor(Math.random() * n);
   const KINDS = {
     zombie: { hostile: true, r: 0.3, h: 1.8, hp: 20, speed: 2.7, melee: { d: 1.15, dmg: 3, cd: 1.1 }, make: makeZombie, drops: function () { return [[GUNPOWDER, Math.random() < 0.5 ? 1 : 0]]; } },
-    enderdragon: { hostile: true, r: 2.8, h: 5.5, hp: 300, speed: 5.0, make: makeEnderDragon, drops: function () { return []; } },
     creeper: { hostile: true, r: 0.3, h: 1.85, hp: 20, speed: 2.4, make: makeCreeper, drops: function () { return [[GUNPOWDER, rnd3(2)]]; } },
     skeleton: { hostile: true, r: 0.3, h: 1.95, hp: 20, speed: 2.2, make: makeSkeleton, drops: function () { return [[BONE, Math.floor(Math.random() * 3)]]; } },
     spider: { hostile: true, r: 0.5, h: 0.8, hp: 16, speed: 3.2, melee: { d: 1.5, dmg: 2, cd: 0.9 }, make: makeSpider, drops: function () { return [[STRING, Math.floor(Math.random() * 3)]]; } },
@@ -2050,53 +2132,26 @@
   }
   function updateMobs(dt) {
     const D = DIFF[difficulty];
-    if (dimension === 'end') {
-      if (!enderDragonDefeated && !mobs.some(function (m) { return m.kind === 'enderdragon'; })) {
-        addMob('enderdragon', player.x + 8, Math.max(28, player.y + 8), player.z + 1, { boss: true });
-        showHint('ENDER DRAGON! Hit it with your sword or shoot it with arrows!', 5500);
-      }
-      spawnT = Math.max(spawnT, 2); animalT = Math.max(animalT, 2); villT = Math.max(villT, 2);
-    }
     spawnT -= dt; animalT -= dt; villT -= dt;
-    if (dimension !== 'end' && hasHealth() && spawnT <= 0) {
+    if (hasHealth() && spawnT <= 0) {
       spawnT = D.every;
       if (D.cap > 0 && (isNight || weather === 'storm') && mobs.filter(function (m) { return m.hostile && !KINDS[m.kind].illager; }).length < D.cap) trySpawnMob();
     }
-    if (dimension !== 'end' && animalT <= 0) {
+    if (animalT <= 0) {
       animalT = 2.5;
       if (!isNight && mobs.filter(function (m) { return !m.hostile && m.kind !== 'villager'; }).length < 12) trySpawnAnimals();
     }
-    if (dimension !== 'end' && villT <= 0) { villT = 1.5; manageVillagers(); }
+    if (villT <= 0) { villT = 1.5; manageVillagers(); }
     patrolT -= dt;
-    if (dimension !== 'end' && patrolT <= 0) {
+    if (patrolT <= 0) {
       patrolT = D.patrol[0] + Math.random() * (D.patrol[1] - D.patrol[0]);
       if (hasHealth() && D.cap > 0 && mobs.filter(function (m) { return KINDS[m.kind].illager && !m.raid; }).length < 6) trySpawnPatrol();
     }
-    if (dimension !== 'end') updateRaid(dt, D);
+    updateRaid(dt, D);
     for (let i = mobs.length - 1; i >= 0; i--) {
       const m = mobs[i], K = KINDS[m.kind];
       const dx = player.x - m.x, dz = player.z - m.z;
       const dist = Math.hypot(dx, dz) || 0.0001;
-      if (m.kind === 'enderdragon') {
-        m.phase += dt * 2.4;
-        const targetX = player.x + Math.sin(m.phase * 0.55) * 10;
-        const targetZ = player.z + Math.cos(m.phase * 0.55) * 10;
-        const targetY = 27 + Math.sin(m.phase * 1.3) * 4;
-        const ex = targetX - m.x, ez = targetZ - m.z, ey = targetY - m.y;
-        const ed = Math.hypot(ex, ez) || 1;
-        m.x += ex / ed * Math.min(ed, K.speed * dt);
-        m.z += ez / ed * Math.min(ed, K.speed * dt);
-        m.y += Math.max(-1, Math.min(1, ey)) * dt * 2.2;
-        m.group.position.set(m.x, m.y + Math.sin(m.phase * 2) * 0.35, m.z);
-        m.group.rotation.y = Math.atan2(ex, ez);
-        if (m.group.userData.wings) m.group.userData.wings.forEach(function (w) { w.rotation.z = Math.sin(m.phase * 5) * 0.55 * w.userData.flapSide; });
-        m.atk -= dt;
-        if (dist < 5.5 && Math.abs(player.y - m.y) < 7 && m.atk <= 0) {
-          m.atk = 1.4; damagePlayer(5, true); player.vx += dx / dist * 7; player.vz += dz / dist * 7; player.vy = 5;
-          showHint('The Ender Dragon knocked you back!', 1400);
-        }
-        continue;
-      }
       if (m.y < -30) { removeMobAt(i); continue; }
       if (m.hostile && D.cap === 0 && hasHealth()) { removeMobAt(i); continue; }   // Peaceful: no monsters at all
       if (m.kind === 'villager' || m.village) { if (dist > 140) { if (m.village) m.village.vSpawned = false; removeMobAt(i); continue; } }
@@ -2215,6 +2270,7 @@
       m.onGround = false; m.hit = false;
       moveEnt(m, 0, m.vx * dt); moveEnt(m, 2, m.vz * dt); moveEnt(m, 1, m.vy * dt);
       if (m.hit && m.onGround && (!m.hostile || dist > 1)) m.vy = m.hostile ? 8.2 : 7.8;
+      if (!K.fireproof && get(Math.floor(m.x), Math.floor(m.y + 0.4), Math.floor(m.z)) === LAVA) { m.lavaT = (m.lavaT || 0) + dt; if (m.lavaT >= 0.5) { m.lavaT = 0; pendingHits.push({ m: m, d: 4 }); } }
       if (m.hostile) {
         const ml = K.melee;
         m.atk -= dt;
@@ -2268,13 +2324,6 @@
   function killMob(m) {
     const i = mobs.indexOf(m);
     if (i >= 0) removeMobAt(i);
-    if (m.kind === 'enderdragon') {
-      enderDragonDefeated = true;
-      showHint('THE ENDER DRAGON IS DEFEATED! You conquered the End!', 8000);
-      sfxAt('explode', m.x, m.y, m.z);
-      if (mode === 'survival') giveItem(DIAMOND, 5);
-      return;
-    }
     sfxAt('die', m.x, m.y + 0.5, m.z);
     if (m.leader && hasHealth() && !omen && DIFF[difficulty].cap > 0) { omen = true; showHint('You feel an ominous presence... Enter a village and a raid will follow.', 5500); }
     if (mode === 'survival') {
@@ -2389,6 +2438,7 @@
       if (by <= 0 || by >= H) continue;
       const b = get(bx, by, bz);
       if (!b || b === 3 && !chunkAt(bx >> 4, bz >> 4)) continue;
+      if (b === OBSIDIAN || b === VOID_FRAME || b === VOID_FRAME_EYE || isFluid(b)) continue;   // too tough to blow up
       const d = Math.hypot(bx + 0.5 - x, by + 0.5 - y, bz + 0.5 - z);
       if (d > rad) continue;
       if (b === TNT) {
@@ -2491,6 +2541,7 @@
   }
   function createRelics() {
     clearRelics();
+    if (dimension !== 'overworld') return;
     let minGap = 30;
     for (let attempt = 0; attempt < 600 && relics.length < RELIC_COUNT; attempt++) {
       if (attempt === 300) minGap = 14;
@@ -2688,7 +2739,12 @@
     { out: TORCH, n: 4, shape: ['c', 's'], key: { c: COAL, s: STICK } },
     { out: 153, n: 1, shapeless: [GOLD, IRON_INGOT] },
     { out: 154, n: 1, shapeless: [GOLD, COPPER_INGOT] },
-    { out: 155, n: 1, shapeless: [GOLD, DIAMOND] }
+    { out: 155, n: 1, shapeless: [GOLD, DIAMOND] },
+    { out: VOID_EYE, n: 1, shapeless: [WISP_TEAR, EMBER_SHARD] },
+    { out: LUMENITE, n: 1, shape: ['ee', 'ee'], key: { e: EMBER_SHARD } },
+    { out: SIFTBRICK, n: 4, shape: ['ss', 'ss'], key: { s: SIFTROCK } },
+    { out: 159, n: 1, shapeless: [GOLD, EMBER_SHARD] },
+    { out: 160, n: 1, shapeless: [GOLD, WISP_TEAR] }
   );
   function iconCanvas(b, size) {
     const c = document.createElement('canvas'); c.width = size; c.height = size;
@@ -2901,7 +2957,7 @@
     butcher: [{ give: [BEEF, 4], get: [EMERALD, 1] }, { give: [PORK, 4], get: [EMERALD, 1] }, { give: [CHICKEN, 5], get: [EMERALD, 1] }, { give: [EMERALD, 1], get: [LEATHER, 3] }],
     mason: [{ give: [COBBLE, 8], get: [EMERALD, 1] }, { give: [EMERALD, 1], get: [STONEBRICK, 8] }, { give: [EMERALD, 1], get: [SANDSTONE, 8] }, { give: [EMERALD, 2], get: [BRICK, 8] }, { give: [COPPER_INGOT, 4], get: [EMERALD, 1] }],
     blacksmith: [{ give: [GUNPOWDER, 3], get: [EMERALD, 1] }, { give: [EMERALD, 1], get: [TORCH, 8] }, { give: [EMERALD, 1], get: [FLINT, 1] }, { give: [EMERALD, 2], get: [DYNAMITE, 2] }, { give: [EMERALD, 3], get: [TNT, 1] }, { give: [EMERALD, 2], get: [134, 1] }, { give: [EMERALD, 2], get: [137, 1] }, { give: [IRON_INGOT, 3], get: [EMERALD, 1] }, { give: [COAL, 10], get: [EMERALD, 1] }, { give: [EMERALD, 3], get: [143, 1] }],
-    cleric: [{ give: [GOLD, 1], get: [EMERALD, 3] }, { give: [EMERALD, 8], get: [GOLD, 1] }, { give: [EMERALD, 1], heal: true }, { give: [DIAMOND, 1], get: [EMERALD, 6] }]
+    cleric: [{ give: [GOLD, 1], get: [EMERALD, 3] }, { give: [EMERALD, 8], get: [GOLD, 1] }, { give: [EMERALD, 1], heal: true }, { give: [EMERALD, 9], get: [VOID_EYE, 1] }, { give: [DIAMOND, 1], get: [EMERALD, 6] }]
   };
   function tradeCell(pair) {
     const w = document.createElement('span'); w.style.display = 'inline-flex'; w.style.alignItems = 'center'; w.style.gap = '4px';
@@ -3088,13 +3144,14 @@
       if (t > maxD) break;
       if (y < 0) return null;
       if (y >= H) { if (sy > 0) return null; continue; }
-      if (get(x, y, z)) return { x: x, y: y, z: z, nx: fx, ny: fy, nz: fz, t: t };
+      if (get(x, y, z) && !isFluid(get(x, y, z))) return { x: x, y: y, z: z, nx: fx, ny: fy, nz: fz, t: t };
     }
     return null;
   }
   function resetMine() { mine.t = 0; mine.x = mine.y = mine.z = -1; mineBar.style.display = 'none'; }
   function doBreak(t) {
     const b = get(t.x, t.y, t.z);
+    if ((b === VOID_FRAME || b === VOID_FRAME_EYE) && mode !== 'creative') { flashName('Void frames cannot be broken'); return; }
     if (mode === 'survival') {
       exert(0.02);
       if (canCollect(b)) { const drop = isBed(b) ? BED : (DROPS[b] || b); inv[drop] = (inv[drop] || 0) + 1; updateHotbar(false); }
@@ -3104,13 +3161,14 @@
     }
     if (mode === 'survival' && b === GRAVEL && Math.random() < 0.3) { giveItem(GUNPOWDER, 1); flashName('+1 Gunpowder'); }
     setBlock(t.x, t.y, t.z, 0);
+    if (b === OBSIDIAN) removePortalsAround(t.x, t.y, t.z);
     if (isBed(b)) {   // take the other half of the bed with it
       const k = b - 19, dv = BED_DIR[k >> 1], head = k & 1, sg = head ? -1 : 1;
       const px = t.x + dv[0] * sg, pz = t.z + dv[1] * sg, pid = 19 + (k >> 1) * 2 + (1 - head);
       if (get(px, t.y, pz) === pid) { setBlock(px, t.y, pz, 0); refreshAround(px, pz); }
     }
     sfx('break', 1, 0, b);
-    let torchGone = b === TORCH;
+    let torchGone = b === TORCH || b === LUMENITE;
     if (get(t.x, t.y + 1, t.z) === TORCH) { setBlock(t.x, t.y + 1, t.z, 0); torchGone = true; if (mode === 'survival') giveItem(TORCH, 1); }
     refreshAround(t.x, t.z, torchGone);
   }
@@ -3171,51 +3229,9 @@
       d.x * 14 + player.vx * 0.3, d.y * 14 + 2.5, d.z * 14 + player.vz * 0.3);
     return 0.5;
   }
-  function activatePortalAtTarget() {
-    if (!target || get(target.x, target.y, target.z) !== OBSIDIAN) return false;
-    // A manually built portal is a 5x5 obsidian frame with a 3x3 opening.
-    // Check both possible vertical frame orientations (along X or along Z).
-    for (const axis of ['x', 'z']) {
-      for (let cx = target.x - 2; cx <= target.x + 2; cx++) {
-        for (let cz = target.z - 2; cz <= target.z + 2; cz++) {
-          for (let by = target.y - 4; by <= target.y; by++) {
-            if (by < 1 || by + 4 >= H) continue;
-            let valid = true;
-            for (let u = -2; u <= 2 && valid; u++) {
-              for (let v = 0; v <= 4; v++) {
-                const x = cx + (axis === 'x' ? u : 0);
-                const z = cz + (axis === 'z' ? u : 0);
-                const edge = Math.abs(u) === 2 || v === 0 || v === 4;
-                const block = get(x, by + v, z);
-                if (edge ? block !== OBSIDIAN : block !== 0) { valid = false; break; }
-              }
-            }
-            if (!valid) continue;
-            const already = portals.some(function (p) {
-              return p.dimension === dimension && p.x === cx && p.y === by && p.z === cz && p.axis === axis;
-            });
-            if (!already) {
-              const portal = { dimension: dimension, x: cx, y: by, z: cz, width: 2, height: 3, axis: axis };
-              portals.push(portal);
-              showPortalVisual(portal);
-              rebuildRegion(cx - 2, cz - 2, cx + 2, cz + 2);
-              saveWorld();
-            }
-            showHint('Portal activated! Walk into the purple opening.', 3000);
-            sfx('click');
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  }
   function lightTnt() {
-    // Flint & steel should activate a complete obsidian portal instead of requiring TNT.
-    if (activatePortalAtTarget()) return 0.3;
-    if (!target || get(target.x, target.y, target.z) !== TNT) {
-      flashName('Aim flint & steel at an obsidian frame, not TNT'); return 0.3;
-    }
+    if (target && get(target.x, target.y, target.z) === OBSIDIAN) return lightPortal();
+    if (!target || get(target.x, target.y, target.z) !== TNT) { flashName('Aim at a TNT block'); return 0.3; }
     if (mode === 'survival' && !(inv[FLINT] > 0)) { showHint('You have no flint & steel.', 1500); return 0.3; }
     setBlock(target.x, target.y, target.z, 0); queueRebuild(target.x, target.z); flushRebuilds();
     spawnTnt(target.x + 0.5, target.y, target.z + 0.5, 3, 0, 0, 0);
@@ -3237,6 +3253,14 @@
   }
   const fadeEl = document.getElementById('fade');
   function useBed(t) {
+    if (dimension !== 'overworld') {   // beds explode outside the Overworld
+      const kk = get(t.x, t.y, t.z) - 19, dv = BED_DIR[kk >> 1], hd = kk & 1, sg = hd ? -1 : 1, px = t.x + dv[0] * sg, pz = t.z + dv[1] * sg;
+      setBlock(t.x, t.y, t.z, 0);
+      if (isBed(get(px, t.y, pz))) setBlock(px, t.y, pz, 0);
+      queueRebuild(t.x, t.z); queueRebuild(px, pz); flushRebuilds();
+      explode(t.x + 0.5, t.y + 0.5, t.z + 0.5, 3.5, 26);
+      return;
+    }
     spawnPoint = { x: t.x, y: t.y, z: t.z };
     if (!isNight && weather !== 'storm') { showHint('Respawn point set. You can only sleep at night or in a storm.', 2800); sfx('click'); return; }
     if (hasHealth()) for (let i = 0; i < mobs.length; i++) if (mobs[i].hostile && Math.hypot(mobs[i].x - t.x, mobs[i].z - t.z) < 14) { showHint('You cannot sleep with monsters nearby.', 2600); sfx('no'); return; }
@@ -3254,6 +3278,127 @@
     if (EGG_KINDS[it]) return useEgg(it);
     flashName(NAMES[it] + ' is a crafting item');
     return 0.4;
+  }
+  /* ---------- Portals: the Sift portal (obsidian + flint & steel) and the End gateway (void frames + void eyes) ---------- */
+  // Flood-fill the air inside an obsidian frame lying in the plane along x (axis 0) or z (axis 1)
+  function findPortalInterior(sx, sy, sz, axis) {
+    const region = [], seen = {}, stack = [[sx, sy, sz]], dx = axis === 0 ? 1 : 0, dz = axis === 1 ? 1 : 0;
+    while (stack.length) {
+      const c = stack.pop(), k = c[0] + ',' + c[1] + ',' + c[2];
+      if (seen[k]) continue;
+      seen[k] = true;
+      const b = get(c[0], c[1], c[2]);
+      if (b === OBSIDIAN) continue;
+      if (b !== 0 && b !== PORTAL) return null;
+      region.push(c);
+      if (region.length > 60) return null;
+      stack.push([c[0] + dx, c[1], c[2] + dz], [c[0] - dx, c[1], c[2] - dz], [c[0], c[1] + 1, c[2]], [c[0], c[1] - 1, c[2]]);
+    }
+    let minA = 1e9, maxA = -1e9, minY = 1e9, maxY = -1e9;
+    region.forEach(function (c) { const a = axis === 0 ? c[0] : c[2]; minA = Math.min(minA, a); maxA = Math.max(maxA, a); minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]); });
+    const w = maxA - minA + 1, h = maxY - minY + 1;
+    return (w >= 2 && h >= 3 && region.length === w * h) ? region : null;
+  }
+  function lightPortal() {
+    if (mode === 'survival' && !(inv[FLINT] > 0)) { showHint('You have no flint & steel.', 1500); return 0.3; }
+    const sx = target.x + target.nx, sy = target.y + target.ny, sz = target.z + target.nz;
+    const region = findPortalInterior(sx, sy, sz, 0) || findPortalInterior(sx, sy, sz, 1);
+    if (!region) { flashName('That is not a complete obsidian frame (2 wide, 3 tall or bigger)'); return 0.4; }
+    region.forEach(function (c) { setBlock(c[0], c[1], c[2], PORTAL); queueRebuild(c[0], c[2]); });
+    flushRebuilds();
+    sfx('portal'); flashName('The portal hums to life');
+    return 0.5;
+  }
+  function removePortalsAround(x, y, z) {   // breaking the frame closes the portal
+    const stack = [[x + 1, y, z], [x - 1, y, z], [x, y + 1, z], [x, y - 1, z], [x, y, z + 1], [x, y, z - 1]];
+    let guard = 0;
+    while (stack.length && guard++ < 200) {
+      const c = stack.pop();
+      if (get(c[0], c[1], c[2]) !== PORTAL) continue;
+      setBlock(c[0], c[1], c[2], 0); queueRebuild(c[0], c[2]);
+      stack.push([c[0] + 1, c[1], c[2]], [c[0] - 1, c[1], c[2]], [c[0], c[1] + 1, c[2]], [c[0], c[1] - 1, c[2]], [c[0], c[1], c[2] + 1], [c[0], c[1], c[2] - 1]);
+    }
+    flushRebuilds();
+  }
+  // End gateway: a ring of 12 void frames around a 3x3 hole. Fill every frame with an eye to open it.
+  function insertEye(t) {
+    if (!spendItem(VOID_EYE)) return;
+    setBlock(t.x, t.y, t.z, VOID_FRAME_EYE); queueRebuild(t.x, t.z); flushRebuilds();
+    sfx('pop');
+    if (!checkEndPortal(t.x, t.y, t.z)) flashName('The frame glows');
+  }
+  function checkEndPortal(x, y, z) {
+    for (let cx0 = x - 3; cx0 <= x + 3; cx0++) for (let cz0 = z - 3; cz0 <= z + 3; cz0++) {
+      let ok = true;
+      for (let dx = -2; dx <= 2 && ok; dx++) for (let dz = -2; dz <= 2 && ok; dz++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== 2 || (Math.abs(dx) === 2 && Math.abs(dz) === 2)) continue;
+        if (get(cx0 + dx, y, cz0 + dz) !== VOID_FRAME_EYE) ok = false;
+      }
+      if (!ok) continue;
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { setBlock(cx0 + dx, y, cz0 + dz, END_PORTAL); queueRebuild(cx0 + dx, cz0 + dz); }
+      flushRebuilds(); sfx('portal'); flashName('The gateway to The End opens!');
+      return true;
+    }
+    return false;
+  }
+  function buildPortalAt(x, y, z, d) {
+    const floorB = d === 'sift' ? SIFTROCK : COBBLE;
+    for (let dx = -1; dx <= 2; dx++) for (let dz = -1; dz <= 1; dz++) for (let yy = y - 1; yy <= y + 3; yy++) {
+      let b = 0;
+      if (yy === y - 1) b = (dz === 0) ? OBSIDIAN : floorB;
+      else if (dz === 0 && (dx === -1 || dx === 2 || yy === y + 3)) b = OBSIDIAN;
+      else if (dz === 0 && dx >= 0 && dx <= 1 && yy <= y + 2) b = PORTAL;
+      setBlock(x + dx, yy, z + dz, b);
+    }
+    rebuildRegion(x - 1, z - 1, x + 2, z + 1);
+  }
+  function setPlayerAt(x, y, z) {
+    player.x = x; player.y = y; player.z = z; player.vx = player.vy = player.vz = 0; player.fallStart = null;
+    for (let k = 0; k < 20 && collides(player.x, player.y, player.z); k++) player.y += 1;
+  }
+  // Arrive near (tx, tz): use a portal that is already there, or build a new one
+  function placeAtPortal(d, tx, tz) {
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) getOrGen((tx >> 4) + dx, (tz >> 4) + dz);
+    let best = null, bd = 1e9;
+    for (let x = tx - 16; x <= tx + 16; x++) for (let z = tz - 16; z <= tz + 16; z++) for (let y = 1; y < H - 1; y++) {
+      if (get(x, y, z) !== PORTAL) continue;
+      const dd = Math.hypot(x - tx, z - tz) + Math.abs(y - 20) * 0.1;
+      if (dd < bd) { bd = dd; best = [x, y, z]; }
+    }
+    if (best) {
+      let y = best[1];
+      while (get(best[0], y - 1, best[2]) === PORTAL) y--;
+      const sides = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+      for (let i = 0; i < 4; i++) {
+        const sx = best[0] + sides[i][0], sz = best[2] + sides[i][1];
+        if (!solid(get(sx, y, sz)) && get(sx, y, sz) !== PORTAL && !solid(get(sx, y + 1, sz)) && solid(get(sx, y - 1, sz))) { setPlayerAt(sx + 0.5, y + 0.01, sz + 0.5); return; }
+      }
+      setPlayerAt(best[0] + 0.5, y + 0.01, best[2] + 0.5);
+      return;
+    }
+    const by = d === 'sift' ? Math.max(siftFloor(tx, tz), LAVA_Y) + 1 : topY(tx, tz) + 1;
+    buildPortalAt(tx, by, tz, d);
+    setPlayerAt(tx + 1.0, by + 0.01, tz + 1.5);
+  }
+  function placeInEnd() {
+    ensureAround(16, 0);
+    setPlayerAt(16.5, endTop(16, 0) + 1.01, 0.5);
+    if (!dragonDefeated) spawnDragonFight();
+  }
+  function enterDimension(d) {
+    const ox = player.x, oz = player.z, from = dimension, carry = switchDimension(d);
+    if (d === 'sift') placeAtPortal(d, Math.floor(ox / 8), Math.floor(oz / 8));
+    else if (d === 'overworld' && from === 'sift') placeAtPortal(d, Math.floor(ox * 8), Math.floor(oz * 8));
+    else if (d === 'end') placeInEnd();
+    else respawn();
+    portalCd = 5; portalT = 0;
+    carry.forEach(function (g) { const m = spawnGolem(g.kind, player.x + 1.5, player.y, player.z); m.hp = g.hp; });
+    showHint('Entering ' + DIM_NAME[dimension], 2500);
+    sfx('portal');
+  }
+  function travelPortal(kind) {
+    if (kind === PORTAL) { if (dimension === 'overworld') enterDimension('sift'); else if (dimension === 'sift') enterDimension('overworld'); }
+    else if (kind === END_PORTAL) { if (dimension === 'overworld') enterDimension('end'); else if (dimension === 'end') { enterDimension('overworld'); } }
   }
   // Build a golem: four blocks of iron, copper or diamond in a T (three across, one below the middle) with a hay bale on top.
   const GOLEM_OF = { 31: 'irongolem', 32: 'coppergolem', 33: 'diamondgolem' };
@@ -3307,53 +3452,10 @@
     setBlock(x, y, z, 19 + dir * 2); setBlock(hx, y, hz, 19 + dir * 2 + 1);
     sfx('place', 1, 0, BED); refreshAround(x, z); refreshAround(hx, hz);
   }
-  function detectObsidianPortal(px, py, pz) {
-    // Load nearby chunks first. Unloaded chunks are treated as solid by get(),
-    // which can make a correct frame look incomplete near chunk borders.
-    ensureAround(px, pz);
-    // Detect a complete 5x5 obsidian frame in either vertical direction.
-    // The 3x3 inside must be empty, leaving a 2x3 doorway for the player.
-    for (const axis of ['x', 'z']) {
-      for (let base = py - 4; base <= py; base++) {
-        for (let offset = -2; offset <= 2; offset++) {
-          const cx = axis === 'x' ? px + offset : px;
-          const cz = axis === 'z' ? pz + offset : pz;
-          if (base < 1 || base + 4 >= H) continue;
-          let valid = true;
-          for (let u = -2; u <= 2 && valid; u++) {
-            for (let v = 0; v <= 4; v++) {
-              const x = cx + (axis === 'x' ? u : 0);
-              const z = cz + (axis === 'z' ? u : 0);
-              const edge = Math.abs(u) === 2 || v === 0 || v === 4;
-              const block = get(x, base + v, z);
-              if (edge ? block !== OBSIDIAN : block !== 0) {
-                valid = false;
-                break;
-              }
-            }
-          }
-          if (!valid) continue;
-          const already = portals.some(q => q.dimension === dimension && q.x === cx && q.y === base && q.z === cz && (q.axis || 'x') === axis);
-          if (already) return true;
-          const portal = { dimension, x: cx, y: base, z: cz, width: 2, height: 3, axis };
-          portals.push(portal);
-          showPortalVisual(portal);
-          if (axis === 'x') rebuildRegion(cx - 2, cz, cx + 2, cz);
-          else rebuildRegion(cx, cz - 2, cx, cz + 2);
-          saveWorld();
-          showHint('Nether portal activated! Walk through the purple opening.', 3500);
-          sfx('pop');
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
   function doPlace() {
     if (!target) return;
     const x = target.x + target.nx, y = target.y + target.ny, z = target.z + target.nz;
-    if (!inBounds(x, y, z) || get(x, y, z)) return;
+    if (!inBounds(x, y, z) || (get(x, y, z) && !isFluid(get(x, y, z)))) return;
     if (hotbar[selected] === BED) { placeBed(x, y, z); return; }
     if (hotbar[selected] !== TORCH && x + 1 > player.x - PR && x < player.x + PR && y + 1 > player.y && y < player.y + PH && z + 1 > player.z - PR && z < player.z + PR) return;
     const b = hotbar[selected];
@@ -3363,9 +3465,8 @@
       inv[b]--; updateHotbar(false);
     }
     setBlock(x, y, z, b);
-    if (b === OBSIDIAN) detectObsidianPortal(x, y, z);
     sfx('place', 1, 0, b);
-    refreshAround(x, z, b === TORCH);
+    refreshAround(x, z, b === TORCH || b === LUMENITE);
     if (b === HAY || GOLEM_OF[b]) tryBuildGolem(x, y, z);
   }
 
@@ -3404,20 +3505,17 @@
       if (mobHit && mobHit.mob.kind === 'villager' && (!blockHit || mobHit.t < blockHit.t)) { openTrade(mobHit.mob); placeCd = 0.4; }
       else if (mobHit && mobHit.mob.golem && (!blockHit || mobHit.t < blockHit.t) && healGolem(mobHit.mob)) { placeCd = 0.5; }
       else if (target && isBed(get(target.x, target.y, target.z)) && !(keys.ShiftLeft || keys.ShiftRight)) { useBed(target); placeCd = 0.6; }
+      else if (target && get(target.x, target.y, target.z) === VOID_FRAME && hotbar[selected] === VOID_EYE) { insertEye(target); placeCd = 0.5; }
       else if (target && get(target.x, target.y, target.z) === CTABLE && !(keys.ShiftLeft || keys.ShiftRight)) { openCraft(3); placeCd = 0.4; }
       else placeCd = useSelected();
     }
   }
 
   /* ---------- Update loop ---------- */
-  let gtime = 0, stepDist = 0, lavaDamageTimer = 0;
+  let gtime = 0, stepDist = 0;
   function update(dt, tNow) {
     dt = Math.min(dt, 0.05);
     gtime += dt;
-    lavaDamageTimer -= dt;
-    if (mode !== 'spectator' && lavaDamageTimer <= 0 && get(Math.floor(player.x), Math.floor(player.y + 0.2), Math.floor(player.z)) === LAVA) {
-      damagePlayer(2, false); lavaDamageTimer = 0.8; flashName('Ouch! Lava burns you!');
-    }
     if (sleepT > 0) {
       sleepT -= dt;
       const el = 3.2 - sleepT;
@@ -3455,7 +3553,8 @@
     } else {
       const flying = player.fly && mode === 'creative';
       const sprinting = shift && !flying && (mx !== 0 || mz !== 0) && !(mode === 'survival' && hunger <= 6);   // too hungry to sprint
-      const speed = flying ? (keys.ControlLeft ? 18 : 10) : (sprinting ? 6.6 : 4.4);
+      const inLava = !flying && (get(Math.floor(player.x), Math.floor(player.y + 0.3), Math.floor(player.z)) === LAVA || get(Math.floor(player.x), Math.floor(player.y + 1.2), Math.floor(player.z)) === LAVA);
+      const speed = (flying ? (keys.ControlLeft ? 18 : 10) : (sprinting ? 6.6 : 4.4)) * (inLava ? 0.5 : 1);
       const tvx = (mx * cs + mz * sn) * speed;
       const tvz = (-mx * sn + mz * cs) * speed;
       const accel = (player.onGround || flying) ? 14 : 3.5;
@@ -3468,22 +3567,33 @@
       } else {
         player.vy = Math.max(-50, player.vy - 28 * dt);
         if (jumpHeld && player.onGround) { player.vy = 8.6; exert(sprinting ? 0.2 : 0.04); }
+        if (inLava) { player.vy = Math.max(player.vy, -2.5); if (jumpHeld) player.vy = 3.2; lavaT -= dt; if (lavaT <= 0) { lavaT = 0.5; if (hasHealth()) damagePlayer(4); } } else lavaT = 0;
       }
       player.onGround = false;
       moveEnt(player, 0, player.vx * dt);
       moveEnt(player, 2, player.vz * dt);
       moveEnt(player, 1, player.vy * dt);
-      checkPortal(dt);
       if (player.y < -30) respawn();
       const wspd = Math.hypot(player.vx, player.vz);
       exert(dt * (0.015 + (wspd > 1.2 && player.onGround ? (sprinting ? 0.13 : 0.03) : 0)));
       if (mode === 'survival' && hunger !== shownHunger) updateFood();
+      if (dimension === 'end' && player.y < -8) {   // fell off the island
+        if (hasHealth()) damagePlayer(9999); else setPlayerAt(16.5, endTop(16, 0) + 1.01, 0.5);
+      }
+      const bodyB = get(Math.floor(player.x), Math.floor(player.y + 0.5), Math.floor(player.z)), headB = get(Math.floor(player.x), Math.floor(player.y + 1.4), Math.floor(player.z));
+      const inPortal = (bodyB === PORTAL || headB === PORTAL) ? PORTAL : ((bodyB === END_PORTAL || headB === END_PORTAL) ? END_PORTAL : 0);
+      portalCd = Math.max(0, portalCd - dt);
+      if (inPortal && portalCd <= 0) {
+        portalT += dt;
+        if (portalT >= (mode === 'creative' ? 0.6 : 2.2)) { portalT = 0; travelPortal(inPortal); }
+      } else if (!inPortal) portalT = Math.max(0, portalT - dt * 2);
+      portalEl.style.opacity = Math.min(0.8, portalT / 2.2);
       if (!flying && player.onGround && wspd > 1.2) {
         stepDist += wspd * dt;
         if (stepDist > 2.2) { stepDist = 0; sfx('step', 0.8, 0, get(Math.floor(player.x), Math.floor(player.y - 0.2), Math.floor(player.z))); }
       }
 
-      if (flying) player.fallStart = null;
+      if (flying || inLava) player.fallStart = null;
       else if (player.onGround) {
         if (player.fallStart !== null) {
           const dist = player.fallStart - player.y;
@@ -3534,7 +3644,7 @@
   const rainMesh = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xb4d0ee, transparent: true, opacity: 0.55, depthWrite: false }));
   rainMesh.frustumCulled = false; rainMesh.visible = false; scene.add(rainMesh);
   const bolts = [];
-  const boltEl = document.getElementById('bolt');
+  const boltEl = document.getElementById('bolt'), portalEl = document.getElementById('portalfx');
   const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Storm' };
   function setWeather(w) {
     weather = w;
@@ -3568,6 +3678,7 @@
     mobs.slice().forEach(function (m) { if (Math.hypot(m.x - (bx + 0.5), m.z - (bz + 0.5)) < 3.5) damageMob(m, 12); });
   }
   function updateWeather(dt) {
+    if (dimension !== 'overworld') { rainLevel = 0; lightningT = 0; boltEl.style.opacity = 0; return; }
     weatherT -= dt;
     if (weatherT <= 0) setWeather(weather === 'clear' ? (Math.random() < 0.72 ? 'rain' : 'storm') : 'clear');
     const diff = rainTarget - rainLevel;
@@ -3628,23 +3739,29 @@
   const cNight = new THREE.Color(0x0a1230), cDay = new THREE.Color(0x87ceeb), cDusk = new THREE.Color(0xf0905a), tmpC = new THREE.Color();
   const sunDir = new THREE.Vector3();
   const cGray = new THREE.Color(0x707a86), cFlash = new THREE.Color(0xdde6ff), tmpG = new THREE.Color();
+  const ENV_SIFT = { sky: new THREE.Color(0x2b0b09), near: 8, far: 58, light: 0.52 }, ENV_END = { sky: new THREE.Color(0x07040f), near: 20, far: 80, light: 0.48 };
   function daylight(dt) {
     tod = (tod + dt / DAY) % 1;
     const a = tod * Math.PI * 2;
     const s = Math.sin(a);
     isNight = s < -0.1; isDay = s > 0.05;
+    if (dimension !== 'overworld') {   // the other dimensions have a fixed look
+      isNight = false; isDay = false;
+      const env = dimension === 'sift' ? ENV_SIFT : ENV_END;
+      scene.background.copy(env.sky); scene.fog.color.copy(env.sky); scene.fog.near = env.near; scene.fog.far = env.far;
+      dayUniform.value = env.light; glowMat.opacity = 0.6;
+      sun.visible = false; moon.visible = false;
+      return;
+    }
     const k = Math.max(0, Math.min(1, 0.5 + s * 1.2));
-    if (dimension === 'nether') tmpC.set(0x581b18);
-    else if (dimension === 'end') tmpC.set(0x160d2b);
-    else tmpC.copy(cNight).lerp(cDay, k);
+    tmpC.copy(cNight).lerp(cDay, k);
     const dusk = Math.max(0, 1 - Math.abs(s - 0.02) / 0.22) * 0.55;
-    if (dimension === 'overworld') tmpC.lerp(cDusk, dusk);
+    tmpC.lerp(cDusk, dusk);
     if (rainLevel > 0.01) { tmpG.copy(cNight).lerp(cGray, k); tmpC.lerp(tmpG, rainLevel * 0.8); }   // overcast sky
     if (lightningT > 0) tmpC.lerp(cFlash, lightningT * 0.55);
-    scene.fog.near = dimension === 'nether' ? 12 : (dimension === 'end' ? 24 : 30 - 14 * rainLevel);
-    scene.fog.far = dimension === 'nether' ? 48 : (dimension === 'end' ? 95 : 78 - 30 * rainLevel);
+    scene.fog.near = 30 - 14 * rainLevel; scene.fog.far = 78 - 30 * rainLevel;
     scene.background.copy(tmpC); scene.fog.color.copy(tmpC);
-    const lightL = dimension === 'nether' ? 0.62 : (dimension === 'end' ? 0.42 : Math.max(0.28, Math.min(1, 0.55 + s * 0.7)) * (1 - 0.3 * rainLevel) + lightningT * 0.5);
+    const lightL = Math.max(0.28, Math.min(1, 0.55 + s * 0.7)) * (1 - 0.3 * rainLevel) + lightningT * 0.5;
     dayUniform.value = lightL; glowMat.opacity = 0.2 + (1 - lightL) * 0.75;
     sunDir.set(Math.cos(a), Math.sin(a), 0.25).normalize();
     sun.position.copy(camera.position).addScaledVector(sunDir, 200);
@@ -3865,91 +3982,6 @@
     const names = []; Object.keys(CMDS).forEach(function (k) { if (CMDS[k].name === k) names.push(k); });
     return 'Commands: ' + names.sort().map(function (n) { return '/' + n; }).join('  ') + '   (try /help <command>)';
   }, function () { return Object.keys(CMDS); });
-  function clearPortalVisuals() { while (portalVisuals.length) { const m = portalVisuals.pop(); scene.remove(m); m.geometry.dispose(); m.material.dispose(); } }
-  function showPortalVisual(portal) {
-    if (portal.dimension !== dimension) return;
-    const geo = new THREE.PlaneGeometry(2.85, 2.85);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xb879ff, transparent: true, opacity: 0.88, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false });
-    const mesh = new THREE.Mesh(geo, mat); mesh.position.set(portal.x + (portal.axis === 'z' ? 0.53 : 0.5), portal.y + 2.45, portal.z + (portal.axis === 'z' ? 0.5 : 0.53)); if (portal.axis === 'z') mesh.rotation.y = Math.PI / 2;
-    const glow = new THREE.PointLight(0xa65cff, 2.8, 12, 2);
-    glow.position.set(0, 0, 0.4);
-    mesh.add(glow);
-    scene.add(mesh); portalVisuals.push(mesh);
-  }
-  function buildPortalFrame(dim, centerX, baseY, centerZ) {
-    // Build a classic obsidian portal frame (5 blocks wide, 5 blocks tall).
-    const cx = Math.round(centerX), cz = Math.round(centerZ), by = Math.max(1, Math.min(H - 6, Math.floor(baseY)));
-    // Load all nearby chunks before placing the frame, including Z-side chunks.
-    ensureAround(cx, cz);
-    const portal = { dimension: dim, x: cx, y: by, z: cz, width: 2, height: 3, axis: 'x' };
-    for (let dx = -2; dx <= 2; dx++) {
-      for (let dy = 0; dy <= 4; dy++) {
-        const edge = Math.abs(dx) === 2 || dy === 0 || dy === 4;
-        setBlock(cx + dx, by + dy, cz, edge ? OBSIDIAN : 0);
-      }
-    }
-    portals.push(portal);
-    showPortalVisual(portal);
-    rebuildRegion(cx - 2, cz, cx + 2, cz);
-    saveWorld();
-    showHint('Portal activated! Walk through the purple opening.', 3000);
-    return portal;
-  }
-  function changeDimension(target, x, z, y) {
-    clearPortalVisuals();
-    if (dimension === 'overworld') chunks.forEach(function (c) { if (c.edited) savedChunks.set(ckey(c.cx, c.cz), c.data.slice()); });
-    chunks.forEach(function (c) { disposeMesh(c); });
-    chunks.clear(); resetChunkCache(); structCache.clear(); clearMobs();
-    dimension = target;
-    portals.forEach(showPortalVisual);
-    const tx = x === undefined ? 0.5 : x, tz = z === undefined ? 0.5 : z;
-    ensureAround(tx, tz);
-    player.x = tx; player.z = tz;
-    player.y = y === undefined ? (target === 'nether' ? 15 : (target === 'end' ? 22 : topY(Math.floor(tx), Math.floor(tz)) + 1.01)) : y;
-    for (let tries = 0; tries < 12 && collides(player.x, player.y, player.z); tries++) player.y += 1;
-    player.vx = player.vy = player.vz = 0; player.fallStart = null;
-    saveWorld();
-    showHint(target === 'nether' ? 'Welcome to the Nether! Watch your step in the red-hot caverns.' : target === 'end' ? 'Welcome to the End! Stay on the floating islands.' : 'Back to the Overworld.', 5000);
-  }
-  function checkPortal(dt) {
-    portalCooldown = Math.max(0, portalCooldown - dt);
-    if (portalCooldown > 0 || !playing || dimension === 'end') return;
-    const p = portals.find(function (q) { return q.dimension === dimension && Math.abs(player.x - q.x) < (q.axis === 'z' ? 1.25 : 1.15) && Math.abs(player.z - q.z) < (q.axis === 'z' ? 1.15 : 1.25) && player.y >= q.y && player.y <= q.y + 4.2; });
-    if (!p) return;
-    const target = dimension === 'overworld' ? 'nether' : 'overworld';
-    const scale = dimension === 'overworld' ? 1 / 8 : 8;
-    const tx = Math.round(p.x * scale), tz = Math.round(p.z * scale);
-    let destination = portals.find(function (q) { return q.dimension === target && Math.abs(q.x - tx) < 3 && Math.abs(q.z - tz) < 3; });
-    // Load the destination dimension before building a paired frame there.
-    changeDimension(target, tx, tz, target === 'nether' ? 15 : undefined);
-    if (!destination) {
-      getOrGen(tx >> 4, tz >> 4);
-      const floorY = target === 'nether' ? 13 : topY(tx, tz) + 1;
-      destination = buildPortalFrame(target, tx, floorY, tz);
-    }
-    // Move just in front of the matching doorway so the player won't bounce straight back.
-    player.x = destination.x + (destination.axis === 'z' ? 2.1 : 0); player.z = destination.z + (destination.axis === 'z' ? 0 : 2.1); player.y = destination.y + 1.05;
-    for (let tries = 0; tries < 12 && collides(player.x, player.y, player.z); tries++) player.y += 1;
-    portalCooldown = 2.5;
-    showHint('Portal travel: ' + (target === 'nether' ? 'Overworld → Nether' : 'Nether → Overworld'), 3000);
-  }
-  defCmd(['portal'], '/portal [build]', 'Build an obsidian Nether portal frame in front of you; walk through it to travel', function (a) {
-    if (dimension === 'end') throw new Error('Nether portals do not work in the End. Return to the Overworld first.');
-    if (a.length && a[0].toLowerCase() !== 'build') throw new Error('Usage: /portal [build]');
-    const cx = Math.round(player.x - Math.sin(player.yaw) * 3);
-    const cz = Math.round(player.z - Math.cos(player.yaw) * 3);
-    const by = Math.max(1, Math.min(H - 6, Math.floor(player.y) - 1));
-    const made = buildPortalFrame(dimension, cx, by, cz);
-    saveWorld();
-    return 'Built an obsidian Nether portal frame at ' + made.x + ' ' + made.y + ' ' + made.z + '. Walk through the doorway to travel.';
-  }, function () { return ['build']; });
-  defCmd(['dimension', 'dim'], '/dimension <overworld|nether|end>', 'Travel between the Overworld, Nether, and End', function (a) {
-    const target = (a[0] || '').toLowerCase();
-    if (['overworld', 'nether', 'end'].indexOf(target) < 0) throw new Error('Usage: /dimension <overworld|nether|end>');
-    if (target === dimension) return 'You are already in the ' + target + '.';
-    changeDimension(target);
-    return 'Entered the ' + target + '.';
-  }, function () { return ['overworld', 'nether', 'end']; });
   defCmd(['time'], '/time set <day|noon|sunset|night|midnight|sunrise|ticks> | add <ticks> | query', 'Change or read the time of day (24000 ticks per day)', function (a) {
     const sub = (a[0] || '').toLowerCase();
     if (sub === 'query') return 'It is ' + Math.round(tod * 24000) + ' ticks into the day (' + (isNight ? 'night' : 'day') + ')';
@@ -4188,7 +4220,7 @@
 
   function snapshot() {
     const m = currentWorld;
-    m.dimension = dimension; m.enderDragonDefeated = enderDragonDefeated; m.portals = portals.map(function (p) { return { dimension: p.dimension, x: p.x, y: p.y, z: p.z, width: p.width, height: p.height }; }); m.mode = mode; m.difficulty = difficulty; m.spawn = spawnPoint; m.omen = omen; m.hunger = hunger; m.sat = sat; m.weather = { w: weather, t: weatherT, r: rainLevel }; m.lastPlayed = Date.now(); m.tod = tod; m.hp = dead ? MAXHP : hp;
+    m.mode = mode; m.difficulty = difficulty; m.spawn = spawnPoint; m.omen = omen; m.dimension = dimension; m.dragonDefeated = dragonDefeated; m.hunger = hunger; m.sat = sat; m.weather = { w: weather, t: weatherT, r: rainLevel }; m.lastPlayed = Date.now(); m.tod = tod; m.hp = dead ? MAXHP : hp;
     m.selected = selected; m.hotbar = hotbar.slice(); m.inv = Object.assign({}, inv);
     m.player = { x: player.x, y: player.y, z: player.z, yaw: player.yaw, pitch: player.pitch, fly: !!player.fly };
     m.relics = relics.map(function (r) { return { x: r.x, y: r.y, z: r.z, got: r.got }; });
@@ -4200,20 +4232,11 @@
     if (!storageOK || !currentWorld || !ready) return Promise.resolve();
     const meta = snapshot();
     const dirty = [];
-    if (dimension === 'overworld') chunks.forEach(function (c) { if (c.dirty) dirty.push(c); });
-    const recMap = new Map();
-    dirty.forEach(function (c) {
+    for (const dn in dims) dims[dn].chunks.forEach(function (c) { if (c.dirty) { c.dim = dn; dirty.push(c); } });
+    const recs = dirty.map(function (c) {
       c.dirty = false;
-      recMap.set(ckey(c.cx, c.cz), { k: meta.id + ':' + c.cx + ',' + c.cz, w: meta.id, cx: c.cx, cz: c.cz, data: c.data.slice() });
+      return { k: meta.id + ':' + (c.dim === 'overworld' ? '' : c.dim + ':') + c.cx + ',' + c.cz, w: meta.id, dim: c.dim, cx: c.cx, cz: c.cz, data: c.data.slice() };
     });
-    // Keep modified Overworld chunks safe while the player explores other dimensions.
-    if (dimension !== 'overworld') savedChunks.forEach(function (data, key) {
-      const parts = key; // key is the packed chunk coordinate used by the chunk cache
-      const cx = (parts >> 16) << 16 >> 16, cz = (parts << 16) >> 16;
-      const k = meta.id + ':' + cx + ',' + cz;
-      recMap.set(key, { k: k, w: meta.id, cx: cx, cz: cz, data: data.slice() });
-    });
-    const recs = Array.from(recMap.values());
     const tx = db.transaction(['worlds', 'chunks'], 'readwrite');
     tx.objectStore('worlds').put(meta);
     const cs = tx.objectStore('chunks');
@@ -4274,11 +4297,7 @@
 
   function applyWorld(m) {
     const p = m.player || { x: 0.5, y: 60, z: 0.5, yaw: 0, pitch: 0, fly: false };
-    dimension = ['overworld', 'nether', 'end'].includes(m.dimension) ? m.dimension : 'overworld';
-    enderDragonDefeated = !!m.enderDragonDefeated;
-    portals.length = 0; if (Array.isArray(m.portals)) m.portals.forEach(function (p) { if (p && ['overworld', 'nether'].includes(p.dimension)) portals.push({ dimension: p.dimension, x: p.x | 0, y: p.y | 0, z: p.z | 0, width: 2, height: 3, axis: p.axis === 'z' ? 'z' : 'x' }); });
-    clearPortalVisuals(); portals.forEach(showPortalVisual);
-    resetWorld(m.seed, Math.floor(p.x / 16), Math.floor(p.z / 16));
+    resetWorld(m.seed, Math.floor(p.x / 16), Math.floor(p.z / 16), m.dimension || 'overworld');
     clearMobs();
     player.x = p.x; player.y = p.y; player.z = p.z; player.vx = player.vy = player.vz = 0;
     player.yaw = p.yaw || 0; player.pitch = p.pitch || 0; player.fallStart = null;
@@ -4291,7 +4310,7 @@
     Object.keys(m.toolWear || {}).forEach(function (k) { toolWear[k] = m.toolWear[k]; });
     mode = m.mode || 'creative';
     difficulty = DIFF[m.difficulty] ? m.difficulty : 'normal';
-    spawnPoint = m.spawn || null; omen = !!m.omen;
+    spawnPoint = m.spawn || null; omen = !!m.omen; dragonDefeated = !!m.dragonDefeated;
     if (m.weather && WEATHER_LABEL[m.weather.w]) { weather = m.weather.w; weatherT = m.weather.t || 300; rainLevel = m.weather.r || 0; }
     else { weather = 'clear'; weatherT = 420; rainLevel = 0; }
     rainTarget = weather === 'clear' ? 0 : (weather === 'rain' ? 0.75 : 1); updateWeatherUI();
@@ -4316,8 +4335,8 @@
       const meta = await dbGetWorld(id);
       if (!meta) throw new Error('missing');
       const recs = await dbGetChunks(id);
-      savedChunks.clear();
-      recs.forEach(function (r) { savedChunks.set(ckey(r.cx, r.cz), r.data); });
+      for (const dn in dims) dims[dn].saved.clear();
+      recs.forEach(function (r) { (dims[r.dim || 'overworld'] || dims.overworld).saved.set(ckey(r.cx, r.cz), r.data); });
       currentWorld = meta;
       await sleep(20);
       applyWorld(meta);
@@ -4334,10 +4353,10 @@
     let maxN = 0;
     worldList.forEach(function (w) { const mm = /^World (\d+)$/.exec(w.name); if (mm) maxN = Math.max(maxN, +mm[1]); });
     const sd = (Math.random() * 1e6) | 0;
-    savedChunks.clear();
+    for (const dn in dims) dims[dn].saved.clear();
     currentWorld = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), name: 'World ' + (maxN + 1), seed: sd, created: Date.now(), lastPlayed: Date.now() };
     resetWorld(sd, 0, 0);
-    spawnPoint = null; omen = false;
+    spawnPoint = null; omen = false; dragonDefeated = false;
     weather = 'clear'; weatherT = 420 + Math.random() * 300; rainLevel = 0; rainTarget = 0; updateWeatherUI();
     respawn(); clearMobs();
     for (const k in inv) delete inv[k];
@@ -4363,26 +4382,13 @@
   }
   newBtn.addEventListener('click', function () { if (!busy) newWorld(); });
   async function init() {
-    setBusy(true, 'Starting MauriceCraft…');
-    try {
-      try { db = await openDB(); storageOK = true; }
-      catch (e) { storageOK = false; db = null; }
-      if (storageOK) {
-        try { worldList = (await dbListWorlds()).sort(function (a, b) { return (b.lastPlayed || 0) - (a.lastPlayed || 0); }); }
-        catch (e) { storageOK = false; worldList = []; db = null; }
-      }
-      renderWorlds();
-      if (storageOK && worldList.length) await loadWorld(worldList[0].id);
-      else await newWorld();
-    } catch (err) {
-      console.error('MauriceCraft could not finish loading:', err);
-      ready = false;
-      setBusy(false);
-      playBtn.disabled = true;
-      newBtn.disabled = false;
-      newBtn.textContent = 'Try again';
-      subEl.textContent = 'The world did not finish loading. Choose “Try again” to start a fresh world.';
+    try { db = await openDB(); storageOK = true; } catch (e) { storageOK = false; }
+    if (storageOK) {
+      try { worldList = (await dbListWorlds()).sort(function (a, b) { return (b.lastPlayed || 0) - (a.lastPlayed || 0); }); }
+      catch (e) { storageOK = false; worldList = []; }
     }
+    renderWorlds();
+    if (storageOK && worldList.length) await loadWorld(worldList[0].id); else await newWorld();
   }
   setInterval(function () { if (ready && playing) saveWorld(); }, 15000);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') saveWorld(); });
@@ -4404,7 +4410,8 @@
         if (fpsT >= 1) { fps = frames; frames = 0; fpsT = 0; }
         if (infoT > 0.2) {
           infoT = 0;
-          // Keep developer diagnostics out of the player-facing game screen.
+          const state = mode === 'creative' ? (player.fly ? 'Flying' : 'Walking') : (isNight && hasHealth() ? 'Night' : (mode === 'spectator' ? 'x' + specSpeed.toFixed(2) : 'Day'));
+          infoEl.textContent = (dimension !== 'overworld' ? DIM_NAME[dimension] + ' \u00b7 ' : '') + LABEL[mode] + (hasHealth() ? ' \u00b7 ' + DIFF[difficulty].label : '') + '  ' + state + '\nX ' + player.x.toFixed(1) + '  Y ' + player.y.toFixed(1) + '  Z ' + player.z.toFixed(1) + '\n' + fps + ' fps' + (weather === 'clear' ? '' : ' \u00b7 ' + WEATHER_LABEL[weather]) + '\nNearby: ' + nearestStructure();
           if (mode === 'adventure') objEl.textContent = objectiveText();
         }
       }
