@@ -47,6 +47,9 @@
   #bolt { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 3; }
   #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 4; }
   #raid { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 10px); transform: translateX(-50%); display: none; padding: 6px 12px; font-size: 14px; background: var(--panel); border: 2px solid #b3261e; color: var(--text); pointer-events: none; white-space: nowrap; }
+  #bossbar { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 10px); transform: translateX(-50%); display: none; padding: 6px 12px; font-size: 14px; text-align: center; background: var(--panel); border: 2px solid #8a5aff; color: var(--text); pointer-events: none; white-space: nowrap; }
+  #bosshp { width: 220px; height: 8px; margin-top: 4px; background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .4); }
+  #bosshp i { display: block; height: 100%; width: 100%; background: #b04aff; }
   #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s;
     background: radial-gradient(ellipse at center, rgba(200,0,0,0) 40%, rgba(200,0,0,.75) 100%); }
 
@@ -216,6 +219,7 @@
 <div id="bolt"></div>
 <div id="portalfx"></div>
 <div id="raid"></div>
+<div id="bossbar">The Dragon<div id="bosshp"><i></i></div></div>
 <div id="info"></div>
 <div id="objective"></div>
 <div id="hint"></div>
@@ -644,17 +648,17 @@
     const rgb = function (r, g, b) { return 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')'; };
     for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
       const n1 = hash2(x, y, 300), n2 = hash2(x >> 1, y >> 1, 301), n3 = hash2(x, y, 302), kk = (n1 - 0.5) * 34 + (n2 - 0.5) * 20;
-      R(92, x, y, 1, 1, rgb(112 + kk, 46 + kk * 0.5, 44 + kk * 0.5));
-      R(93, x, y, 1, 1, n3 < 0.2 ? '#6a5446' : rgb(98 + (n1 - 0.5) * 22, 78 + (n1 - 0.5) * 18, 66 + (n1 - 0.5) * 14));
+      R(92, x, y, 1, 1, n2 < 0.2 ? rgb(64 + kk * 0.5, 18, 20) : rgb(108 + kk, 33 + kk * 0.4, 35 + kk * 0.4));
+      R(93, x, y, 1, 1, n3 < 0.3 ? '#4e3a2c' : rgb(90 + (n1 - 0.5) * 20, 68 + (n1 - 0.5) * 16, 54 + (n1 - 0.5) * 12));
       R(94, x, y, 1, 1, ((x + y) % 5 === 0) ? '#be7a2a' : (n2 < 0.4 ? '#fff0b0' : rgb(255, 205 + (n1 - 0.5) * 40, 110)));
       const spot = hash2(x >> 1, y >> 1, 310) < 0.3 && n3 < 0.85;
-      R(95, x, y, 1, 1, spot ? (n1 < 0.5 ? '#ffb347' : '#ffe9b0') : rgb(112 + kk, 46 + kk * 0.5, 44 + kk * 0.5));
+      R(95, x, y, 1, 1, spot ? (n1 < 0.5 ? '#ffb347' : '#ffe9b0') : (n2 < 0.2 ? rgb(64 + kk * 0.5, 18, 20) : rgb(108 + kk, 33 + kk * 0.4, 35 + kk * 0.4)));
       R(96, x, y, 1, 1, n3 < 0.12 ? '#5a3d8a' : rgb(22 + (n1 - 0.5) * 14, 12 + (n1 - 0.5) * 8, 38 + (n1 - 0.5) * 20));
       R(97, x, y, 1, 1, n2 < 0.28 ? '#ffc03c' : (n1 < 0.3 ? '#a82a0a' : rgb(228 + (n1 - 0.5) * 30, 88 + (n3 - 0.5) * 50, 18)));
       const sw = Math.sin((x + y * 0.7) * 0.9) + Math.sin((y - x * 0.5) * 0.8);
       R(98, x, y, 1, 1, sw > 0.9 ? '#c48aff' : (sw < -0.9 ? '#3c1478' : rgb(112 + (n1 - 0.5) * 30, 42, 190)));
       const brm = (y % 8 === 7) || (((x + (Math.floor(y / 8) % 2) * 4) % 8) === 7);
-      R(99, x, y, 1, 1, brm ? '#2c1010' : rgb(92 + (n1 - 0.5) * 16, 34, 34));
+      R(99, x, y, 1, 1, brm ? '#1e0b0b' : rgb(72 + (n1 - 0.5) * 14, 27, 29));
       const ring = Math.hypot(x - 7.5, y - 7.5);
       R(100, x, y, 1, 1, ring < 3.3 ? '#14282a' : (ring < 5.2 ? '#3f6b5b' : rgb(70 + (n1 - 0.5) * 12, 104, 88)));
       R(101, x, y, 1, 1, (y === 0 || y === 15 || x === 0 || x === 15) ? '#2f4a3f' : rgb(72 + (n1 - 0.5) * 14, 106 + (n1 - 0.5) * 12, 90));
@@ -1341,7 +1345,7 @@
         for (let y = fl + 1; y <= LAVA_Y; y++) put1(y, LAVA);
         for (let y = ce; y < H; y++) put1(y, SIFTROCK);
         if (hash2(x, z, seed + 5010) < 0.035) { const len = 2 + Math.floor(hash2(x, z, seed + 5012) * 4); for (let y = ce - 1; y >= ce - len && y > fl + 1; y--) put1(y, SIFTROCK); }
-        if (hash2(x, z, seed + 5011) < 0.012) { put1(ce - 1, LUMENITE); put1(ce - 2, LUMENITE); }
+        if (hash2(x, z, seed + 5011) < 0.03) { put1(ce - 1, LUMENITE); put1(ce - 2, LUMENITE); if (hash2(x, z, seed + 5015) < 0.4) put1(ce - 3, LUMENITE); }
         if (fl > LAVA_Y && hash2(x, z, seed + 5013) < 0.02) { const len = 1 + Math.floor(hash2(x, z, seed + 5014) * 3); for (let y = fl + 1; y <= fl + len; y++) put1(y, SIFTROCK); }
       }
     }
@@ -1889,6 +1893,43 @@
     return g;
   }
   const rnd3 = n => 1 + Math.floor(Math.random() * n);
+  function makeWisp() {   // a floating, glowing tear of the Sift
+    const g = new THREE.Group(); g.userData.legs = [];
+    part(g, 0.4, 0.4, 0.4, 0x8fe0ff, 0, 0.5, 0);
+    part(g, 0.24, 0.24, 0.24, 0xffffff, 0, 0.5, 0);
+    part(g, 0.13, 0.13, 0.13, 0x8fe0ff, 0, 0.08, 0);
+    part(g, 0.09, 0.09, 0.09, 0x6fd0ff, 0, -0.22, 0);
+    return g;
+  }
+  function makeCinderhusk() {   // a burnt-out husk that still glows inside
+    const g = new THREE.Group(); g.userData.legs = [];
+    leg(g, 0.2, 0.62, 0x1c1210, -0.12, 0.62, 0); leg(g, 0.2, 0.62, 0x1c1210, 0.12, 0.62, 0);
+    part(g, 0.52, 0.62, 0.3, 0x241612, 0, 1.24, 0);
+    part(g, 0.3, 0.06, 0.32, 0xff6a1a, 0, 1.18, 0.01); part(g, 0.18, 0.05, 0.31, 0xffb020, 0, 1.4, 0.01);
+    part(g, 0.44, 0.44, 0.44, 0x2a1a14, 0, 1.78, 0);
+    part(g, 0.1, 0.06, 0.03, 0xff8a2a, -0.1, 1.84, 0.23); part(g, 0.1, 0.06, 0.03, 0xff8a2a, 0.1, 1.84, 0.23);
+    part(g, 0.12, 0.06, 0.04, 0x140c0a, 0, 1.7, 0.23);
+    for (const sx of [-1, 1]) { const arm = part(g, 0.18, 0.6, 0.18, 0x1c1210, sx * 0.35, 1.3, 0.28); arm.rotation.x = -1.45; }
+    return g;
+  }
+  function makeDragon() {   // the boss of The End
+    const g = new THREE.Group(); g.userData.legs = []; g.userData.wings = [];
+    part(g, 1.5, 1.0, 3.2, 0x1a1226, 0, 0, -0.4);                     // body
+    part(g, 0.8, 0.6, 1.4, 0x221832, 0, 0.15, 1.4);                   // neck
+    part(g, 0.95, 0.75, 1.3, 0x2a1e3e, 0, 0.3, 2.4);                  // head
+    part(g, 0.6, 0.3, 0.6, 0x3a2a52, 0, 0.42, 3.2);                   // snout
+    part(g, 0.14, 0.4, 0.14, 0x8a5aff, -0.3, 0.85, 2.4); part(g, 0.14, 0.4, 0.14, 0x8a5aff, 0.3, 0.85, 2.4);   // horns
+    part(g, 0.16, 0.12, 0.06, 0xff4a6a, -0.22, 0.52, 3.05); part(g, 0.16, 0.12, 0.06, 0xff4a6a, 0.22, 0.52, 3.05); // eyes
+    part(g, 0.45, 0.5, 2.0, 0x160f20, 0, 0.2, -2.2);                  // tail
+    part(g, 0.3, 0.35, 1.2, 0x120b1a, 0, 0.25, -3.4);
+    for (const sx of [-1, 1]) {
+      const w = new THREE.Group(); w.position.set(sx * 0.75, 0.45, 0.2);
+      part(w, 2.4, 0.12, 1.6, 0x201632, sx * 1.2, 0, 0);
+      part(w, 1.5, 0.1, 1.0, 0x2e2050, sx * 0.75, 0.06, 0.7);
+      g.add(w); g.userData.wings.push(w);
+    }
+    return g;
+  }
   const KINDS = {
     zombie: { hostile: true, r: 0.3, h: 1.8, hp: 20, speed: 2.7, melee: { d: 1.15, dmg: 3, cd: 1.1 }, make: makeZombie, drops: function () { return [[GUNPOWDER, Math.random() < 0.5 ? 1 : 0]]; } },
     creeper: { hostile: true, r: 0.3, h: 1.85, hp: 20, speed: 2.4, make: makeCreeper, drops: function () { return [[GUNPOWDER, rnd3(2)]]; } },
@@ -1903,7 +1944,10 @@
     cow: { hostile: false, r: 0.45, h: 1.5, hp: 10, speed: 1.0, make: makeCow, drops: function () { return [[BEEF, rnd3(3)], [LEATHER, Math.random() < 0.5 ? 1 : 0]]; } },
     pig: { hostile: false, r: 0.4, h: 0.95, hp: 10, speed: 1.1, make: makePig, drops: function () { return [[PORK, rnd3(3)]]; } },
     sheep: { hostile: false, r: 0.45, h: 1.4, hp: 8, speed: 1.0, make: makeSheep, drops: function () { return [[MUTTON, rnd3(2)], [WOOL, rnd3(2)]]; } },
-    chicken: { hostile: false, r: 0.2, h: 0.8, hp: 4, speed: 1.4, make: makeChicken, drops: function () { return [[CHICKEN, 1], [FEATHER, Math.floor(Math.random() * 3)]]; } }
+    chicken: { hostile: false, r: 0.2, h: 0.8, hp: 4, speed: 1.4, make: makeChicken, drops: function () { return [[CHICKEN, 1], [FEATHER, Math.floor(Math.random() * 3)]]; } },
+    wisp: { hostile: false, fly: true, r: 0.35, h: 0.7, hp: 8, speed: 1.1, make: makeWisp, drops: function () { return [[WISP_TEAR, 1 + (Math.random() < 0.35 ? 1 : 0)]]; } },
+    cinderhusk: { hostile: true, fireproof: true, r: 0.3, h: 1.85, hp: 24, speed: 2.6, melee: { d: 1.15, dmg: 4, cd: 1.1 }, make: makeCinderhusk, drops: function () { return [[EMBER_SHARD, rnd3(2)]]; } },
+    dragon: { hostile: true, boss: true, r: 2.2, h: 2.6, hp: 200, speed: 10, make: makeDragon, drops: function () { return [[DIAMOND, 5]]; } }
   };
   const ANIMALS = ['cow', 'pig', 'sheep', 'chicken'];
   function addMob(kind, x, y, z, opts) {
@@ -1919,6 +1963,7 @@
   function removeMobAt(i) { scene.remove(mobs[i].group); mobs.splice(i, 1); }
   function clearMobs() {
     mobs.forEach(function (m) { if (m.village) m.village.vSpawned = false; });   // villages repopulate afterwards
+    bossOff();
     while (mobs.length) removeMobAt(mobs.length - 1);
     while (blasts.length) removeBlastAt(blasts.length - 1);
     while (fx.length) removeFxAt(fx.length - 1);
@@ -1957,6 +2002,25 @@
       addMob(kind, x + 0.5, y + 1.01, z + 0.5);
     }
   }
+  function trySpawnSift(wantHostile) {   // The Sift spawns its own mobs: cinder husks on the rock, wisps in the air
+    const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 12;
+    const x = Math.floor(player.x + Math.cos(a) * d), z = Math.floor(player.z + Math.sin(a) * d);
+    if (!chunkAt(x >> 4, z >> 4)) return;
+    const fl = siftFloor(x, z);
+    if (wantHostile) {
+      if (fl < LAVA_Y) return;   // never on the lava sea
+      const b = get(x, fl, z);
+      if (b !== SIFTROCK && b !== SIFT_SAND && b !== SIFTBRICK) return;
+      if (get(x, fl + 1, z) !== 0 || get(x, fl + 2, z) !== 0) return;
+      if (nearTorch(x + 0.5, fl + 1, z + 0.5, 8)) return;
+      if (collides(x + 0.5, fl + 1.01, z + 0.5, 0.3, 1.85)) return;
+      addMob('cinderhusk', x + 0.5, fl + 1.01, z + 0.5);
+    } else {
+      const ce = siftCeil(x, z, fl);
+      if (ce - fl < 7) return;
+      addMob('wisp', x + 0.5, fl + 3 + Math.random() * (ce - fl - 7), z + 0.5);
+    }
+  }
   let spawnT = 2, animalT = 0.5, villT = 0.2, patrolT = 70;
   const pendingBlasts = [], pendingHits = [], arrows = [];
   function hasLOS(m, tgt) {
@@ -1966,15 +2030,16 @@
     for (let i = 1; i < n; i++) { const t = i / n; if (solid(get(Math.floor(ox + dx * t), Math.floor(oy + dy * t), Math.floor(oz + dz * t)))) return false; }
     return true;
   }
-  function shootArrow(m, dmg, tgt) {
+  function shootArrow(m, dmg, tgt, fire) {
     const tx0 = tgt ? tgt.x : player.x, ty0 = (tgt ? tgt.y : player.y) + 1.2, tz0 = tgt ? tgt.z : player.z;
     const ox = m.x, oy = m.y + 1.5, oz = m.z, dx = tx0 - ox, dy = ty0 - oy, dz = tz0 - oz;
-    const d = Math.hypot(dx, dy, dz) || 1, sp = 20;
-    const vx = dx / d * sp, vz = dz / d * sp, vy = dy / d * sp + 0.3 * d;
+    const d = Math.hypot(dx, dy, dz) || 1, sp = fire ? 14 : 20;
+    const vx = dx / d * sp, vz = dz / d * sp, vy = dy / d * sp + (fire ? 0 : 0.3 * d);
     const g = new THREE.Group();
-    part(g, 0.05, 0.05, 0.6, 0x8a6a3c, 0, 0, 0); part(g, 0.08, 0.08, 0.08, 0xcfcfcf, 0, 0, 0.32);
+    if (fire) { part(g, 0.32, 0.32, 0.32, 0xff6a1a, 0, 0, 0); part(g, 0.2, 0.2, 0.2, 0xffe08a, 0, 0, 0.12); }
+    else { part(g, 0.05, 0.05, 0.6, 0x8a6a3c, 0, 0, 0); part(g, 0.08, 0.08, 0.08, 0xcfcfcf, 0, 0, 0.32); }
     g.position.set(ox, oy, oz); scene.add(g); g.lookAt(ox + vx, oy + vy, oz + vz);
-    arrows.push({ x: ox, y: oy, z: oz, vx: vx, vy: vy, vz: vz, mesh: g, life: 6, stuck: false, dmg: dmg || 3 });
+    arrows.push({ x: ox, y: oy, z: oz, vx: vx, vy: vy, vz: vz, mesh: g, life: fire ? 3 : 6, stuck: false, dmg: dmg || 3, noG: !!fire, big: !!fire });
     sfxAt('arrow', ox, oy, oz);
   }
   function updateArrows(dt) {
@@ -1983,14 +2048,15 @@
       a.life -= dt;
       if (a.life <= 0) { scene.remove(a.mesh); arrows.splice(i, 1); continue; }
       if (a.stuck) continue;
-      a.vy -= 12 * dt;
+      if (!a.noG) a.vy -= 12 * dt;
       const steps = Math.max(1, Math.ceil(Math.hypot(a.vx, a.vy, a.vz) * dt / 0.3));
       let gone = false;
       for (let s2 = 0; s2 < steps; s2++) {
         const nx = a.x + a.vx * dt / steps, ny = a.y + a.vy * dt / steps, nz = a.z + a.vz * dt / steps;
         if (collides(nx, ny - 0.05, nz, 0.05, 0.1)) { a.stuck = true; a.life = Math.min(a.life, 3); break; }
         a.x = nx; a.y = ny; a.z = nz;
-        if (hasHealth() && Math.abs(a.x - player.x) < 0.45 && Math.abs(a.z - player.z) < 0.45 && a.y > player.y && a.y < player.y + 1.8) {
+        const hw = a.big ? 0.7 : 0.45;
+        if (hasHealth() && Math.abs(a.x - player.x) < hw && Math.abs(a.z - player.z) < hw && a.y > player.y && a.y < player.y + 1.8) {
           damagePlayer(a.dmg || 3, true); sfx('hit'); scene.remove(a.mesh); arrows.splice(i, 1); gone = true; break;
         }
         for (let q = 0; q < mobs.length; q++) {   // arrows hit villagers too
@@ -2135,11 +2201,12 @@
     spawnT -= dt; animalT -= dt; villT -= dt;
     if (hasHealth() && spawnT <= 0) {
       spawnT = D.every;
-      if (D.cap > 0 && (isNight || weather === 'storm') && mobs.filter(function (m) { return m.hostile && !KINDS[m.kind].illager; }).length < D.cap) trySpawnMob();
+      if (D.cap > 0 && dimension !== 'end' && (isNight || weather === 'storm' || dimension === 'sift') && mobs.filter(function (m) { return m.hostile && !KINDS[m.kind].illager; }).length < D.cap) { if (dimension === 'sift') trySpawnSift(true); else trySpawnMob(); }
     }
     if (animalT <= 0) {
       animalT = 2.5;
-      if (!isNight && mobs.filter(function (m) { return !m.hostile && m.kind !== 'villager'; }).length < 12) trySpawnAnimals();
+      if (dimension === 'sift') { if (mobs.filter(function (m) { return m.kind === 'wisp'; }).length < 6) trySpawnSift(false); }
+      else if (!isNight && mobs.filter(function (m) { return !m.hostile && m.kind !== 'villager'; }).length < 12) trySpawnAnimals();
     }
     if (villT <= 0) { villT = 1.5; manageVillagers(); }
     patrolT -= dt;
@@ -2153,7 +2220,7 @@
       const dx = player.x - m.x, dz = player.z - m.z;
       const dist = Math.hypot(dx, dz) || 0.0001;
       if (m.y < -30) { removeMobAt(i); continue; }
-      if (m.hostile && D.cap === 0 && hasHealth()) { removeMobAt(i); continue; }   // Peaceful: no monsters at all
+      if (m.hostile && m.kind !== 'dragon' && D.cap === 0 && hasHealth()) { removeMobAt(i); continue; }   // Peaceful: no monsters at all (the dragon stays)
       if (m.kind === 'villager' || m.village) { if (dist > 140) { if (m.village) m.village.vSpawned = false; removeMobAt(i); continue; } }
       else if (dist > (m.persist ? 120 : (K.illager ? 130 : (m.hostile ? 70 : 95)))) { removeMobAt(i); continue; }
       m.snd -= dt;
@@ -2161,9 +2228,10 @@
         m.snd = 6 + Math.random() * 10;
         if (m.kind !== 'creeper' && dist < (m.hostile ? 18 : 26)) sfxAt(m.kind, m.x, m.y + 1, m.z);
       }
+      if (m.kind === 'dragon') { updateDragon(m, dt, D); continue; }
       let tx = 0, tz = 0, ax = dx, az = dz, ad = dist, huntV = null;   // a*, huntV: who this monster is going after
       if (m.hostile) {
-        if (isDay && rainLevel < 0.5 && !m.persist && !K.illager) {   // rain keeps monsters from burning in daylight
+        if (dimension === 'overworld' && isDay && rainLevel < 0.5 && !m.persist && !K.illager) {   // rain keeps monsters from burning in daylight
           if (m.burn < 0) m.burn = 1 + Math.random() * 5; m.burn -= dt; if (m.burn <= 0) { removeMobAt(i); continue; } }
         else m.burn = -1;
         const ill = !!K.illager;
@@ -2266,7 +2334,8 @@
       const k = Math.min(1, 8 * dt);
       if (m.kind === 'spider' && !m.onGround) { /* keep the pounce going */ }
       else { m.vx += (tx - m.vx) * k; m.vz += (tz - m.vz) * k; }
-      m.vy = Math.max(-50, m.vy - 28 * dt);
+      if (K.fly) { m.phase += dt * 2; m.vy = Math.sin(m.phase * 1.5) * 0.55; }   // wisps hover and bob instead of falling
+      else m.vy = Math.max(-50, m.vy - 28 * dt);
       m.onGround = false; m.hit = false;
       moveEnt(m, 0, m.vx * dt); moveEnt(m, 2, m.vz * dt); moveEnt(m, 1, m.vy * dt);
       if (m.hit && m.onGround && (!m.hostile || dist > 1)) m.vy = m.hostile ? 8.2 : 7.8;
@@ -2325,6 +2394,13 @@
     const i = mobs.indexOf(m);
     if (i >= 0) removeMobAt(i);
     sfxAt('die', m.x, m.y + 0.5, m.z);
+    if (m.kind === 'dragon') {
+      dragonDefeated = true;
+      bossOff();
+      buildEndExitPortal();
+      sfx('portal');
+      showHint('The Dragon is defeated! Its egg and a portal home wait at the heart of the island.', 6500);
+    }
     if (m.leader && hasHealth() && !omen && DIFF[difficulty].cap > 0) { omen = true; showHint('You feel an ominous presence... Enter a village and a raid will follow.', 5500); }
     if (mode === 'survival') {
       const got = [];
@@ -3384,6 +3460,65 @@
     ensureAround(16, 0);
     setPlayerAt(16.5, endTop(16, 0) + 1.01, 0.5);
     if (!dragonDefeated) spawnDragonFight();
+    else ensureEndExit();
+  }
+  function spawnDragonFight() {
+    if (dragonDefeated) { ensureEndExit(); return; }
+    ensureAround(0, 0);
+    const m = addMob('dragon', 0, 46, 0, null);
+    m.persist = true; m.dst = 'circle'; m.dA = Math.random() * 6.28; m.dT = 6; m.atk = 1; m.fire = 2;
+    bossOn();
+    showHint('The Dragon awakens!', 3000);
+  }
+  function buildEndExitPortal() {   // appears once the dragon is beaten: a way home, with the egg on top
+    ensureAround(0, 0);
+    const G = endTop(0, 0);
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {   // flatten a small plaza so the portal is never buried or floating
+      const g = endTop(dx, dz);
+      for (let y = Math.min(g + 1, G + 1); y <= G; y++) setBlock(dx, y, dz, END_STONE);   // raise low ground
+      for (let y = G + 1; y <= G + 5; y++) if (get(dx, y, dz) !== 0) setBlock(dx, y, dz, 0);   // lower high ground
+    }
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) setBlock(dx, G + 1, dz, (dx === 0 && dz === 0) ? OBSIDIAN : END_PORTAL);
+    setBlock(0, G + 2, 0, OBSIDIAN);
+    setBlock(0, G + 3, 0, DRAGON_EGG);
+    rebuildRegion(-2, -2, 2, 2);
+  }
+  function ensureEndExit() {
+    ensureAround(0, 0);
+    if (get(1, endTop(0, 0) + 1, 1) !== END_PORTAL) buildEndExitPortal();
+  }
+  function steerMob(m, tx, ty, tz, sp, dt) {
+    const dx = tx - m.x, dy = ty - m.y, dz = tz - m.z, d = Math.hypot(dx, dy, dz) || 1;
+    const k = Math.min(1, 2.4 * dt);
+    m.vx += (dx / d * sp - m.vx) * k; m.vy += (dy / d * sp - m.vy) * k; m.vz += (dz / d * sp - m.vz) * k;
+    m.x += m.vx * dt; m.y += m.vy * dt; m.z += m.vz * dt;
+  }
+  function updateDragon(m, dt, D) {   // the boss circles the island, dives at you and spits fireballs
+    m.dT -= dt; m.atk -= dt; m.fire -= dt;
+    const pd = Math.hypot(player.x - m.x, player.y - m.y, player.z - m.z);
+    if (m.dst === 'circle') {
+      m.dA += dt * 0.4;
+      steerMob(m, Math.cos(m.dA) * 24, 45 + Math.sin(m.dA * 1.7) * 3, Math.sin(m.dA) * 24, 9, dt);
+      if (m.dT <= 0 && pd < 60) { m.dst = 'dive'; m.dT = 6; sfxAt('dragon', m.x, m.y, m.z); }
+      else if (m.fire <= 0 && pd < 46) { m.fire = 2.4; shootArrow(m, 5, null, true); }
+    } else {
+      steerMob(m, player.x, player.y + 0.6, player.z, 15, dt);
+      if (pd < 3.6 && m.atk <= 0) {
+        m.atk = 1.4;
+        if (hasHealth()) damagePlayer(7, true);
+        const dx = player.x - m.x, dz = player.z - m.z, d = Math.hypot(dx, dz) || 1;
+        player.vx += dx / d * 11; player.vz += dz / d * 11; player.vy = 7;
+        m.dst = 'circle'; m.dT = 5 + Math.random() * 5;
+      }
+      if (m.dT <= 0) { m.dst = 'circle'; m.dT = 5 + Math.random() * 5; }
+    }
+    m.face = Math.atan2(m.vx, m.vz);
+    m.group.position.set(m.x, m.y, m.z);
+    m.group.rotation.y = m.face;
+    m.phase += dt * 4.5;
+    const flap = Math.sin(m.phase) * 0.5;
+    m.group.userData.wings.forEach(function (w, i) { w.rotation.z = (i ? -1 : 1) * flap; });
+    updateBoss(m.hp);
   }
   function enterDimension(d) {
     const ox = player.x, oz = player.z, from = dimension, carry = switchDimension(d);
@@ -3645,6 +3780,10 @@
   rainMesh.frustumCulled = false; rainMesh.visible = false; scene.add(rainMesh);
   const bolts = [];
   const boltEl = document.getElementById('bolt'), portalEl = document.getElementById('portalfx');
+  const bossEl = document.getElementById('bossbar'), bossHpEl = document.getElementById('bosshp').firstElementChild;
+  function bossOn() { bossEl.style.display = 'block'; }
+  function bossOff() { bossEl.style.display = 'none'; }
+  function updateBoss(hp) { bossHpEl.style.width = Math.max(0, Math.min(100, hp / 200 * 100)) + '%'; }
   const WEATHER_LABEL = { clear: 'Clear', rain: 'Rain', storm: 'Storm' };
   function setWeather(w) {
     weather = w;
@@ -3739,7 +3878,7 @@
   const cNight = new THREE.Color(0x0a1230), cDay = new THREE.Color(0x87ceeb), cDusk = new THREE.Color(0xf0905a), tmpC = new THREE.Color();
   const sunDir = new THREE.Vector3();
   const cGray = new THREE.Color(0x707a86), cFlash = new THREE.Color(0xdde6ff), tmpG = new THREE.Color();
-  const ENV_SIFT = { sky: new THREE.Color(0x2b0b09), near: 8, far: 58, light: 0.52 }, ENV_END = { sky: new THREE.Color(0x07040f), near: 20, far: 80, light: 0.48 };
+  const ENV_SIFT = { sky: new THREE.Color(0x43110a), near: 8, far: 64, light: 0.52 }, ENV_END = { sky: new THREE.Color(0x07040f), near: 20, far: 80, light: 0.48 };
   function daylight(dt) {
     tod = (tod + dt / DAY) % 1;
     const a = tod * Math.PI * 2;
@@ -4046,6 +4185,13 @@
     return 'Teleported to ' + x.toFixed(1) + ' ' + y.toFixed(1) + ' ' + z.toFixed(1);
   }, function (i) { return i === 1 ? ['spawn'] : []; });
   defCmd(['pos'], '/pos', 'Show where you are', function () { return 'You are at ' + player.x.toFixed(1) + ' ' + player.y.toFixed(1) + ' ' + player.z.toFixed(1); });
+  defCmd(['dim', 'dimension'], '/dim <overworld|sift|end>', 'Travel to another dimension', function (a) {
+    const d = (a[0] || '').toLowerCase();
+    if (d !== 'overworld' && d !== 'sift' && d !== 'end') throw new Error('Usage: /dim overworld, /dim sift or /dim end');
+    if (d === dimension) return 'You are already in ' + DIM_NAME[dimension];
+    enterDimension(d);
+    return 'Entering ' + DIM_NAME[dimension];
+  }, function (i) { return i === 1 ? ['overworld', 'sift', 'end'] : []; });
   defCmd(['seed'], '/seed', 'Show the world seed', function () { return 'Seed: ' + seed; });
   defCmd(['spawn', 'summon'], '/spawn <creature> [count]', 'Spawn creatures in front of you', function (a) {
     if (!a[0]) throw new Error('Usage: /spawn <creature> [count]. Creatures: ' + mobNames().join(', '));
@@ -4077,7 +4223,7 @@
     const sel = { hostile: function (m) { return m.hostile; }, passive: function (m) { return !m.hostile && !m.golem && m.kind !== 'villager'; }, villagers: function (m) { return m.kind === 'villager'; }, golems: function (m) { return m.golem; }, all: function () { return true; } }[what];
     if (!sel) throw new Error('Usage: /kill [hostile|passive|villagers|golems|all|me]');
     let n = 0;
-    for (let i = mobs.length - 1; i >= 0; i--) if (sel(mobs[i])) { removeMobAt(i); n++; }
+    for (let i = mobs.length - 1; i >= 0; i--) if (sel(mobs[i])) { if (mobs[i].kind === 'dragon') killMob(mobs[i]); else removeMobAt(i); n++; }
     return 'Removed ' + n + ' creature' + (n === 1 ? '' : 's');
   }, function () { return ['hostile', 'passive', 'villagers', 'golems', 'all', 'me']; });
   defCmd(['setblock'], '/setblock <x> <y> <z> <block|air>', 'Place a single block', function (a) {
@@ -4311,6 +4457,7 @@
     mode = m.mode || 'creative';
     difficulty = DIFF[m.difficulty] ? m.difficulty : 'normal';
     spawnPoint = m.spawn || null; omen = !!m.omen; dragonDefeated = !!m.dragonDefeated;
+    if (dimension === 'end') { if (dragonDefeated) ensureEndExit(); else spawnDragonFight(); }   // the dragon waits for you in The End
     if (m.weather && WEATHER_LABEL[m.weather.w]) { weather = m.weather.w; weatherT = m.weather.t || 300; rainLevel = m.weather.r || 0; }
     else { weather = 'clear'; weatherT = 420; rainLevel = 0; }
     rainTarget = weather === 'clear' ? 0 : (weather === 'rain' ? 0.75 : 1); updateWeatherUI();

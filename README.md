@@ -33,6 +33,16 @@ Open the game in your browser. If the link does not open, visit the repository's
 
 You can also choose a difficulty before starting!
 
+## 🌀 Three Dimensions to Explore
+
+| Dimension | How to get there | What you will find |
+|:---|:---|:---|
+| 🌍 **Overworld** | Where every world begins | Fields, forests, villages, ores and raids. |
+| 🔥 **The Sift** | Build an obsidian frame at least 2 blocks wide and 3 tall, light the inside with flint & steel, and step through | A deep red cavern of siftrock and sift sand, a sea of lava, glowing lumenite on the ceiling, ember ore, floating wisps, cinder husks and the Sift citadel. One step in the Sift equals eight steps in the Overworld. |
+| 🌌 **The End** | Craft 12 void eyes (a wisp tear + an ember shard each), place them into the 12 frames of a void gateway, and jump in | A floating island of end stone under a dark sky, obsidian pillars, and the Dragon. Beat it and a dragon egg and a portal home appear on the island. |
+
+Flint & steel is crafted from gravel and cobblestone. Void eyes can also be bought from a cleric villager. Want a shortcut? Type `/dim sift` or `/dim end` in the command bar.
+
 ## ✨ What Can You Do?
 
 - 🌍 Explore a 3D block world.
