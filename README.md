@@ -1,64 +1,96 @@
-# MauriceCraft
+# 🌈 MauriceCraft
 
-A browser-based, block-building adventure game inspired by Minecraft. MauriceCraft is being made so middle school students can play and explore on a home computer or school Chromebook.
+> 🧱 **Build. Explore. Create your own adventure!**
 
-## Play
+MauriceCraft is a browser-based, 3D block-building adventure inspired by Minecraft. It is being made so middle school students can play, build, and explore on a home computer or school Chromebook.
 
-Open the game in your browser:
+<p align="center">
+  <a href="https://mauricecraft.github.io/MauriceCraft/">
+    <img src="https://img.shields.io/badge/▶%20PLAY-MauriceCraft-7c3aed?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Play MauriceCraft">
+  </a>
+  <img src="https://img.shields.io/badge/🎮-4%20Game%20Modes-16a34a?style=for-the-badge" alt="Four game modes">
+  <img src="https://img.shields.io/badge/💻-Chromebook%20Friendly-2563eb?style=for-the-badge" alt="Chromebook friendly">
+</p>
 
-**[Play MauriceCraft](https://mauricecraft.github.io/MauriceCraft/)**
+---
 
-If that link does not open, visit the repository's **Settings → Pages** to check whether GitHub Pages is enabled and confirm its published URL.
+## 🚀 Play MauriceCraft
 
-## Game modes
+Ready to jump in?
 
-Choose a mode when you start a world:
+### [🟣 CLICK HERE TO PLAY](https://mauricecraft.github.io/MauriceCraft/)
 
-- **Creative** — build and experiment freely.
-- **Survival** — explore while keeping track of your health and food.
-- **Adventure** — play with objectives.
-- **Spectator** — explore the world without the usual building gameplay.
+Open the game in your browser. If the link does not open, visit the repository's **Settings → Pages** to check whether GitHub Pages is enabled and confirm its published URL.
 
-You can also choose a difficulty before starting.
+## 🕹️ Choose Your Game Mode
 
-## What you can do
+| Mode | Your adventure |
+|:---|:---|
+| 🟢 **Creative** | Build and experiment freely. |
+| ❤️ **Survival** | Explore while keeping track of your health and food. |
+| 🟡 **Adventure** | Play with objectives to complete. |
+| 👻 **Spectator** | Explore the world without the usual building gameplay. |
 
-- Explore a 3D block world.
-- Break blocks and place blocks to build.
-- Collect items and manage your inventory and hotbar.
-- Use the crafting menu to make items from recipes.
-- Meet villagers and use the trading menu.
-- Visit portals and explore different areas.
-- Create and load worlds. Worlds are saved in your browser when local storage is available.
-- Play with touch controls on supported touchscreen devices.
+You can also choose a difficulty before starting!
 
-## Controls
+## ✨ What Can You Do?
 
-The game includes on-screen touch controls for moving, jumping, placing blocks, flying, opening your bag, and opening the command bar.
+- 🌍 Explore a 3D block world.
+- ⛏️ Break blocks and place blocks to build.
+- 🎒 Collect items and manage your inventory and hotbar.
+- 🛠️ Use crafting recipes to make items.
+- 🧑‍🌾 Meet villagers and use the trading menu.
+- 🌀 Visit portals and explore different areas.
+- 💾 Create and load worlds. Worlds are saved in your browser when local storage is available.
+- 📱 Use touch controls on supported touchscreen devices.
 
-On a computer, use the keyboard and mouse. The game displays shortcut hints in its menus (for example, **I** for inventory, **C** for crafting, and **E** for villager trading).
+## 🎮 Controls
 
-Type `/help` in the command bar to see available commands.
+**On a computer:** use your keyboard and mouse. Shortcut hints also appear in the game menus.
 
-## Chromebook tips
+| Key | Action |
+|:---:|:---|
+| **W A S D** | Move |
+| **Space** | Jump |
+| **Mouse** | Look around |
+| **Left click / Q** | Break a block |
+| **Right click / E** | Place a block or use the selected item |
+| **I / Tab** | Open inventory |
+| **C** | Open crafting |
+| **M** | Mute or unmute sound |
+| **T or /** | Open the command bar |
+| **Esc** | Pause the game |
 
-- Open the game in an up-to-date browser such as Chrome.
-- Close extra tabs if the game feels slow.
-- Allow the page to finish loading before starting a world.
-- Your saved worlds are stored in that browser on that device. Clearing browser site data may erase them, so do not clear it if you want to keep your worlds.
+💡 Type `/help` in the command bar to see available commands.
 
-## About this project
+**On a touchscreen:** use the on-screen controls for moving, jumping, placing blocks, flying, opening your bag, and opening the command bar.
+
+## 💻 Chromebook Tips
+
+- 🌐 Open the game in an up-to-date browser such as Chrome.
+- 🧹 Close extra tabs if the game feels slow.
+- ⏳ Let the world finish loading before starting.
+- 💾 Your worlds are saved in the browser on that device. Clearing browser site data may erase them, so keep that in mind before clearing it.
+
+## 🧩 About This Project
 
 MauriceCraft is an independent learning and game project. It is inspired by block-building games and is not affiliated with or endorsed by Mojang or Microsoft.
 
-## Built with
+## ⚙️ Built With
 
-- HTML, CSS, and JavaScript
-- [Three.js](https://threejs.org/) for 3D graphics
-- Browser storage for saved worlds
+- 🟧 HTML
+- 🟦 CSS
+- 🟨 JavaScript
+- 🎨 [Three.js](https://threejs.org/) for 3D graphics
+- 💾 Browser storage for saved worlds
 
-## Feedback
+## 🐛 Ideas, Bugs, or Feedback?
 
-Found a bug or have an idea? Open an issue in this GitHub repository and describe what happened, what you expected, and which browser/device you were using.
+Have an idea or found a bug? Open an issue in this GitHub repository. Tell us what happened, what you expected, and which browser or device you were using.
 
-Have fun building!
+---
+
+<p align="center">
+  <strong>🌟 Thanks for checking out MauriceCraft! 🌟</strong><br>
+  <em>Have fun building, exploring, and creating!</em>
+</p>
