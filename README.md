@@ -43,15 +43,26 @@ You can also choose a difficulty before starting!
 
 Flint & steel is crafted from gravel and cobblestone. Void eyes can also be bought from a cleric villager. Want a shortcut? Type `/dim sift` or `/dim end` in the command bar.
 
+## 💎 Siftite: The Sift's Own Mineral
+
+Deep in the Sift, siftite ore hides inside the walls of the cavern. It is the strongest crafting material in the game — even stronger than diamond. Mine it with a diamond pickaxe (or better) to collect siftite gems, then craft:
+
+- ⚒️ **Siftite tools** — a pickaxe, axe, sword and shovel that outlast and out-damage every other tier.
+- 🛡️ **Siftite armor** — craft a helmet, chestplate, leggings and boots in the crafting table and equip them from your inventory. Full siftite armor cuts incoming damage by up to 80%.
+- 🧱 **Siftite blocks** — nine siftite gems craft a decorative block, and a block breaks back into nine gems.
+
+Armor comes in leather, iron, diamond and siftite tiers, each with a different amount of protection. Equipped armor shows up as a cyan diamond bar above your hearts, and it gradually wears out as you take hits.
+
 ## ✨ What Can You Do?
 
 - 🌍 Explore a 3D block world.
 - ⛏️ Break blocks and place blocks to build.
 - 🎒 Collect items and manage your inventory and hotbar.
-- 🛠️ Use crafting recipes to make items.
+- 🛠️ Use crafting recipes to make items, tools, blocks and armor.
 - 🧑‍🌾 Meet villagers and use the trading menu.
 - 🌀 Visit portals and explore different areas.
-- 💾 Create and load worlds. Worlds are saved in your browser when local storage is available.
+- 🌱 Type a seed before creating a world to get the exact same world every time you use that seed. Type `/seed` to see the seed of the world you are in.
+- 💾 Create and load worlds. Worlds are saved in your browser when local storage is available. Your inventory, armor, position and dimension are all remembered when you save and reload.
 - 📱 Use touch controls on supported touchscreen devices.
 
 ## 🎮 Controls

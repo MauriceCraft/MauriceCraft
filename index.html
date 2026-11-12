@@ -83,6 +83,15 @@
   .heart.full { color: #e8363b; }
   .heart.half { color: #e8363b; opacity: .5; }
   .heart.empty { color: #4a525b; }
+  #armorbar {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 74px); transform: translateX(-50%);
+    display: none; gap: 2px; padding: 4px 8px; background: var(--panel); border: 2px solid var(--panel-edge);
+    font-size: 22px; line-height: 1; pointer-events: none;
+  }
+  #armorbar.raised { bottom: calc(env(safe-area-inset-bottom, 0px) + 136px); }
+  .arm.full { color: #4fe3e8; }
+  .arm.half { color: #4fe3e8; opacity: .5; }
+  .arm.empty { color: #4a525b; }
   #hotbar {
     position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); transform: translateX(-50%);
     display: flex; gap: 4px; padding: 4px; background: var(--panel); border: 2px solid var(--panel-edge);
@@ -195,6 +204,7 @@
   #btnInv { right: 26px; bottom: calc(env(safe-area-inset-bottom, 0px) + 196px); width: 48px; height: 48px; font-size: 13px; }
   .btn:focus-visible, .itile:focus-visible, .slot:focus-visible, .mode:focus-visible, .dmode:focus-visible, .wmode:focus-visible, #touchui button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
   #hearts { left: calc(50% - 4px); transform: translateX(-100%); }
+  #seedInput { width: min(220px, 60vw); box-sizing: border-box; font-family: var(--font); font-size: 16px; padding: 8px 10px; background: rgba(0, 0, 0, 0.4); color: var(--text); border: 2px solid var(--panel-edge); outline: none; }
   #food { position: fixed; left: calc(50% + 4px); bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: none; gap: 2px; padding: 4px 8px; background: var(--panel); border: 2px solid var(--panel-edge); font-size: 18px; line-height: 1.25; pointer-events: none; }
   #food.raised { bottom: calc(env(safe-area-inset-bottom, 0px) + 74px); }
   .food.half { opacity: .55; }
@@ -203,10 +213,12 @@
     #hearts { left: 50%; transform: translateX(-50%); }
     #food { left: 50%; transform: translateX(-50%); }
     #hearts.raised { bottom: calc(env(safe-area-inset-bottom, 0px) + 112px); }
+    #armorbar.raised { bottom: calc(env(safe-area-inset-bottom, 0px) + 174px); }
   }
   @media (max-width: 520px) {
     #food.raised { bottom: calc(env(safe-area-inset-bottom, 0px) + 62px); }
     #hearts.raised { bottom: calc(env(safe-area-inset-bottom, 0px) + 98px); }
+    #armorbar.raised { bottom: calc(env(safe-area-inset-bottom, 0px) + 160px); }
   }
 </style>
 </head>
@@ -227,6 +239,7 @@
 <div id="chatlog" aria-live="polite"></div>
 <div id="cmdbar" class="hidden"><input id="cmdinput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type a command, e.g. /help" aria-label="Command line"></div>
 <div id="hearts"></div>
+<div id="armorbar"></div>
 <div id="food"></div>
 <div id="hotbar"></div>
 
@@ -324,9 +337,13 @@
       <button class="btn ghost small" id="sfxBtn" type="button">Sound: On</button>
       <button class="btn ghost small" id="musicBtn" type="button">Music: On</button>
     </div>
+    <div class="row" style="gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap;">
+      <label for="seedInput" style="font-size: 14px;">Seed</label>
+      <input id="seedInput" type="text" placeholder="Optional: same seed, same world" aria-label="Seed for a new world" autocomplete="off">
+      <button class="btn ghost" id="newworld" type="button" disabled>New world</button>
+    </div>
     <div class="row">
       <button class="btn" id="play" type="button" disabled>Loading…</button>
-      <button class="btn ghost" id="newworld" type="button" disabled>New world</button>
     </div>
   </div>
 </div>
@@ -368,7 +385,8 @@
   const BEEF = 101, PORK = 102, MUTTON = 103, CHICKEN = 104, COOKED = 105, WOOL = 106, FEATHER = 107, LEATHER = 108, GUNPOWDER = 109, DYNAMITE = 110, FLINT = 111, EMERALD = 112, BONE = 113, STRING = 114, STICK = 115;
   const SIFTROCK = 34, SIFT_SAND = 35, LUMENITE = 36, EMBER_ORE = 37, OBSIDIAN = 38, LAVA = 39, PORTAL = 40, SIFTBRICK = 41;
   const VOID_FRAME = 42, VOID_FRAME_EYE = 43, END_PORTAL = 44, END_STONE = 45, DRAGON_EGG = 46;
-  const EMBER_SHARD = 156, WISP_TEAR = 157, VOID_EYE = 158;
+  const SIFTITE_ORE = 47, SIFTITE_BLOCK = 48;
+  const EMBER_SHARD = 156, WISP_TEAR = 157, VOID_EYE = 158, SIFTITE = 161;
   const COAL = 116, RAW_COPPER = 117, RAW_IRON = 118, COPPER_INGOT = 119, IRON_INGOT = 151, DIAMOND = 152;
   const ITEM_TILE = { 101: 21, 102: 22, 103: 23, 104: 24, 105: 25, 106: 26, 107: 27, 108: 28, 109: 29, 110: 30, 111: 31, 112: 34, 113: 35, 114: 36, 115: 40, 19: 67, 116: 75, 117: 76, 118: 77, 119: 78, 151: 79, 152: 80, 120: 41, 121: 42, 122: 43, 123: 44, 124: 45, 125: 46, 126: 47, 127: 48, 128: 49 };
   // Spawn eggs: item id -> creature
@@ -380,10 +398,11 @@
     10: [11, 11, 11], 11: [13, 12, 13], 12: [14, 14, 14], 13: [16, 15, 16], 14: [17, 17, 17], 15: [18, 18, 18], 16: [19, 20, 19], 17: [37, 37, 37], 18: [38, 39, 8],
     27: [68, 68, 68], 28: [69, 69, 69], 29: [70, 70, 70], 30: [71, 71, 71], 31: [72, 72, 72], 32: [73, 73, 73], 33: [74, 74, 74],
     34: [92, 92, 92], 35: [93, 93, 93], 36: [94, 94, 94], 37: [95, 95, 95], 38: [96, 96, 96], 39: [97, 97, 97], 40: [98, 98, 98], 41: [99, 99, 99],
-    42: [100, 101, 101], 43: [102, 101, 101], 44: [103, 103, 103], 45: [104, 104, 104], 46: [105, 105, 105]
+    42: [100, 101, 101], 43: [102, 101, 101], 44: [103, 103, 103], 45: [104, 104, 104], 46: [105, 105, 105],
+    47: [111, 111, 111], 48: [112, 112, 112]
   };
   const tileOf = b => TILES[b] ? TILES[b][1] : ITEM_TILE[b];
-  const ATLAS_N = 128;   // tiles across the texture atlas
+  const ATLAS_N = 160;   // tiles across the texture atlas
   // Torches are see-through and walk-through; everything else non-empty is solid
   const isBed = b => b >= 19 && b <= 26;                        // 19 + facing * 2 + (head ? 1 : 0)
   const BED_H = 0.5625;                                         // beds are only a little over half a block tall
@@ -391,20 +410,20 @@
   const isFluid = b => b === 39 || b === 40 || b === 44;      // lava and the two portals: see-through and walk-through
   const solid = b => b !== 0 && b !== TORCH && !isFluid(b);
   const opq = b => b !== 0 && b !== TORCH && !isFluid(b) && !(b >= 19 && b <= 26);
-  const NAMES = { 1: 'Grass', 2: 'Dirt', 3: 'Stone', 4: 'Sand', 5: 'Log', 6: 'Leaves', 7: 'Planks', 8: 'Brick', 9: 'Cobblestone', 10: 'Stone Brick', 11: 'Sandstone', 12: 'Gravel', 13: 'Hay Bale', 14: 'Gold Block', 15: 'Mossy Cobble', 16: 'TNT', 17: 'Torch', 18: 'Crafting Table', 19: 'Bed', 27: 'Coal Ore', 28: 'Copper Ore', 29: 'Iron Ore', 30: 'Diamond Ore', 31: 'Iron Block', 32: 'Copper Block', 33: 'Diamond Block', 34: 'Siftrock', 35: 'Sift Sand', 36: 'Lumenite', 37: 'Ember Ore', 38: 'Obsidian', 39: 'Lava', 40: 'Sift Portal', 41: 'Siftbrick', 42: 'Void Frame', 43: 'Void Frame (Eye)', 44: 'End Portal', 45: 'End Stone', 46: 'Dragon Egg',
-    101: 'Raw Beef', 102: 'Raw Pork', 103: 'Raw Mutton', 104: 'Raw Chicken', 105: 'Cooked Meat', 106: 'Wool', 107: 'Feather', 108: 'Leather', 109: 'Gunpowder', 110: 'Dynamite', 111: 'Flint & Steel', 112: 'Emerald', 113: 'Bone', 114: 'String', 115: 'Stick', 116: 'Coal', 117: 'Raw Copper', 118: 'Raw Iron', 119: 'Copper Ingot', 151: 'Iron Ingot', 152: 'Diamond', 156: 'Ember Shard', 157: 'Wisp Tear', 158: 'Void Eye',
+  const NAMES = { 1: 'Grass', 2: 'Dirt', 3: 'Stone', 4: 'Sand', 5: 'Log', 6: 'Leaves', 7: 'Planks', 8: 'Brick', 9: 'Cobblestone', 10: 'Stone Brick', 11: 'Sandstone', 12: 'Gravel', 13: 'Hay Bale', 14: 'Gold Block', 15: 'Mossy Cobble', 16: 'TNT', 17: 'Torch', 18: 'Crafting Table', 19: 'Bed', 27: 'Coal Ore', 28: 'Copper Ore', 29: 'Iron Ore', 30: 'Diamond Ore', 31: 'Iron Block', 32: 'Copper Block', 33: 'Diamond Block', 34: 'Siftrock', 35: 'Sift Sand', 36: 'Lumenite', 37: 'Ember Ore', 38: 'Obsidian', 39: 'Lava', 40: 'Sift Portal', 41: 'Siftbrick', 42: 'Void Frame', 43: 'Void Frame (Eye)', 44: 'End Portal', 45: 'End Stone', 46: 'Dragon Egg', 47: 'Siftite Ore', 48: 'Siftite Block',
+    101: 'Raw Beef', 102: 'Raw Pork', 103: 'Raw Mutton', 104: 'Raw Chicken', 105: 'Cooked Meat', 106: 'Wool', 107: 'Feather', 108: 'Leather', 109: 'Gunpowder', 110: 'Dynamite', 111: 'Flint & Steel', 112: 'Emerald', 113: 'Bone', 114: 'String', 115: 'Stick', 116: 'Coal', 117: 'Raw Copper', 118: 'Raw Iron', 119: 'Copper Ingot', 151: 'Iron Ingot', 152: 'Diamond', 156: 'Ember Shard', 157: 'Wisp Tear', 158: 'Void Eye', 161: 'Siftite',
     120: 'Cow Spawn Egg', 121: 'Pig Spawn Egg', 122: 'Sheep Spawn Egg', 123: 'Chicken Spawn Egg', 124: 'Villager Spawn Egg', 125: 'Zombie Spawn Egg', 126: 'Creeper Spawn Egg', 127: 'Skeleton Spawn Egg', 128: 'Spider Spawn Egg' };
   const ALL_BLOCKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 120, 121, 122, 123, 124, 125, 126, 127, 128];   // blocks first, then items (tools are appended below)
   const hotbar = ALL_BLOCKS.slice(0, 9);   // which block sits in each hotbar slot (editable from the inventory)
   // Survival: seconds to break, and what a block drops
   const BREAK_TIME = { 1: 0.6, 2: 0.5, 3: 2.2, 4: 0.5, 5: 1.3, 6: 0.25, 7: 1.0, 8: 2.4, 9: 2.2, 10: 2.4, 11: 1.2, 12: 0.6, 13: 0.5, 14: 2.0, 15: 2.2, 16: 0.3, 17: 0.1, 18: 1.2 };
   for (let bi = 19; bi <= 26; bi++) BREAK_TIME[bi] = 0.4;
-  Object.assign(BREAK_TIME, { 27: 2.6, 28: 3, 29: 3.2, 30: 4.2, 31: 4, 32: 3.5, 33: 5, 34: 1.2, 35: 0.6, 36: 0.8, 37: 2.8, 38: 9, 39: 1, 40: 1, 41: 2.4, 42: 5000, 43: 5000, 44: 1, 45: 2.4, 46: 3 });
-  const DROPS = { 1: 2, 3: 9, 27: COAL, 28: RAW_COPPER, 29: RAW_IRON, 30: DIAMOND, 37: EMBER_SHARD };
+  Object.assign(BREAK_TIME, { 27: 2.6, 28: 3, 29: 3.2, 30: 4.2, 31: 4, 32: 3.5, 33: 5, 34: 1.2, 35: 0.6, 36: 0.8, 37: 2.8, 38: 9, 39: 1, 40: 1, 41: 2.4, 42: 5000, 43: 5000, 44: 1, 45: 2.4, 46: 3, 47: 5.6, 48: 6 });
+  const DROPS = { 1: 2, 3: 9, 27: COAL, 28: RAW_COPPER, 29: RAW_IRON, 30: DIAMOND, 37: EMBER_SHARD, 47: SIFTITE };
   // Tools. Tool ids run 130..141: tier * 4 + kind.
-  const TOOL_KINDS = ['pickaxe', 'axe', 'shovel', 'sword'], TOOL_TIERS = ['Wooden', 'Stone', 'Emerald', 'Iron', 'Diamond'];
-  const toolId = (ti, ki) => ti < 3 ? 130 + ti * 4 + ki : 143 + (ti - 3) * 4 + ki;
-  const toolTile = (ti, ki) => ti < 3 ? 50 + ti * 4 + ki : 81 + (ti - 3) * 4 + ki;
+  const TOOL_KINDS = ['pickaxe', 'axe', 'shovel', 'sword'], TOOL_TIERS = ['Wooden', 'Stone', 'Emerald', 'Iron', 'Diamond', 'Siftite'];
+  const toolId = (ti, ki) => ti < 3 ? 130 + ti * 4 + ki : (ti < 5 ? 143 + (ti - 3) * 4 + ki : 162 + ki);
+  const toolTile = (ti, ki) => ti < 3 ? 50 + ti * 4 + ki : (ti < 5 ? 81 + (ti - 3) * 4 + ki : 114 + ki);
   const TOOLS = {}, TOOL_IDS = [], toolWear = {};
   TOOL_TIERS.forEach(function (tn, ti) {
     TOOL_KINDS.forEach(function (k, ki) {
@@ -416,21 +435,47 @@
   ALL_BLOCKS.push.apply(ALL_BLOCKS, TOOL_IDS);
   EGG_KINDS[129] = 'pillager'; EGG_KINDS[142] = 'vindicator'; EGG_KINDS[153] = 'irongolem'; EGG_KINDS[154] = 'coppergolem'; EGG_KINDS[155] = 'diamondgolem';
   NAMES[129] = 'Pillager Spawn Egg'; NAMES[142] = 'Vindicator Spawn Egg'; NAMES[153] = 'Iron Golem Spawn Egg'; NAMES[154] = 'Copper Golem Spawn Egg'; NAMES[155] = 'Diamond Golem Spawn Egg';
-  ITEM_TILE[156] = 106; ITEM_TILE[157] = 107; ITEM_TILE[158] = 108; ITEM_TILE[159] = 109; ITEM_TILE[160] = 110;
+  ITEM_TILE[156] = 106; ITEM_TILE[157] = 107; ITEM_TILE[158] = 108; ITEM_TILE[159] = 109; ITEM_TILE[160] = 110; ITEM_TILE[161] = 113;
   ITEM_TILE[129] = 64; ITEM_TILE[142] = 65; ITEM_TILE[153] = 89; ITEM_TILE[154] = 90; ITEM_TILE[155] = 91;
   EGG_KINDS[159] = 'cinderhusk'; EGG_KINDS[160] = 'wisp';
   NAMES[159] = 'Cinder Husk Spawn Egg'; NAMES[160] = 'Wisp Spawn Egg';
   ALL_BLOCKS.push(129, 142, 153, 154, 155, 159, 160);
   ALL_BLOCKS.push(34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 156, 157, 158);   // The Sift and The End
+  ALL_BLOCKS.push(47, 48, 161);   // siftite ore, siftite block, siftite gem
   ALL_BLOCKS.push(27, 28, 29, 30, 31, 32, 33, 116, 117, 118, 119, 151, 152);   // ores, metal blocks, ore items
-  const TOOL_MAX = [40, 90, 400, 250, 800];             // uses before a tool breaks
-  const TOOL_LVL = [0, 1, 2, 2, 3];                     // mining level per tier
-  const TOOL_SPD = [2.4, 4, 6.5, 5.5, 8];               // mining speed per tier
-  const TOOL_DMG = { sword: [6, 8, 12, 9, 14], axe: [5, 7, 10, 8, 12], pickaxe: [4, 6, 8, 6, 9], shovel: [4, 5, 7, 5, 8] };
+  // Armor: four pieces per tier. ids 166..181.
+  const ARMOR_SLOTS = ['head', 'chest', 'legs', 'feet'];
+  const ARMOR_PIECES = [['Helmet', 'head'], ['Chestplate', 'chest'], ['Leggings', 'legs'], ['Boots', 'feet']];
+  const ARMOR_TIERS = [
+    ['Leather', LEATHER, [1, 3, 2, 1], 90],
+    ['Iron', IRON_INGOT, [2, 6, 5, 2], 260],
+    ['Diamond', DIAMOND, [3, 8, 6, 3], 560],
+    ['Siftite', SIFTITE, [4, 9, 7, 4], 1200]
+  ];
+  const ARMOR = {}, ARMOR_IDS = [];
+  ARMOR_TIERS.forEach(function (T, ti) {
+    ARMOR_PIECES.forEach(function (P, pi) {
+      const id = 166 + ti * 4 + pi;
+      ARMOR[id] = { slot: P[1], tier: ti, def: T[2][pi], max: T[3] };
+      NAMES[id] = T[0] + ' ' + P[0]; ITEM_TILE[id] = 118 + ti * 4 + pi;
+      ARMOR_IDS.push(id);
+    });
+  });
+  ALL_BLOCKS.push.apply(ALL_BLOCKS, ARMOR_IDS);
+  let armor = { head: 0, chest: 0, legs: 0, feet: 0 };   // the armor you are wearing (item ids)
+  function armorPts() {
+    let p = 0;
+    ARMOR_SLOTS.forEach(function (sl) { if (armor[sl]) p += ARMOR[armor[sl]].def; });
+    return p;
+  }
+  const TOOL_MAX = [40, 90, 400, 250, 800, 1600];        // uses before a tool breaks
+  const TOOL_LVL = [0, 1, 2, 2, 3, 4];                   // mining level per tier
+  const TOOL_SPD = [2.4, 4, 6.5, 5.5, 8, 11];            // mining speed per tier
+  const TOOL_DMG = { sword: [6, 8, 12, 9, 14, 18], axe: [5, 7, 10, 8, 12, 15], pickaxe: [4, 6, 8, 6, 9, 11], shovel: [4, 5, 7, 5, 8, 9] };
   // blocks that only drop with a pickaxe of at least this level
-  const NEEDS_PICK = { 3: 0, 8: 0, 9: 0, 10: 0, 11: 0, 15: 0, 14: 1, 27: 0, 28: 1, 29: 1, 30: 2, 31: 1, 32: 1, 33: 2, 37: 0, 38: 3 };
+  const NEEDS_PICK = { 3: 0, 8: 0, 9: 0, 10: 0, 11: 0, 15: 0, 14: 1, 27: 0, 28: 1, 29: 1, 30: 2, 31: 1, 32: 1, 33: 2, 37: 0, 38: 3, 47: 3, 48: 3 };
   function blockKind(b) {
-    if (b === 3 || b === 8 || b === 9 || b === 10 || b === 11 || b === 14 || b === 15 || (b >= 27 && b <= 33) || b === 34 || b === 37 || b === 38 || b === 41 || b === 45 || b === 46) return 'pickaxe';
+    if (b === 3 || b === 8 || b === 9 || b === 10 || b === 11 || b === 14 || b === 15 || (b >= 27 && b <= 33) || b === 34 || b === 37 || b === 38 || b === 41 || b === 45 || b === 46 || b === 47 || b === 48) return 'pickaxe';
     if (b === 5 || b === 6 || b === 7 || b === 13 || b === 18) return 'axe';
     if (b === 1 || b === 2 || b === 4 || b === 12 || b === 35) return 'shovel';
     return null;
@@ -467,7 +512,7 @@
   /* ---------- Texture atlas ---------- */
   function makeAtlas() {
     const c = document.createElement('canvas');
-    c.width = 2048; c.height = 16;
+    c.width = 2560; c.height = 16;
     const g = c.getContext('2d');
     const rnd = mulberry32(7);
     const GLYPH = { T: [7, 2, 2, 2, 2], N: [5, 7, 7, 5, 5] };
@@ -594,8 +639,8 @@
       }
       R(t, 5, 4, 2, 1, 'rgba(255,255,255,0.75)'); R(t, 5, 5, 1, 1, 'rgba(255,255,255,0.5)');
     });
-    const TIER_COL = [['#b58d52', '#8a6a3c'], ['#a9a9a9', '#7a7a7a'], ['#35e08a', '#1a9a52'], ['#e4e4e8', '#9a9aa2'], ['#4fe3e8', '#1a9ca0']];
-    for (let ti = 0; ti < 5; ti++) for (let ki = 0; ki < 4; ki++) {
+    const TIER_COL = [['#b58d52', '#8a6a3c'], ['#a9a9a9', '#7a7a7a'], ['#35e08a', '#1a9a52'], ['#e4e4e8', '#9a9aa2'], ['#4fe3e8', '#1a9ca0'], ['#66f0dc', '#159e8c']];
+    for (let ti = 0; ti < 6; ti++) for (let ki = 0; ki < 4; ki++) {
       const t = toolTile(ti, ki), hc = TIER_COL[ti][0], hd = TIER_COL[ti][1];
       const handle = function (x0, y0, x1, y1) {
         const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
@@ -606,6 +651,30 @@
       else if (ki === 2) { handle(2, 14, 10, 6); R(t, 9, 2, 4, 5, hc); R(t, 10, 1, 2, 1, hc); R(t, 9, 6, 4, 1, hd); }
       else { handle(2, 14, 5, 11); R(t, 3, 9, 5, 1, '#6b4f2e'); for (let i = 0; i < 8; i++) { R(t, 6 + i, 9 - i, 2, 1, hc); R(t, 8 + i, 9 - i, 1, 1, hd); } }
     }
+    // Armor icons: tiles 118-133, four tiers (leather, iron, diamond, siftite) x four pieces
+    const ARMOR_COL = [['#a5692f', '#7c4a1d', '#c98a4a'], ['#d8d8dc', '#8d8d94', '#f6f6fa'], ['#4fe3e8', '#1a9ca0', '#b6fbfd'], ['#66f0dc', '#159e8c', '#d2fff5']];
+    ARMOR_COL.forEach(function (cc, ti) {
+      for (let k = 0; k < 4; k++) {
+        const t = 118 + ti * 4 + k, hc = cc[0], hd = cc[1], hl = cc[2];
+        const sp = (x, y) => hash2(x, y, t) < 0.3;
+        if (k === 0) {          // helmet
+          for (let y = 3; y <= 9; y++) for (let x = 4; x <= 11; x++) { if (y === 3 && (x < 5 || x > 10)) continue; R(t, x, y, 1, 1, sp(x, y) ? hl : hc); }
+          R(t, 4, 7, 8, 2, hd); R(t, 5, 7, 2, 2, '#22242a'); R(t, 9, 7, 2, 2, '#22242a');
+        } else if (k === 1) {   // chestplate
+          for (let y = 3; y <= 12; y++) for (let x = 4; x <= 11; x++) { if (y === 3 && (x < 6 || x > 9)) continue; if (y === 4 && (x === 7 || x === 8)) continue; R(t, x, y, 1, 1, sp(x, y) ? hl : hc); }
+          R(t, 3, 3, 2, 4, hd); R(t, 11, 3, 2, 4, hd); R(t, 7, 5, 2, 2, hd);
+        } else if (k === 2) {   // leggings
+          R(t, 4, 3, 8, 2, hc); R(t, 5, 5, 6, 2, hc); R(t, 7, 5, 2, 2, hd);
+          for (let y = 7; y <= 12; y++) { R(t, 5, y, 2, 1, sp(5, y) ? hl : hc); R(t, 9, y, 2, 1, sp(9, y) ? hl : hc); }
+          R(t, 6, 12, 1, 1, hd); R(t, 10, 12, 1, 1, hd);
+        } else {                // boots
+          [3, 9].forEach(function (bx) {
+            for (let y = 9; y <= 12; y++) for (let x = bx; x <= bx + 3; x++) R(t, x, y, 1, 1, y === 12 ? hd : (sp(x, y) ? hl : hc));
+            R(t, bx, 9, 1, 3, hd); R(t, bx + 3, 9, 1, 3, hd);
+          });
+        }
+      }
+    });
     for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
       const bn = hash2(x, y, 62) * 14 - 7, red = 'rgb(' + ((196 + bn) | 0) + ',' + ((44 + bn) | 0) + ',' + ((44 + bn) | 0) + ')';
       R(62, x, y, 1, 1, (x === 0 || x === 15 || y === 0 || y === 15) ? '#7a1414' : red);
@@ -666,6 +735,10 @@
       R(103, x, y, 1, 1, n3 < 0.06 ? '#9ff6ff' : (n3 < 0.1 ? '#6a8cff' : rgb(8 + (n1 - 0.5) * 6, 6, 18)));
       R(104, x, y, 1, 1, n3 < 0.18 ? '#c9c58a' : rgb(222 + (n1 - 0.5) * 14, 224 + (n1 - 0.5) * 12, 168 + (n1 - 0.5) * 18));
       R(105, x, y, 1, 1, ((x * 3 + y * 2) % 11 === 0) ? '#c04cff' : rgb(16 + (n1 - 0.5) * 10, 8, 26 + (n1 - 0.5) * 12));
+      const spotS = hash2(x >> 1, y >> 1, 311) < 0.3 && n3 < 0.85;
+      R(111, x, y, 1, 1, spotS ? (n1 < 0.5 ? '#35e0c0' : '#bffcf0') : (n2 < 0.2 ? rgb(64 + kk * 0.5, 18, 20) : rgb(108 + kk, 33 + kk * 0.4, 35 + kk * 0.4)));
+      R(112, x, y, 1, 1, ((x * 3 + y * 2) % 7 === 0) ? '#3ce8c8' : rgb(30 + (n1 - 0.5) * 12, 20, 44 + (n1 - 0.5) * 16));
+      if (Math.abs(x - 7.5) + Math.abs(y - 8) <= 6.5) R(113, x, y, 1, 1, (x + y < 11) ? '#d2fff5' : (x > 9 ? '#159e8c' : '#4fe8d2'));
       const eyeR = Math.hypot(x - 7.5, y - 8);
       if (eyeR < 6.5) R(108, x, y, 1, 1, eyeR < 2.2 ? '#0b1f1a' : (eyeR < 4 ? '#3ad6a0' : (eyeR < 5.4 ? '#1f7a5a' : '#103d2e')));
     }
@@ -1349,7 +1422,7 @@
         if (fl > LAVA_Y && hash2(x, z, seed + 5013) < 0.02) { const len = 1 + Math.floor(hash2(x, z, seed + 5014) * 3); for (let y = fl + 1; y <= fl + len; y++) put1(y, SIFTROCK); }
       }
     }
-    veins(data, cx, cz, [[EMBER_ORE, 14, 2, 40, 5], [LUMENITE, 3, 6, 36, 3]], SIFTROCK, 5);
+    veins(data, cx, cz, [[EMBER_ORE, 14, 2, 40, 5], [LUMENITE, 3, 6, 36, 3], [SIFTITE_ORE, 2, 4, 30, 3]], SIFTROCK, 5);
     const rs = structureFor(Math.floor(x0 / REG), Math.floor(z0 / REG));
     if (rs && Math.abs(rs.cx - (x0 + 8)) <= rs.reach + 8 && Math.abs(rs.cz - (z0 + 8)) <= rs.reach + 8) buildStructure(rs, function (x, y, z, b) { putData(data, x0, z0, x, y, z, b); }, x0, z0);
     return registerChunk(cx, cz, data);
@@ -2676,7 +2749,7 @@
   /* ---------- Hotbar & hearts ---------- */
   const hotbarEl = document.getElementById('hotbar');
   const nameEl = document.getElementById('blockname');
-  const heartsEl = document.getElementById('hearts'), foodEl = document.getElementById('food');
+  const heartsEl = document.getElementById('hearts'), foodEl = document.getElementById('food'), armorEl = document.getElementById('armorbar');
   const flashEl = document.getElementById('flash');
   const mineBar = document.getElementById('mineBar');
   const slotEls = [];
@@ -2704,9 +2777,9 @@
       s.classList.toggle('on', i === selected);
       const surv = mode === 'survival';
       s._cnt.textContent = surv ? (inv[b] || '') : '';
-      const T = TOOLS[b];
-      if (surv && T && toolWear[b] > 0) {
-        const pr = 1 - toolWear[b] / TOOL_MAX[T.tier];
+      const T = TOOLS[b], mx = T ? TOOL_MAX[T.tier] : (ARMOR[b] ? ARMOR[b].max : 0);
+      if (surv && mx && toolWear[b] > 0) {
+        const pr = 1 - toolWear[b] / mx;
         s._dur.style.display = 'block'; s._dur.style.width = 'calc((100% - 6px) * ' + pr + ')';
         s._dur.style.background = pr > 0.5 ? '#43c34a' : (pr > 0.2 ? '#e3c42f' : '#d9372b');
       } else s._dur.style.display = 'none';
@@ -2749,15 +2822,56 @@
     heartsEl.innerHTML = html;
     heartsEl.setAttribute('aria-label', 'Health ' + hp + ' of ' + MAXHP);
   }
+  function updateArmor() {
+    const pts = armorPts();
+    armorEl.style.display = (hasHealth() && pts > 0) ? 'flex' : 'none';
+    armorEl.classList.toggle('raised', canInteract());
+    let html = '';
+    for (let i = 0; i < 12; i++) {
+      const v = pts - i * 2;
+      html += '<span class="arm ' + (v >= 2 ? 'full' : (v >= 1 ? 'half' : 'empty')) + '">\u25c6</span>';
+    }
+    armorEl.innerHTML = html;
+    armorEl.setAttribute('aria-label', 'Armor ' + pts + ' of 24');
+  }
+  function equipArmor(id) {
+    const A = ARMOR[id];
+    if (mode === 'survival' && !(inv[id] > 0)) { invMsg.textContent = 'You have no ' + NAMES[id].toLowerCase() + ' yet. Craft or find some first.'; return; }
+    if (armor[A.slot] === id) { invMsg.textContent = 'You are already wearing that.'; return; }
+    if (armor[A.slot] && mode === 'survival') inv[armor[A.slot]] = (inv[armor[A.slot]] || 0) + 1;   // swap the old piece back to your bag
+    if (mode === 'survival') inv[id] = Math.max(0, (inv[id] || 0) - 1);
+    toolWear[id] = toolWear[id] || 0;   // a fresh piece keeps its old wear history if you wore it before
+    armor[A.slot] = id;
+    invMsg.textContent = 'You put on the ' + NAMES[id].toLowerCase() + '.';
+    sfx('pop'); updateArmor(); updateHotbar(false); renderInventory();
+  }
   function damagePlayer(n, scaled) {
     if (scaled) n = Math.round(n * DIFF[difficulty].dmg);   // monster hits scale with difficulty
     if (!hasHealth() || dead || n <= 0) return;
+    const pts = armorPts();   // worn armor soaks up part of every hit
+    if (pts > 0) {
+      n = Math.max(1, Math.round(n * (1 - Math.min(0.8, pts * 0.04))));
+      wearArmor(n);
+    }
     if (sleepT > 0) { sleepT = 0; fadeEl.style.opacity = 0; }
     hp = Math.max(0, hp - n); sinceHurt = 0; regenT = 0; sfx('hurt');
     flashEl.style.opacity = 0.9;
     setTimeout(function () { flashEl.style.opacity = 0; }, 140);
     updateHearts();
     if (hp <= 0) die();
+  }
+  // Every hit damages the armor a little; a piece shatters when it runs out
+  function wearArmor(n) {
+    ARMOR_SLOTS.forEach(function (sl) {
+      const id = armor[sl];
+      if (!id) return;
+      toolWear[id] = (toolWear[id] || 0) + 1 + Math.floor(n / 4);
+      if (toolWear[id] >= ARMOR[id].max) {
+        toolWear[id] = 0; armor[sl] = 0;
+        flashName('Your ' + NAMES[id].toLowerCase() + ' broke!'); sfx('die');
+      }
+    });
+    updateArmor();
   }
 
   /* ---------- Inventory ---------- */
@@ -2800,14 +2914,19 @@
     { out: BED, n: 1, shape: ['www', 'ppp'], key: { w: WOOL, p: PLANKS } }
   ];
   TOOL_TIERS.forEach(function (tn, ti) {
-    const mat = [PLANKS, COBBLE, EMERALD, IRON_INGOT, DIAMOND][ti];
+    const mat = [PLANKS, COBBLE, EMERALD, IRON_INGOT, DIAMOND, SIFTITE][ti];
     [['mmm', '.s.', '.s.'], ['mm', 'ms', '.s'], ['m', 's', 's'], ['m', 'm', 's']].forEach(function (shape, ki) {
       RECIPES.push({ out: toolId(ti, ki), n: 1, shape: shape, key: { m: mat, s: STICK } });
     });
   });
-  [[IRON_BLOCK, IRON_INGOT], [COPPER_BLOCK, COPPER_INGOT], [DIAMOND_BLOCK, DIAMOND]].forEach(function (pr) {
+  [[IRON_BLOCK, IRON_INGOT], [COPPER_BLOCK, COPPER_INGOT], [DIAMOND_BLOCK, DIAMOND], [SIFTITE_BLOCK, SIFTITE]].forEach(function (pr) {
     RECIPES.push({ out: pr[0], n: 1, shape: ['iii', 'iii', 'iii'], key: { i: pr[1] } });
     RECIPES.push({ out: pr[1], n: 9, shapeless: [pr[0]] });
+  });
+  ARMOR_TIERS.forEach(function (T, ti) {
+    [['mmm', 'm.m'], ['m.m', 'mmm', 'mmm'], ['mmm', 'm.m', 'm.m'], ['m.m', 'm.m']].forEach(function (shape, pi) {
+      RECIPES.push({ out: 166 + ti * 4 + pi, n: 1, shape: shape, key: { m: T[1] } });
+    });
   });
   RECIPES.push(
     { out: IRON_INGOT, n: 1, shapeless: [RAW_IRON, COAL] },       // "smelting": raw ore plus coal for fuel
@@ -2986,10 +3105,39 @@
       t.appendChild(iconCanvas(b, 40));
       const l = document.createElement('span'); l.className = 'iname'; l.textContent = NAMES[b]; t.appendChild(l);
       if (surv) { const c = document.createElement('span'); c.className = 'icount'; c.textContent = String(inv[b] || 0); t.appendChild(c); }
-      t.addEventListener('click', function () { assignSlot(b); });
+      t.addEventListener('click', function () { if (ARMOR[b]) equipArmor(b); else assignSlot(b); });
       invGrid.appendChild(t);
     });
     craftEl.innerHTML = '';
+    const ah = document.createElement('div'); ah.className = 'invsub'; ah.textContent = 'Armor'; craftEl.appendChild(ah);
+    const arow = document.createElement('div'); arow.className = 'invhot'; arow.style.marginBottom = '14px';
+    ARMOR_SLOTS.forEach(function (sl) {
+      const id = armor[sl];
+      const s = document.createElement('button'); s.type = 'button'; s.className = 'slot' + (id ? '' : ' empty');
+      s.setAttribute('aria-label', id ? NAMES[id] + ' equipped, click to take it off' : 'Nothing on your ' + sl);
+      if (id) {
+        s.appendChild(iconCanvas(id, 36));
+        if (surv) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = String(inv[id] || 0); s.appendChild(c); }
+        if (toolWear[id] > 0) {
+          const du = document.createElement('i'); du.className = 'dur'; s.appendChild(du);
+          const pr = 1 - toolWear[id] / ARMOR[id].max;
+          du.style.display = 'block'; du.style.width = 'calc((100% - 6px) * ' + pr + ')';
+          du.style.background = pr > 0.5 ? '#43c34a' : (pr > 0.2 ? '#e3c42f' : '#d9372b');
+        }
+      } else {
+        const ph = document.createElement('span'); ph.style.cssText = 'font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:center;width:100%;height:100%;'; ph.textContent = sl === 'head' ? 'head' : (sl === 'chest' ? 'body' : (sl === 'legs' ? 'legs' : 'feet')); s.appendChild(ph);
+      }
+      s.addEventListener('click', function () {
+        if (!armor[sl]) { invMsg.textContent = 'Click armor in your bag to wear it. Craft it from leather, ingots, diamonds or siftite.'; return; }
+        const off = armor[sl];
+        if (mode === 'survival') inv[off] = (inv[off] || 0) + 1;   // back in the bag (its wear is remembered)
+        armor[sl] = 0;
+        invMsg.textContent = 'You took off the ' + NAMES[off].toLowerCase() + '.';
+        sfx('click'); updateArmor(); updateHotbar(false); renderInventory();
+      });
+      arow.appendChild(s);
+    });
+    craftEl.appendChild(arow);
     if (surv) {
       const h = document.createElement('div'); h.className = 'invsub'; h.textContent = 'Crafting'; craftEl.appendChild(h);
       const b = document.createElement('button'); b.type = 'button'; b.className = 'btn small'; b.textContent = 'Open crafting grid (C)';
@@ -3350,6 +3498,7 @@
     if (FOOD[it] !== undefined) return eatItem(it);
     if (it === DYNAMITE) return throwDynamite();
     if (it === FLINT) return lightTnt();
+    if (ARMOR[it]) { equipArmor(it); return 0.3; }
     if (TOOLS[it]) { flashName(NAMES[it] + ' (left click to use)'); return 0.3; }
     if (EGG_KINDS[it]) return useEgg(it);
     flashName(NAMES[it] + ' is a crafting item');
@@ -3530,6 +3679,7 @@
     carry.forEach(function (g) { const m = spawnGolem(g.kind, player.x + 1.5, player.y, player.z); m.hp = g.hp; });
     showHint('Entering ' + DIM_NAME[dimension], 2500);
     sfx('portal');
+    saveWorld();   // never lose your spot when you hop dimensions
   }
   function travelPortal(kind) {
     if (kind === PORTAL) { if (dimension === 'overworld') enterDimension('sift'); else if (dimension === 'sift') enterDimension('overworld'); }
@@ -3958,7 +4108,7 @@
     modeBtns.forEach(function (b) { const on = b.dataset.mode === mode; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     modeDescEl.textContent = DESC[mode];
     updateDiffUI();
-    updateHotbar(false); updateHearts(); updateFood();
+    updateHotbar(false); updateHearts(); updateFood(); updateArmor();
   }
   function setMode(m) {
     mode = m;
@@ -4274,6 +4424,10 @@
     return 'Nearest ' + STRUCT_NAMES[type].toLowerCase() + ': x ' + best.cx + ', z ' + best.cz + ' (' + Math.round(bd) + ' blocks away)';
   }, function (i) { return i === 1 ? Object.keys(STRUCT_NAMES) : (i === 2 ? ['tp'] : []); });
   defCmd(['save'], '/save', 'Save the world now', function () { saveWorld().then(refreshWorlds); return storageOK ? 'Saving the world...' : 'Saving is not available in this browser'; });
+  defCmd(['seed'], '/seed', 'Show the seed of this world (the same seed always builds the same world)', function () {
+    if (!currentWorld) throw new Error('No world is loaded yet');
+    return 'World seed: ' + currentWorld.seed + '  (type it into the Seed box before making a new world to get this exact world again)';
+  });
   defCmd(['say'], '/say <message>', 'Write a message in the chat', function (a) { return '[You] ' + a.join(' '); });
 
   function execute(line) {
@@ -4372,6 +4526,7 @@
     m.relics = relics.map(function (r) { return { x: r.x, y: r.y, z: r.z, got: r.got }; });
     m.toolWear = Object.assign({}, toolWear);
     m.golems = mobs.filter(function (g) { return g.golem && g.persist; }).map(function (g) { return { kind: g.kind, x: g.x, y: g.y, z: g.z, hp: g.hp, hx: g.hx, hz: g.hz }; });
+    m.armor = { head: armor.head, chest: armor.chest, legs: armor.legs, feet: armor.feet };
     return m;
   }
   function doSave() {
@@ -4408,7 +4563,7 @@
       const row = document.createElement('div'); row.className = 'world' + (isCur ? ' on' : '');
       const main = document.createElement('button'); main.type = 'button'; main.className = 'wmain';
       main.appendChild(document.createTextNode(w.name));
-      const sm = document.createElement('small'); sm.textContent = (LABEL[w.mode] || 'Creative') + ' \u00b7 played ' + ago(w.lastPlayed || w.created || Date.now()); main.appendChild(sm);
+      const sm = document.createElement('small'); sm.textContent = (LABEL[w.mode] || 'Creative') + ' \u00b7 seed ' + (w.seed || '?') + ' \u00b7 played ' + ago(w.lastPlayed || w.created || Date.now()); main.appendChild(sm);
       main.addEventListener('click', function () { if (busy) return; if (isCur) startGame(); else loadWorld(w.id); });
       const del = document.createElement('button'); del.type = 'button'; del.className = 'wdel'; del.textContent = 'Delete';
       del.setAttribute('aria-label', 'Delete ' + w.name);
@@ -4454,6 +4609,8 @@
     tod = (typeof m.tod === 'number') ? m.tod : 0.22;
     for (const k in toolWear) delete toolWear[k];
     Object.keys(m.toolWear || {}).forEach(function (k) { toolWear[k] = m.toolWear[k]; });
+    armor = { head: 0, chest: 0, legs: 0, feet: 0 };   // armor is saved with the world, so it survives reloads
+    if (m.armor) ARMOR_SLOTS.forEach(function (sl) { if (m.armor[sl] && ARMOR[m.armor[sl]]) armor[sl] = m.armor[sl]; });
     mode = m.mode || 'creative';
     difficulty = DIFF[m.difficulty] ? m.difficulty : 'normal';
     spawnPoint = m.spawn || null; omen = !!m.omen; dragonDefeated = !!m.dragonDefeated;
@@ -4499,7 +4656,13 @@
     await sleep(20);
     let maxN = 0;
     worldList.forEach(function (w) { const mm = /^World (\d+)$/.exec(w.name); if (mm) maxN = Math.max(maxN, +mm[1]); });
-    const sd = (Math.random() * 1e6) | 0;
+    // Seeds: type a word or number before making a world to get the exact same world every time
+    const rawSeed = (document.getElementById('seedInput').value || '').trim();
+    let sd;
+    if (/^-?\d+$/.test(rawSeed)) { sd = ((parseInt(rawSeed, 10) % 2147483647) + 2147483647) % 2147483647; if (sd === 0) sd = 1; }
+    else if (rawSeed) { let h = 5381; for (let i = 0; i < rawSeed.length; i++) h = ((h * 33) ^ rawSeed.charCodeAt(i)) >>> 0; sd = h % 2147483647 || 1; }
+    else sd = 1 + Math.floor(Math.random() * 999999);
+    document.getElementById('seedInput').value = '';
     for (const dn in dims) dims[dn].saved.clear();
     currentWorld = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), name: 'World ' + (maxN + 1), seed: sd, created: Date.now(), lastPlayed: Date.now() };
     resetWorld(sd, 0, 0);
